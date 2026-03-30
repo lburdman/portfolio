@@ -1,0 +1,21 @@
+---
+import BaseLayout from '@/components/BaseLayout.astro';
+import AboutSection from '@/components/AboutSection.astro';
+import LeadershipSection from '@/components/LeadershipSection.astro';
+import ContactSection from '@/components/ContactSection.astro';
+import { useTranslations } from '@/i18n/index';
+
+const locale = 'en';
+const t = useTranslations(locale);
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+---
+
+<BaseLayout
+  title="About — Lucas Burdman"
+  description="Lucas Burdman is an Electronic Engineer building practical experience across machine learning, AI-backed applications, and intelligent systems."
+  locale={locale}
+>
+  <AboutSection t={t} />
+  <LeadershipSection t={t} />
+  <ContactSection t={t} base={base} />
+</BaseLayout>

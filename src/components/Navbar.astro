@@ -1,0 +1,128 @@
+---
+import type { Locale, UIStrings } from '@/i18n/types';
+import { localizeURL } from '@/i18n/index';
+import LanguageSwitcher from '@/components/LanguageSwitcher.astro';
+
+interface Props {
+  locale: Locale;
+  t: UIStrings;
+  base: string;
+}
+
+const { locale, t, base } = Astro.props;
+
+const navLinks = [
+  { label: t.nav.projects, href: localizeURL('/projects', locale, base) },
+  { label: t.nav.about, href: localizeURL('/about', locale, base) },
+  { label: t.nav.notes, href: localizeURL('/notes', locale, base) },
+  { label: t.nav.contact, href: `${localizeURL('/', locale, base)}#contact` },
+];
+
+const homeURL = localizeURL('/', locale, base);
+const currentPath = Astro.url.pathname;
+---
+
+<header class="sticky top-0 z-50 w-full border-b border-surface-border bg-surface/90 backdrop-blur-sm">
+  <nav
+    class="section-container flex h-16 items-center justify-between"
+    aria-label="Primary navigation"
+  >
+    <!-- Logo / Name -->
+    <a
+      href={homeURL}
+      class="group flex items-center gap-3 text-sm font-semibold text-text-primary"
+      aria-label="Lucas Burdman — Home"
+    >
+      <span
+        class="flex h-8 w-8 items-center justify-center rounded-lg bg-accent/10 border border-accent/20 text-accent-hover font-bold text-xs tracking-widest group-hover:bg-accent/20 transition-colors"
+        aria-hidden="true"
+      >
+        LB
+      </span>
+      <span class="hidden sm:inline">Lucas Burdman</span>
+    </a>
+
+    <!-- Desktop Nav -->
+    <div class="hidden md:flex items-center gap-1">
+      {
+        navLinks.map(({ label, href }) => {
+          const isActive =
+            href !== homeURL &&
+            (currentPath === href || currentPath === href + '/');
+          return (
+            <a
+              href={href}
+              class={`px-3 py-1.5 text-sm rounded-md transition-colors duration-150 ${
+                isActive
+                  ? 'text-text-primary bg-surface-highlight'
+                  : 'text-text-secondary hover:text-text-primary hover:bg-surface-highlight'
+              }`}
+              aria-current={isActive ? 'page' : undefined}
+            >
+              {label}
+            </a>
+          );
+        })
+      }
+    </div>
+
+    <!-- Right: Lang Switch + Mobile Menu -->
+    <div class="flex items-center gap-3">
+      <LanguageSwitcher locale={locale} t={t} base={base} />
+
+      <!-- Mobile menu button -->
+      <button
+        id="mobile-menu-btn"
+        class="md:hidden flex items-center justify-center w-9 h-9 rounded-md text-text-secondary hover:text-text-primary hover:bg-surface-highlight transition-colors"
+        aria-expanded="false"
+        aria-controls="mobile-menu"
+        aria-label="Toggle menu"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <line x1="3" y1="6" x2="21" y2="6"/>
+          <line x1="3" y1="12" x2="21" y2="12"/>
+          <line x1="3" y1="18" x2="21" y2="18"/>
+        </svg>
+      </button>
+    </div>
+  </nav>
+
+  <!-- Mobile Menu -->
+  <div
+    id="mobile-menu"
+    class="hidden md:hidden border-t border-surface-border bg-surface"
+    aria-label="Mobile navigation"
+  >
+    <div class="section-container py-4 flex flex-col gap-1">
+      {
+        navLinks.map(({ label, href }) => {
+          const isActive = currentPath === href || currentPath === href + '/';
+          return (
+            <a
+              href={href}
+              class={`px-3 py-2 text-sm rounded-md transition-colors ${
+                isActive
+                  ? 'text-text-primary bg-surface-highlight'
+                  : 'text-text-secondary hover:text-text-primary hover:bg-surface-highlight'
+              }`}
+              aria-current={isActive ? 'page' : undefined}
+            >
+              {label}
+            </a>
+          );
+        })
+      }
+    </div>
+  </div>
+</header>
+
+<script>
+  const btn = document.getElementById('mobile-menu-btn');
+  const menu = document.getElementById('mobile-menu');
+  if (btn && menu) {
+    btn.addEventListener('click', () => {
+      const isOpen = menu.classList.toggle('hidden') === false;
+      btn.setAttribute('aria-expanded', String(isOpen));
+    });
+  }
+</script>

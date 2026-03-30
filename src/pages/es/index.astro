@@ -1,0 +1,31 @@
+---
+import BaseLayout from '@/components/BaseLayout.astro';
+import Hero from '@/components/Hero.astro';
+import TechnicalAreas from '@/components/TechnicalAreas.astro';
+import FeaturedProjects from '@/components/FeaturedProjects.astro';
+import LeadershipSection from '@/components/LeadershipSection.astro';
+import NotesPlaceholder from '@/components/NotesPlaceholder.astro';
+import AboutSection from '@/components/AboutSection.astro';
+import ContactSection from '@/components/ContactSection.astro';
+import { useTranslations } from '@/i18n/index';
+import { getCollection } from 'astro:content';
+
+const locale = 'es';
+const t = useTranslations(locale);
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+const allProjects = await getCollection('projects');
+---
+
+<BaseLayout
+  title="Lucas Burdman | Portfolio — Construyendo Sistemas Inteligentes"
+  description="Lucas Burdman es un Ingeniero Electrónico trabajando en machine learning, IA aplicada, flujos de datos y sistemas inteligentes."
+  locale={locale}
+>
+  <Hero t={t} base={base} />
+  <TechnicalAreas t={t} />
+  <FeaturedProjects t={t} projects={allProjects} locale={locale} base={base} />
+  <LeadershipSection t={t} />
+  <NotesPlaceholder t={t} base={base} />
+  <AboutSection t={t} />
+  <ContactSection t={t} base={base} />
+</BaseLayout>

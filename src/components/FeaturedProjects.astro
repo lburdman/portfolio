@@ -1,0 +1,49 @@
+---
+import type { CollectionEntry } from 'astro:content';
+import type { UIStrings } from '@/i18n/types';
+import ProjectCard from '@/components/ProjectCard.astro';
+import type { Locale } from '@/i18n/types';
+
+interface Props {
+  t: UIStrings;
+  projects: CollectionEntry<'projects'>[];
+  locale: Locale;
+  base: string;
+}
+
+const { t, projects, locale, base } = Astro.props;
+
+const featured = projects
+  .filter((p) => p.data.featured && p.data.lang === locale && p.data.status === 'published')
+  .sort((a, b) => a.data.order - b.data.order);
+---
+
+<section class="py-20 border-t border-surface-border" aria-labelledby="projects-heading">
+  <div class="section-container">
+    <div class="mb-12 flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+      <div>
+        <h2 id="projects-heading" class="section-heading">{t.projects.heading}</h2>
+        <p class="section-subtitle max-w-xl">{t.projects.subtitle}</p>
+      </div>
+      <a
+        href={locale === 'en' ? `${base}/projects` : `${base}/es/projects`}
+        class="btn-ghost shrink-0 self-start sm:self-auto"
+        id="view-all-projects"
+      >
+        {t.projects.viewAll}
+      </a>
+    </div>
+
+    {
+      featured.length > 0 ? (
+        <div class="grid sm:grid-cols-2 gap-5">
+          {featured.map((project) => (
+            <ProjectCard project={project} t={t} locale={locale} base={base} />
+          ))}
+        </div>
+      ) : (
+        <p class="text-text-muted text-sm">No featured projects available.</p>
+      )
+    }
+  </div>
+</section>
