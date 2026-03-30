@@ -1,5 +1,6 @@
 ---
 import type { GetStaticPaths } from 'astro';
+import type { CollectionEntry } from 'astro:content';
 import BaseLayout from '@/components/BaseLayout.astro';
 import { useTranslations, localizeURL } from '@/i18n/index';
 import { getCollection } from 'astro:content';
@@ -12,12 +13,12 @@ export const getStaticPaths: GetStaticPaths = async () => {
   }));
 };
 
-const { project } = Astro.props;
+const { project } = Astro.props as { project: CollectionEntry<'projects'> };
 const { Content } = await project.render();
 const locale = 'es';
 const t = useTranslations(locale);
 const base = import.meta.env.BASE_URL.replace(/\/$/, '');
-const { title, summary, tags, github, demo, coverImage, projectSlug: _projectSlug } = project.data;
+const { title, summary, tags, github, demo, coverImage } = project.data;
 ---
 
 <BaseLayout title={`${title} — Lucas Burdman`} description={summary} locale={locale}>
@@ -38,7 +39,7 @@ const { title, summary, tags, github, demo, coverImage, projectSlug: _projectSlu
           </h1>
           <p class="text-lg text-text-secondary leading-relaxed mb-6">{summary}</p>
           <div class="flex flex-wrap gap-1.5" aria-label={t.projectDetail.technologies}>
-            {tags.map((tag) => <span class="tag">{tag}</span>)}
+            {tags.map((tag: string) => <span class="tag">{tag}</span>)}
           </div>
         </header>
 
@@ -122,7 +123,7 @@ const { title, summary, tags, github, demo, coverImage, projectSlug: _projectSlu
             {t.projectDetail.technologies}
           </h2>
           <div class="flex flex-wrap gap-1.5">
-            {tags.map((tag) => <span class="tag">{tag}</span>)}
+            {tags.map((tag: string) => <span class="tag">{tag}</span>)}
           </div>
         </div>
       </aside>
