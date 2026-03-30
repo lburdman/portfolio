@@ -9,9 +9,21 @@
     "exactOptionalPropertyTypes": true,
     "baseUrl": ".",
     "paths": {
-      "@/*": ["src/*"]
-    }
+      "@/*": [
+        "src/*"
+      ]
+    },
+    "types": [
+      "astro/astro-jsx"
+    ]
   },
-  "include": ["src", "tests", "tailwind.config.ts"],
-  "exclude": ["node_modules", "dist"]
+  "include": [
+    "src",
+    "tests",
+    "tailwind.config.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist"
+  ]
 }
