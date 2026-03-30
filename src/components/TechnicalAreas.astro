@@ -51,10 +51,7 @@ const areas = [
     <div class="grid grid-cols-2 sm:grid-cols-3 gap-4">
       {
         areas.map(({ label, icon }, i) => (
-          <div
-            class="group card flex flex-col gap-4 cursor-default"
-            style={`animation-delay: ${i * 0.07}s`}
-          >
+          <div class="group card flex flex-col gap-4 cursor-default" style={`animation-delay: ${i * 0.07}s`}>
             <div
               class="flex h-10 w-10 items-center justify-center rounded-lg bg-accent/8 border border-accent/15 text-accent group-hover:text-accent-hover group-hover:bg-accent/12 transition-colors"
               aria-hidden="true"

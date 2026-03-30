@@ -21,7 +21,9 @@
    Base Resets
    ========================================= */
 @layer base {
-  *, *::before, *::after {
+  *,
+  *::before,
+  *::after {
     box-sizing: border-box;
   }
 
@@ -71,7 +73,12 @@
   }
 
   /* Typography */
-  h1, h2, h3, h4, h5, h6 {
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
     font-family: 'Inter', system-ui, sans-serif;
     font-weight: 600;
     letter-spacing: -0.025em;
@@ -90,7 +97,8 @@
     color: var(--color-text-secondary);
   }
 
-  code, pre {
+  code,
+  pre {
     font-family: 'JetBrains Mono', 'Fira Code', monospace;
   }
 
@@ -119,7 +127,8 @@
   .prose p {
     margin-bottom: 1.25rem;
   }
-  .prose ul, .prose ol {
+  .prose ul,
+  .prose ol {
     margin-bottom: 1.25rem;
     padding-left: 1.25rem;
   }
@@ -199,10 +208,14 @@
     border-radius: 0.75rem;
     padding: 1.5rem;
     transition: all 0.2s ease;
-    box-shadow: 0 1px 3px 0 rgba(0,0,0,0.4), 0 0 0 1px rgba(255,255,255,0.04);
+    box-shadow:
+      0 1px 3px 0 rgba(0, 0, 0, 0.4),
+      0 0 0 1px rgba(255, 255, 255, 0.04);
   }
   .card:hover {
-    box-shadow: 0 4px 24px 0 rgba(99,102,241,0.12), 0 0 0 1px rgba(99,102,241,0.2);
+    box-shadow:
+      0 4px 24px 0 rgba(99, 102, 241, 0.12),
+      0 0 0 1px rgba(99, 102, 241, 0.2);
     border-color: rgba(99, 102, 241, 0.3);
   }
 
@@ -244,7 +257,7 @@
   .btn-ghost:hover {
     color: var(--color-text-primary);
     border-color: var(--color-text-muted);
-    background-color: rgba(255,255,255,0.04);
+    background-color: rgba(255, 255, 255, 0.04);
   }
 
   .tag {
@@ -290,10 +303,18 @@
     opacity: 0;
   }
 
-  .animate-in-delay-1 { animation-delay: 0.1s; }
-  .animate-in-delay-2 { animation-delay: 0.2s; }
-  .animate-in-delay-3 { animation-delay: 0.3s; }
-  .animate-in-delay-4 { animation-delay: 0.4s; }
+  .animate-in-delay-1 {
+    animation-delay: 0.1s;
+  }
+  .animate-in-delay-2 {
+    animation-delay: 0.2s;
+  }
+  .animate-in-delay-3 {
+    animation-delay: 0.3s;
+  }
+  .animate-in-delay-4 {
+    animation-delay: 0.4s;
+  }
 }
 
 @keyframes fadeUp {

@@ -48,19 +48,19 @@ npm run preview
 
 ## Scripts
 
-| Script | Description |
-|--------|-------------|
-| `npm run dev` | Start local dev server |
-| `npm run build` | Build for production |
-| `npm run preview` | Preview production build |
-| `npm run type-check` | Run TypeScript type checks |
-| `npm run lint` | ESLint (zero warnings policy) |
-| `npm run lint:fix` | ESLint with auto-fix |
-| `npm run format` | Prettier format all files |
-| `npm run format:check` | Prettier check (used in CI) |
-| `npm run test` | Run Vitest test suite |
-| `npm run test:watch` | Vitest in watch mode |
-| `npm run test:coverage` | Test coverage report |
+| Script                  | Description                   |
+| ----------------------- | ----------------------------- |
+| `npm run dev`           | Start local dev server        |
+| `npm run build`         | Build for production          |
+| `npm run preview`       | Preview production build      |
+| `npm run type-check`    | Run TypeScript type checks    |
+| `npm run lint`          | ESLint (zero warnings policy) |
+| `npm run lint:fix`      | ESLint with auto-fix          |
+| `npm run format`        | Prettier format all files     |
+| `npm run format:check`  | Prettier check (used in CI)   |
+| `npm run test`          | Run Vitest test suite         |
+| `npm run test:watch`    | Vitest in watch mode          |
+| `npm run test:coverage` | Test coverage report          |
 
 ---
 
@@ -150,6 +150,7 @@ The site is fully bilingual (English / Spanish):
 - Tests verify key parity between EN and ES (no missing translations)
 
 To add a new translatable string:
+
 1. Add the key to `src/i18n/types.ts` (UIStrings interface)
 2. Add the English value in `src/i18n/en.ts`
 3. Add the Spanish value in `src/i18n/es.ts`
@@ -178,6 +179,7 @@ Projects are defined in `src/content/projects/` and validated by Zod:
 ```
 
 To add a new project:
+
 1. Create `src/content/projects/your-project.en.md` with the required frontmatter
 2. Create `src/content/projects/your-project.es.md` with Spanish translation
 3. Set `featured: true` to include it on the home page
@@ -188,6 +190,7 @@ To add a new project:
 ## Adding Notes (Future)
 
 Create `.md` files in `src/content/notes/`. The schema expects:
+
 - `title`, `lang`, and optional `publishedAt`, `tags`, `summary`, `status`
 - Update `src/pages/notes.astro` to render the collection
 
@@ -200,6 +203,7 @@ Create `.md` files in `src/content/notes/`. The schema expects:
 Push to `main` → GitHub Actions runs CI → builds → deploys to GitHub Pages.
 
 **Required GitHub repo settings:**
+
 1. Go to **Settings → Pages**
 2. Set source to **GitHub Actions**
 3. Ensure the repo is named `portfolio` (or update `base` in `astro.config.mjs`)
@@ -215,13 +219,13 @@ npm run build
 
 ## Configuration
 
-| Setting | Location | Value |
-|---------|----------|-------|
-| Site URL | `astro.config.mjs` | `https://lburdman.github.io` |
-| Base path | `astro.config.mjs` | `/portfolio` |
-| Contact email | `src/i18n/en.ts`, `src/i18n/es.ts` | Update `contact.email` |
-| LinkedIn URL | `src/components/Footer.astro`, `ContactSection.astro` | Update href |
-| GitHub URL | Same as above | Update href |
+| Setting       | Location                                              | Value                        |
+| ------------- | ----------------------------------------------------- | ---------------------------- |
+| Site URL      | `astro.config.mjs`                                    | `https://lburdman.github.io` |
+| Base path     | `astro.config.mjs`                                    | `/portfolio`                 |
+| Contact email | `src/i18n/en.ts`, `src/i18n/es.ts`                    | Update `contact.email`       |
+| LinkedIn URL  | `src/components/Footer.astro`, `ContactSection.astro` | Update href                  |
+| GitHub URL    | Same as above                                         | Update href                  |
 
 ---
 
@@ -235,11 +239,11 @@ npm run test:coverage     # With coverage report
 
 **Test suites:**
 
-| File | What it tests |
-|------|---------------|
-| `tests/content.schema.test.ts` | Zod schema validation for project data |
-| `tests/i18n.test.ts` | EN/ES key parity, empty string checks, type conformance |
-| `tests/projects.render.test.ts` | i18n utilities, URL helpers, featured project logic |
+| File                            | What it tests                                           |
+| ------------------------------- | ------------------------------------------------------- |
+| `tests/content.schema.test.ts`  | Zod schema validation for project data                  |
+| `tests/i18n.test.ts`            | EN/ES key parity, empty string checks, type conformance |
+| `tests/projects.render.test.ts` | i18n utilities, URL helpers, featured project logic     |
 
 ---
 
@@ -258,15 +262,15 @@ npm run format:check      # Check formatting (CI)
 
 The site is designed to look polished without images, but add these when available:
 
-| Asset | Suggested filename | Location |
-|-------|--------------------|----------|
-| Professional headshot or portrait | `portrait.jpg` | `public/assets/images/portrait.jpg` |
-| Resume / CV (PDF) | `resume.pdf` | `public/assets/resume.pdf` |
-| Augmenta — architecture diagram or UI screenshot | `augmenta-preview.png` | `public/assets/images/augmenta-preview.png` |
-| Energy Forecasting — dashboard or results chart | `energy-forecasting-preview.png` | `public/assets/images/energy-forecasting-preview.png` |
-| Quantum Audio — model pipeline diagram | `quantum-audio-preview.png` | `public/assets/images/quantum-audio-preview.png` |
-| Support Classifier — UI screenshot | `support-classifier-preview.png` | `public/assets/images/support-classifier-preview.png` |
-| Qiskit Fall Fest — event photo or banner | `qiskit-fallFest-banner.jpg` | `public/assets/images/qiskit-fallFest-banner.jpg` |
+| Asset                                            | Suggested filename               | Location                                              |
+| ------------------------------------------------ | -------------------------------- | ----------------------------------------------------- |
+| Professional headshot or portrait                | `portrait.jpg`                   | `public/assets/images/portrait.jpg`                   |
+| Resume / CV (PDF)                                | `resume.pdf`                     | `public/assets/resume.pdf`                            |
+| Augmenta — architecture diagram or UI screenshot | `augmenta-preview.png`           | `public/assets/images/augmenta-preview.png`           |
+| Energy Forecasting — dashboard or results chart  | `energy-forecasting-preview.png` | `public/assets/images/energy-forecasting-preview.png` |
+| Quantum Audio — model pipeline diagram           | `quantum-audio-preview.png`      | `public/assets/images/quantum-audio-preview.png`      |
+| Support Classifier — UI screenshot               | `support-classifier-preview.png` | `public/assets/images/support-classifier-preview.png` |
+| Qiskit Fall Fest — event photo or banner         | `qiskit-fallFest-banner.jpg`     | `public/assets/images/qiskit-fallFest-banner.jpg`     |
 
 To use a project image, add `coverImage: "/portfolio/assets/images/your-image.png"` to the project frontmatter.
 
@@ -276,15 +280,15 @@ To use a project image, add `coverImage: "/portfolio/assets/images/your-image.pn
 
 The palette and typography are defined in `tailwind.config.ts` and `src/styles/global.css`.
 
-| Token | Value |
-|-------|-------|
-| Background | `#0a0a0f` |
-| Surface | `#12121a` |
-| Border | `#1e1e2e` |
-| Text primary | `#e8e8f0` |
-| Text secondary | `#8888a0` |
-| Accent | `#6366f1` (indigo) |
-| Font | Inter (variable) |
+| Token          | Value              |
+| -------------- | ------------------ |
+| Background     | `#0a0a0f`          |
+| Surface        | `#12121a`          |
+| Border         | `#1e1e2e`          |
+| Text primary   | `#e8e8f0`          |
+| Text secondary | `#8888a0`          |
+| Accent         | `#6366f1` (indigo) |
+| Font           | Inter (variable)   |
 
 ---
 

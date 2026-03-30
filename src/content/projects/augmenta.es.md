@@ -1,12 +1,12 @@
 ---
-title: "Augmenta"
-projectSlug: "augmenta"
-summary: "Una capa de privacidad para flujos de trabajo con LLMs con detección de PII, anonimización y integración orientada a servicios — centrada en herramientas de privacidad, diseño de APIs e IA aplicada."
-lang: "es"
-tags: ["Privacidad", "LLM", "Python", "FastAPI", "Docker", "IA Aplicada"]
+title: 'Augmenta'
+projectSlug: 'augmenta'
+summary: 'Una capa de privacidad para flujos de trabajo con LLMs con detección de PII, anonimización y integración orientada a servicios — centrada en herramientas de privacidad, diseño de APIs e IA aplicada.'
+lang: 'es'
+tags: ['Privacidad', 'LLM', 'Python', 'FastAPI', 'Docker', 'IA Aplicada']
 featured: true
-status: "published"
-github: "https://github.com/lburdman/augmenta"
+status: 'published'
+github: 'https://github.com/lburdman/augmenta'
 order: 1
 ---
 

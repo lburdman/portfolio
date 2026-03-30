@@ -4,7 +4,10 @@ const projectSchema = z.object({
   title: z.string().min(1, 'Project title is required'),
   // projectSlug is the URL slug used for routing (e.g. "augmenta").
   // It is separate from the Astro content collection slug (the filename).
-  projectSlug: z.string().min(1).regex(/^[a-z0-9-]+$/, 'Slug must be lowercase alphanumeric with hyphens'),
+  projectSlug: z
+    .string()
+    .min(1)
+    .regex(/^[a-z0-9-]+$/, 'Slug must be lowercase alphanumeric with hyphens'),
   summary: z.string().min(10, 'Summary must be at least 10 characters'),
   lang: z.enum(['en', 'es']),
   tags: z.array(z.string().min(1)).min(1, 'At least one tag is required'),

@@ -23,10 +23,7 @@ const currentPath = Astro.url.pathname;
 ---
 
 <header class="sticky top-0 z-50 w-full border-b border-surface-border bg-surface/90 backdrop-blur-sm">
-  <nav
-    class="section-container flex h-16 items-center justify-between"
-    aria-label="Primary navigation"
-  >
+  <nav class="section-container flex h-16 items-center justify-between" aria-label="Primary navigation">
     <!-- Logo / Name -->
     <a
       href={homeURL}
@@ -46,9 +43,7 @@ const currentPath = Astro.url.pathname;
     <div class="hidden md:flex items-center gap-1">
       {
         navLinks.map(({ label, href }) => {
-          const isActive =
-            href !== homeURL &&
-            (currentPath === href || currentPath === href + '/');
+          const isActive = href !== homeURL && (currentPath === href || currentPath === href + '/');
           return (
             <a
               href={href}
@@ -78,10 +73,21 @@ const currentPath = Astro.url.pathname;
         aria-controls="mobile-menu"
         aria-label="Toggle menu"
       >
-        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <line x1="3" y1="6" x2="21" y2="6"/>
-          <line x1="3" y1="12" x2="21" y2="12"/>
-          <line x1="3" y1="18" x2="21" y2="18"/>
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          width="20"
+          height="20"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          aria-hidden="true"
+        >
+          <line x1="3" y1="6" x2="21" y2="6"></line>
+          <line x1="3" y1="12" x2="21" y2="12"></line>
+          <line x1="3" y1="18" x2="21" y2="18"></line>
         </svg>
       </button>
     </div>

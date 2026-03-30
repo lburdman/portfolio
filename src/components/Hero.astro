@@ -15,7 +15,8 @@ const { t, base } = Astro.props;
     class="pointer-events-none absolute inset-0"
     style="background-image: radial-gradient(circle at 50% 0%, rgba(99,102,241,0.08) 0%, transparent 60%), linear-gradient(rgba(255,255,255,0.015) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.015) 1px, transparent 1px); background-size: 100% 100%, 48px 48px, 48px 48px;"
     aria-hidden="true"
-  ></div>
+  >
+  </div>
 
   <div class="section-container relative">
     <div class="max-w-3xl">
@@ -28,7 +29,9 @@ const { t, base } = Astro.props;
       </div>
 
       <!-- Name -->
-      <h1 class="animate-in animate-in-delay-1 text-5xl md:text-6xl lg:text-7xl font-semibold tracking-tight text-text-primary leading-none mb-6">
+      <h1
+        class="animate-in animate-in-delay-1 text-5xl md:text-6xl lg:text-7xl font-semibold tracking-tight text-text-primary leading-none mb-6"
+      >
         {t.hero.name}
       </h1>
 
@@ -46,8 +49,19 @@ const { t, base } = Astro.props;
       <div class="animate-in animate-in-delay-4 flex flex-wrap gap-3">
         <a href={`${base}/projects`} class="btn-primary" id="hero-cta-projects">
           {t.hero.ctaProjects}
-          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <path d="M5 12h14"/><path d="m12 5 7 7-7 7"/>
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M5 12h14"></path><path d="m12 5 7 7-7 7"></path>
           </svg>
         </a>
         <a href={`${base}/notes`} class="btn-ghost" id="hero-cta-notes">
@@ -65,8 +79,20 @@ const { t, base } = Astro.props;
           download
         >
           {t.hero.ctaResume}
-          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"
+            ></polyline><line x1="12" y1="15" x2="12" y2="3"></line>
           </svg>
         </a>
       </div>

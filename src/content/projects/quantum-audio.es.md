@@ -1,12 +1,12 @@
 ---
-title: "Redes Neuronales Clásico-Cuánticas Híbridas para Clasificación de Emociones en Audio"
-projectSlug: "quantum-audio"
-summary: "Un pipeline de reconocimiento de emociones en voz sobre CREMA-D usando mel-spectrogramas, transfer learning y cabezas cuánticas/clásicas híbridas — enfocado en experimentación controlada bajo restricciones de recursos reales."
-lang: "es"
-tags: ["Quantum ML", "PyTorch", "PennyLane", "Procesamiento de Audio", "Deep Learning", "CREMA-D"]
+title: 'Redes Neuronales Clásico-Cuánticas Híbridas para Clasificación de Emociones en Audio'
+projectSlug: 'quantum-audio'
+summary: 'Un pipeline de reconocimiento de emociones en voz sobre CREMA-D usando mel-spectrogramas, transfer learning y cabezas cuánticas/clásicas híbridas — enfocado en experimentación controlada bajo restricciones de recursos reales.'
+lang: 'es'
+tags: ['Quantum ML', 'PyTorch', 'PennyLane', 'Procesamiento de Audio', 'Deep Learning', 'CREMA-D']
 featured: true
-status: "published"
-github: "https://github.com/lburdman/qnn-speech-recognition"
+status: 'published'
+github: 'https://github.com/lburdman/qnn-speech-recognition'
 order: 3
 ---
 

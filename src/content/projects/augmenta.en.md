@@ -1,12 +1,12 @@
 ---
-title: "Augmenta"
-projectSlug: "augmenta"
-summary: "A privacy layer for LLM workflows with PII detection, anonymization, and service-oriented integration — built around privacy tooling, API design, and infrastructure-oriented applied AI."
-lang: "en"
-tags: ["Privacy", "LLM", "Python", "FastAPI", "Docker", "Applied AI"]
+title: 'Augmenta'
+projectSlug: 'augmenta'
+summary: 'A privacy layer for LLM workflows with PII detection, anonymization, and service-oriented integration — built around privacy tooling, API design, and infrastructure-oriented applied AI.'
+lang: 'en'
+tags: ['Privacy', 'LLM', 'Python', 'FastAPI', 'Docker', 'Applied AI']
 featured: true
-status: "published"
-github: "https://github.com/lburdman/augmenta"
+status: 'published'
+github: 'https://github.com/lburdman/augmenta'
 order: 1
 ---
 

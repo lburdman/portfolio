@@ -1,12 +1,12 @@
 ---
-title: "Support Ticket Classifier"
-projectSlug: "support-classifier"
-summary: "An AI-assisted support ticket classifier with validated structured outputs, deterministic fallbacks, and a lightweight local UI — focused on maintainable backend design and practical handling of model outputs."
-lang: "en"
-tags: ["AI", "NLP", "Python", "Pydantic", "Anthropic", "Classification"]
+title: 'Support Ticket Classifier'
+projectSlug: 'support-classifier'
+summary: 'An AI-assisted support ticket classifier with validated structured outputs, deterministic fallbacks, and a lightweight local UI — focused on maintainable backend design and practical handling of model outputs.'
+lang: 'en'
+tags: ['AI', 'NLP', 'Python', 'Pydantic', 'Anthropic', 'Classification']
 featured: true
-status: "published"
-github: "https://github.com/lburdman/support-ticket-classifier"
+status: 'published'
+github: 'https://github.com/lburdman/support-ticket-classifier'
 order: 4
 ---
 

@@ -13,13 +13,7 @@ interface Props {
   ogImage?: string;
 }
 
-const {
-  title,
-  description,
-  locale = 'en',
-  canonicalURL = Astro.url.href,
-  ogImage,
-} = Astro.props;
+const { title, description, locale = 'en', canonicalURL = Astro.url.href, ogImage } = Astro.props;
 
 const t = useTranslations(locale);
 const base = import.meta.env.BASE_URL.replace(/\/$/, '');

@@ -9,14 +9,14 @@ export default {
       colors: {
         // Flat color names to avoid Tailwind DEFAULT suffix issues
         'bg-base': '#0a0a0f',
-        'surface': '#12121a',
+        surface: '#12121a',
         'surface-elevated': '#12121a',
         'surface-border': '#1e1e2e',
         'surface-highlight': '#252535',
         'text-primary': '#e8e8f0',
         'text-secondary': '#8888a0',
         'text-muted': '#55556a',
-        'accent': '#6366f1',
+        accent: '#6366f1',
         'accent-hover': '#818cf8',
         'accent-faint': 'rgba(99,102,241,0.12)',
       },

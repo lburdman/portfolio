@@ -1,12 +1,12 @@
 ---
-title: "Clasificador de Tickets de Soporte"
-projectSlug: "support-classifier"
-summary: "Un clasificador de tickets de soporte asistido por IA con outputs estructurados validados, fallbacks determinísticos y una UI local ligera — enfocado en diseño de backend mantenible y manejo práctico de respuestas del modelo."
-lang: "es"
-tags: ["IA", "NLP", "Python", "Pydantic", "Anthropic", "Clasificación"]
+title: 'Clasificador de Tickets de Soporte'
+projectSlug: 'support-classifier'
+summary: 'Un clasificador de tickets de soporte asistido por IA con outputs estructurados validados, fallbacks determinísticos y una UI local ligera — enfocado en diseño de backend mantenible y manejo práctico de respuestas del modelo.'
+lang: 'es'
+tags: ['IA', 'NLP', 'Python', 'Pydantic', 'Anthropic', 'Clasificación']
 featured: true
-status: "published"
-github: "https://github.com/lburdman/support-ticket-classifier"
+status: 'published'
+github: 'https://github.com/lburdman/support-ticket-classifier'
 order: 4
 ---
 

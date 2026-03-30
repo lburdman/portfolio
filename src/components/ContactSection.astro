@@ -62,10 +62,15 @@ const links = [
             class="card group flex flex-col gap-4"
             aria-label={`${label}: ${value}`}
           >
-            <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-surface-highlight border border-surface-border text-text-muted group-hover:text-accent-hover group-hover:bg-accent/10 group-hover:border-accent/20 transition-all" set:html={icon} />
+            <div
+              class="flex h-10 w-10 items-center justify-center rounded-lg bg-surface-highlight border border-surface-border text-text-muted group-hover:text-accent-hover group-hover:bg-accent/10 group-hover:border-accent/20 transition-all"
+              set:html={icon}
+            />
             <div>
               <p class="text-xs text-text-muted mb-1">{label}</p>
-              <p class="text-sm font-medium text-text-secondary group-hover:text-text-primary transition-colors truncate">{value}</p>
+              <p class="text-sm font-medium text-text-secondary group-hover:text-text-primary transition-colors truncate">
+                {value}
+              </p>
             </div>
           </a>
         ))

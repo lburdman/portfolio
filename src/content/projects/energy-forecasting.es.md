@@ -1,12 +1,12 @@
 ---
-title: "Pronóstico de Demanda Energética"
-projectSlug: "energy-forecasting"
-summary: "Un pipeline de pronóstico de demanda eléctrica a 24 horas con ingeniería de características, validación rolling-origin, modelos basados en árboles y estimación de incertidumbre — enfocado en evaluación ML reproducible."
-lang: "es"
-tags: ["Machine Learning", "Series Temporales", "Python", "Scikit-learn", "Pronóstico", "XGBoost"]
+title: 'Pronóstico de Demanda Energética'
+projectSlug: 'energy-forecasting'
+summary: 'Un pipeline de pronóstico de demanda eléctrica a 24 horas con ingeniería de características, validación rolling-origin, modelos basados en árboles y estimación de incertidumbre — enfocado en evaluación ML reproducible.'
+lang: 'es'
+tags: ['Machine Learning', 'Series Temporales', 'Python', 'Scikit-learn', 'Pronóstico', 'XGBoost']
 featured: true
-status: "published"
-github: "https://github.com/lburdman/energy-demand-forecasting"
+status: 'published'
+github: 'https://github.com/lburdman/energy-demand-forecasting'
 order: 2
 ---
 

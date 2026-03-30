@@ -20,8 +20,19 @@ const switchURL = getAlternateURL(Astro.url, targetLocale, base);
   hreflang={targetLocale}
 >
   <span class="text-text-muted font-mono text-2xs tracking-widest">{t.lang.current}</span>
-  <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-    <polyline points="9 18 15 12 9 6"/>
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    width="12"
+    height="12"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    stroke-width="2"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+    aria-hidden="true"
+  >
+    <polyline points="9 18 15 12 9 6"></polyline>
   </svg>
   <span>{t.lang.switchTo}</span>
 </a>

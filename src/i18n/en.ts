@@ -69,14 +69,20 @@ export const en: UIStrings = {
   notes: {
     heading: 'Notes & Writing',
     subtitle: 'Engineering notes, case studies, and technical reflections.',
-    placeholder: "I'm building out this section. Expect observations on ML systems, applied AI, and engineering trade-offs.",
+    placeholder:
+      "I'm building out this section. Expect observations on ML systems, applied AI, and engineering trade-offs.",
     comingSoon: 'Coming soon',
   },
   about: {
     heading: 'About',
     bio: "I'm an Electronic Engineer with a strong foundation in mathematics, physics, and computational thinking, building practical experience across machine learning, AI-backed applications, data workflows, and software systems. My work combines experimentation, technical rigor, and a production-minded approach to implementation.",
     currently: 'Currently exploring',
-    interests: ['LLM systems in production', 'Quantum ML at realistic hardware constraints', 'Time series forecasting pipelines', 'Privacy-preserving AI architectures'],
+    interests: [
+      'LLM systems in production',
+      'Quantum ML at realistic hardware constraints',
+      'Time series forecasting pipelines',
+      'Privacy-preserving AI architectures',
+    ],
   },
   contact: {
     heading: 'Contact',

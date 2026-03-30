@@ -4,7 +4,10 @@ import { z } from 'zod';
 // Mirror the project schema from content/config.ts for unit testing
 const projectSchema = z.object({
   title: z.string().min(1, 'Project title is required'),
-  projectSlug: z.string().min(1).regex(/^[a-z0-9-]+$/, 'Slug must be lowercase alphanumeric with hyphens'),
+  projectSlug: z
+    .string()
+    .min(1)
+    .regex(/^[a-z0-9-]+$/, 'Slug must be lowercase alphanumeric with hyphens'),
   summary: z.string().min(10, 'Summary must be at least 10 characters'),
   lang: z.enum(['en', 'es']),
   tags: z.array(z.string().min(1)).min(1, 'At least one tag is required'),
@@ -122,7 +125,8 @@ describe('All featured projects validate against schema', () => {
     {
       title: 'Energy Demand Forecasting',
       projectSlug: 'energy-forecasting',
-      summary: 'A 24-hour ahead electricity demand forecasting pipeline with feature engineering and rolling-origin validation.',
+      summary:
+        'A 24-hour ahead electricity demand forecasting pipeline with feature engineering and rolling-origin validation.',
       lang: 'en',
       tags: ['Machine Learning', 'Time Series', 'Python', 'Scikit-learn', 'Forecasting', 'XGBoost'],
       featured: true,
@@ -133,7 +137,8 @@ describe('All featured projects validate against schema', () => {
     {
       title: 'Hybrid Classical–Quantum Neural Networks for Audio Emotion Classification',
       projectSlug: 'quantum-audio',
-      summary: 'An end-to-end speech emotion recognition pipeline on CREMA-D using mel-spectrograms and hybrid quantum/classical heads.',
+      summary:
+        'An end-to-end speech emotion recognition pipeline on CREMA-D using mel-spectrograms and hybrid quantum/classical heads.',
       lang: 'en',
       tags: ['Quantum ML', 'PyTorch', 'PennyLane', 'Speech Processing', 'Deep Learning'],
       featured: true,
@@ -144,7 +149,8 @@ describe('All featured projects validate against schema', () => {
     {
       title: 'Support Ticket Classifier',
       projectSlug: 'support-classifier',
-      summary: 'An AI-assisted support ticket classifier with validated structured outputs and deterministic fallbacks.',
+      summary:
+        'An AI-assisted support ticket classifier with validated structured outputs and deterministic fallbacks.',
       lang: 'en',
       tags: ['AI', 'NLP', 'Python', 'Pydantic', 'Anthropic', 'Classification'],
       featured: true,
