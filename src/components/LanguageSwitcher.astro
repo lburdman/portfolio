@@ -1,0 +1,27 @@
+---
+import type { Locale, UIStrings } from '@/i18n/types';
+import { getAlternateURL } from '@/i18n/index';
+
+interface Props {
+  locale: Locale;
+  t: UIStrings;
+  base: string;
+}
+
+const { locale, t, base } = Astro.props;
+const targetLocale: Locale = locale === 'en' ? 'es' : 'en';
+const switchURL = getAlternateURL(Astro.url, targetLocale, base);
+---
+
+<a
+  href={switchURL}
+  class="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium text-text-secondary hover:text-text-primary border border-surface-border hover:border-text-muted transition-all duration-150"
+  aria-label={`Switch language to ${t.lang.switchTo}`}
+  hreflang={targetLocale}
+>
+  <span class="text-text-muted font-mono text-2xs tracking-widest">{t.lang.current}</span>
+  <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    <polyline points="9 18 15 12 9 6"/>
+  </svg>
+  <span>{t.lang.switchTo}</span>
+</a>

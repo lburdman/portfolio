@@ -1,0 +1,71 @@
+---
+import type { UIStrings } from '@/i18n/types';
+
+interface Props {
+  t: UIStrings;
+}
+
+const { t } = Astro.props;
+
+const areas = [
+  {
+    key: 'ml' as const,
+    label: t.areas.items.ml,
+    icon: `<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M13 6h3a2 2 0 0 1 2 2v7"/><path d="M11 18H8a2 2 0 0 1-2-2V9"/><line x1="6" y1="9" x2="6" y2="9"/></svg>`,
+  },
+  {
+    key: 'appliedAI' as const,
+    label: t.areas.items.appliedAI,
+    icon: `<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a4 4 0 0 1 4 4 4 4 0 0 1-4 4 4 4 0 0 1-4-4 4 4 0 0 1 4-4"/><path d="M12 14a7 7 0 0 1 7 7H5a7 7 0 0 1 7-7"/></svg>`,
+  },
+  {
+    key: 'forecasting' as const,
+    label: t.areas.items.forecasting,
+    icon: `<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>`,
+  },
+  {
+    key: 'privacyLLM' as const,
+    label: t.areas.items.privacyLLM,
+    icon: `<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>`,
+  },
+  {
+    key: 'quantumML' as const,
+    label: t.areas.items.quantumML,
+    icon: `<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="2"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/><path d="M2 12h20"/></svg>`,
+  },
+  {
+    key: 'backend' as const,
+    label: t.areas.items.backend,
+    icon: `<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>`,
+  },
+];
+---
+
+<section class="py-20 border-t border-surface-border" aria-labelledby="areas-heading">
+  <div class="section-container">
+    <div class="mb-12">
+      <h2 id="areas-heading" class="section-heading">{t.areas.heading}</h2>
+      <p class="section-subtitle">{t.areas.subtitle}</p>
+    </div>
+
+    <div class="grid grid-cols-2 sm:grid-cols-3 gap-4">
+      {
+        areas.map(({ label, icon }, i) => (
+          <div
+            class="group card flex flex-col gap-4 cursor-default"
+            style={`animation-delay: ${i * 0.07}s`}
+          >
+            <div
+              class="flex h-10 w-10 items-center justify-center rounded-lg bg-accent/8 border border-accent/15 text-accent group-hover:text-accent-hover group-hover:bg-accent/12 transition-colors"
+              aria-hidden="true"
+              set:html={icon}
+            />
+            <p class="text-sm font-medium text-text-secondary group-hover:text-text-primary transition-colors leading-snug">
+              {label}
+            </p>
+          </div>
+        ))
+      }
+    </div>
+  </div>
+</section>

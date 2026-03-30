@@ -1,0 +1,61 @@
+---
+import type { UIStrings } from '@/i18n/types';
+
+interface Props {
+  t: UIStrings;
+}
+
+const { t } = Astro.props;
+---
+
+<section class="py-20 border-t border-surface-border" aria-labelledby="about-heading">
+  <div class="section-container">
+    <div class="grid md:grid-cols-5 gap-12">
+      <!-- Left: Content -->
+      <div class="md:col-span-3">
+        <h2 id="about-heading" class="section-heading mb-6">{t.about.heading}</h2>
+
+        <!-- Bio -->
+        <p class="text-base text-text-secondary leading-relaxed mb-8">{t.about.bio}</p>
+
+        <!-- Currently exploring -->
+        <div>
+          <h3 class="text-xs font-medium tracking-widest text-text-muted uppercase mb-4">{t.about.currently}</h3>
+          <ul class="flex flex-col gap-2" role="list">
+            {
+              t.about.interests.map((interest) => (
+                <li class="flex items-center gap-3 text-sm text-text-secondary">
+                  <span class="h-1 w-1 rounded-full bg-accent shrink-0" aria-hidden="true" />
+                  {interest}
+                </li>
+              ))
+            }
+          </ul>
+        </div>
+      </div>
+
+      <!-- Right: Meta / identity -->
+      <div class="md:col-span-2 flex flex-col gap-6">
+        <!-- Image placeholder -->
+        <div class="relative aspect-[4/5] rounded-card bg-surface-elevated border border-surface-border overflow-hidden">
+          <div class="absolute inset-0 flex flex-col items-center justify-center gap-3 text-text-muted">
+            <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
+            </svg>
+            <span class="text-xs">Photo coming soon</span>
+          </div>
+          <!-- Recommended asset: public/assets/images/portrait.jpg -->
+        </div>
+
+        <!-- Identity chips -->
+        <div class="flex flex-wrap gap-2">
+          {
+            ['Electronic Engineer', 'FIUBA', 'Buenos Aires'].map((chip) => (
+              <span class="tag">{chip}</span>
+            ))
+          }
+        </div>
+      </div>
+    </div>
+  </div>
+</section>

@@ -1,0 +1,75 @@
+---
+import type { UIStrings } from '@/i18n/types';
+
+interface Props {
+  t: UIStrings;
+  base: string;
+}
+
+const { t, base } = Astro.props;
+---
+
+<section class="relative overflow-hidden py-28 md:py-36" aria-label="Hero">
+  <!-- Subtle background grid -->
+  <div
+    class="pointer-events-none absolute inset-0"
+    style="background-image: radial-gradient(circle at 50% 0%, rgba(99,102,241,0.08) 0%, transparent 60%), linear-gradient(rgba(255,255,255,0.015) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.015) 1px, transparent 1px); background-size: 100% 100%, 48px 48px, 48px 48px;"
+    aria-hidden="true"
+  ></div>
+
+  <div class="section-container relative">
+    <div class="max-w-3xl">
+      <!-- Label -->
+      <div class="animate-in mb-6 inline-flex items-center gap-2">
+        <span class="h-px w-8 bg-accent opacity-60"></span>
+        <span class="text-xs font-medium tracking-widest text-accent-hover uppercase">
+          Electronic Engineer · ML · Applied AI
+        </span>
+      </div>
+
+      <!-- Name -->
+      <h1 class="animate-in animate-in-delay-1 text-5xl md:text-6xl lg:text-7xl font-semibold tracking-tight text-text-primary leading-none mb-6">
+        {t.hero.name}
+      </h1>
+
+      <!-- Tagline -->
+      <p class="animate-in animate-in-delay-2 text-2xl md:text-3xl font-light text-accent-hover tracking-tight mb-6">
+        {t.hero.tagline}
+      </p>
+
+      <!-- Intro -->
+      <p class="animate-in animate-in-delay-3 text-base md:text-lg text-text-secondary leading-relaxed max-w-2xl mb-10">
+        {t.hero.intro}
+      </p>
+
+      <!-- CTAs -->
+      <div class="animate-in animate-in-delay-4 flex flex-wrap gap-3">
+        <a href={`${base}/projects`} class="btn-primary" id="hero-cta-projects">
+          {t.hero.ctaProjects}
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M5 12h14"/><path d="m12 5 7 7-7 7"/>
+          </svg>
+        </a>
+        <a href={`${base}/notes`} class="btn-ghost" id="hero-cta-notes">
+          {t.hero.ctaNotes}
+        </a>
+        <a href="#contact" class="btn-ghost" id="hero-cta-contact">
+          {t.hero.ctaContact}
+        </a>
+        <a
+          href={`${base}/assets/resume.pdf`}
+          class="btn-ghost"
+          id="hero-cta-resume"
+          target="_blank"
+          rel="noopener noreferrer"
+          download
+        >
+          {t.hero.ctaResume}
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+          </svg>
+        </a>
+      </div>
+    </div>
+  </div>
+</section>

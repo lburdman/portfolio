@@ -1,0 +1,60 @@
+---
+import type { UIStrings } from '@/i18n/types';
+
+interface Props {
+  t: UIStrings;
+}
+
+const { t } = Astro.props;
+
+const items = [
+  {
+    key: 'qiskit' as const,
+    accent: '#6366f1',
+    badge: '500+ attendees',
+  },
+  {
+    key: 'digitalSystems' as const,
+    accent: '#818cf8',
+    badge: 'FIUBA',
+  },
+  {
+    key: 'quantumComms' as const,
+    accent: '#a5b4fc',
+    badge: 'FIUBA',
+  },
+];
+---
+
+<section class="py-20 border-t border-surface-border" aria-labelledby="leadership-heading">
+  <div class="section-container">
+    <div class="mb-12">
+      <h2 id="leadership-heading" class="section-heading">{t.leadership.heading}</h2>
+      <p class="section-subtitle">{t.leadership.subtitle}</p>
+    </div>
+
+    <div class="flex flex-col gap-4">
+      {
+        items.map(({ key, badge }) => {
+          const item = t.leadership.items[key];
+          return (
+            <div class="card flex flex-col sm:flex-row gap-5 sm:gap-8">
+              <!-- Left: role indicator -->
+              <div class="shrink-0 flex flex-col gap-1 sm:w-48">
+                <span class="text-xs font-medium tracking-wide text-accent-hover uppercase">{item.role}</span>
+                <span class="text-xs text-text-muted">{item.period}</span>
+                <span class="mt-2 self-start tag">{badge}</span>
+              </div>
+
+              <!-- Right: content -->
+              <div class="flex-1 min-w-0">
+                <h3 class="text-sm font-semibold text-text-primary mb-2">{item.org}</h3>
+                <p class="text-sm text-text-secondary leading-relaxed">{item.description}</p>
+              </div>
+            </div>
+          );
+        })
+      }
+    </div>
+  </div>
+</section>

@@ -1,0 +1,74 @@
+---
+import BaseLayout from '@/components/BaseLayout.astro';
+import ProjectCard from '@/components/ProjectCard.astro';
+import { useTranslations } from '@/i18n/index';
+import { getCollection } from 'astro:content';
+
+const locale = 'es';
+const t = useTranslations(locale);
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+const allProjects = await getCollection('projects');
+
+const projects = allProjects
+  .filter((p) => p.data.lang === locale && p.data.status === 'published')
+  .sort((a, b) => a.data.order - b.data.order);
+
+const allTags = [...new Set(projects.flatMap((p) => p.data.tags))].sort();
+---
+
+<BaseLayout
+  title="Proyectos — Lucas Burdman"
+  description="Proyectos técnicos en machine learning, IA aplicada, pronóstico, privacidad y quantum ML."
+  locale={locale}
+>
+  <div class="section-container py-20">
+    <div class="mb-12">
+      <h1 class="text-3xl md:text-4xl font-semibold text-text-primary tracking-tight mb-3">{t.projects.heading}</h1>
+      <p class="text-text-secondary max-w-xl">{t.projects.subtitle}</p>
+    </div>
+
+    <div class="mb-10 flex flex-wrap gap-2" role="group" aria-label="Filtrar por tecnología">
+      <button class="tag cursor-pointer" data-filter="all" id="filter-all" aria-pressed="true">
+        {t.projects.filterAll}
+      </button>
+      {
+        allTags.map((tag) => (
+          <button
+            class="tag cursor-pointer"
+            data-filter={tag}
+            id={`filter-${tag.toLowerCase().replace(/\s+/g, '-')}`}
+            aria-pressed="false"
+          >
+            {tag}
+          </button>
+        ))
+      }
+    </div>
+
+    <div class="grid sm:grid-cols-2 gap-5" id="projects-grid">
+      {
+        projects.map((project) => (
+          <div data-tags={project.data.tags.join(',')}>
+            <ProjectCard project={project} t={t} locale={locale} base={base} />
+          </div>
+        ))
+      }
+    </div>
+  </div>
+</BaseLayout>
+
+<script>
+  const btns = document.querySelectorAll<HTMLButtonElement>('[data-filter]');
+  const cards = document.querySelectorAll<HTMLElement>('[data-tags]');
+  btns.forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const filter = btn.dataset.filter ?? 'all';
+      btns.forEach((b) => b.setAttribute('aria-pressed', 'false'));
+      btn.setAttribute('aria-pressed', 'true');
+      cards.forEach((card) => {
+        const tags = card.dataset.tags?.split(',') ?? [];
+        card.style.display = filter === 'all' || tags.includes(filter) ? '' : 'none';
+      });
+    });
+  });
+</script>

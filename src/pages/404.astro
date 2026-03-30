@@ -1,0 +1,23 @@
+---
+import BaseLayout from '@/components/BaseLayout.astro';
+import { useTranslations } from '@/i18n/index';
+
+const locale = 'en';
+const t = useTranslations(locale);
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+---
+
+<BaseLayout
+  title="404 — Page Not Found | Lucas Burdman"
+  description="The page you're looking for doesn't exist."
+  locale={locale}
+>
+  <div class="section-container flex flex-col items-center justify-center min-h-[60vh] text-center py-24">
+    <p class="text-8xl font-bold text-surface-border mb-6" aria-hidden="true">404</p>
+    <h1 class="text-2xl font-semibold text-text-primary mb-3">{t.notFound.heading}</h1>
+    <p class="text-text-secondary mb-8">{t.notFound.message}</p>
+    <a href={base || '/'} class="btn-ghost" id="not-found-home">
+      {t.notFound.backHome}
+    </a>
+  </div>
+</BaseLayout>

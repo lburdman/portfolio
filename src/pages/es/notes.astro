@@ -1,0 +1,21 @@
+---
+import BaseLayout from '@/components/BaseLayout.astro';
+import NotesPlaceholder from '@/components/NotesPlaceholder.astro';
+import { useTranslations } from '@/i18n/index';
+
+const locale = 'es';
+const t = useTranslations(locale);
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+---
+
+<BaseLayout
+  title="Notas — Lucas Burdman"
+  description="Notas de ingeniería, casos de estudio y reflexiones técnicas. Próximamente."
+  locale={locale}
+>
+  <div class="section-container pt-16">
+    <h1 class="text-3xl font-semibold text-text-primary tracking-tight mb-2">{t.notes.heading}</h1>
+    <p class="text-text-secondary mb-0">{t.notes.subtitle}</p>
+  </div>
+  <NotesPlaceholder t={t} base={base} />
+</BaseLayout>
