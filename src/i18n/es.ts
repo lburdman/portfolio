@@ -12,7 +12,7 @@ export const es: UIStrings = {
     name: 'Lucas Burdman',
     tagline: 'Construyendo Sistemas Inteligentes',
     intro:
-      'Ingeniero Electrónico trabajando en machine learning, IA aplicada, flujos de datos y sistemas inteligentes — con un enfoque orientado a la implementación en producción.',
+      'Ingeniero Electrónico enfocado en sistemas de IA, automatización y software orientado a producción — conectando rigor de investigación con entrega práctica.',
     ctaProjects: 'Ver Proyectos',
     ctaNotes: 'Notas',
     ctaContact: 'Contacto',
@@ -32,7 +32,7 @@ export const es: UIStrings = {
   },
   projects: {
     heading: 'Proyectos Seleccionados',
-    subtitle: 'Un conjunto enfocado de proyectos técnicos en ML, IA aplicada e ingeniería de sistemas.',
+    subtitle: 'Un conjunto enfocado de proyectos que muestra cómo abordo machine learning, IA aplicada y sistemas.',
     viewAll: 'Todos los Proyectos',
     viewProject: 'Ver Proyecto',
     github: 'GitHub',
@@ -70,12 +70,12 @@ export const es: UIStrings = {
     heading: 'Notas y Escritura',
     subtitle: 'Notas de ingeniería, casos de estudio y reflexiones técnicas.',
     placeholder:
-      'Estoy construyendo esta sección. Se esperan observaciones sobre sistemas ML, IA aplicada y compromisos de ingeniería.',
+      'Esta sección reunirá notas de ingeniería, casos breves y los compromisos detrás de decisiones reales de sistema.',
     comingSoon: 'Próximamente',
   },
   about: {
     heading: 'Sobre mí',
-    bio: 'Soy Ingeniero Electrónico con una sólida base en matemática, física y pensamiento computacional, construyendo experiencia práctica en machine learning, aplicaciones respaldadas por IA, flujos de datos y sistemas de software. Mi trabajo combina experimentación, rigor técnico y un enfoque orientado a la implementación en producción.',
+    bio: 'Soy Ingeniero Electrónico con una sólida base en matemática, física y pensamiento computacional, construyendo experiencia práctica en sistemas de IA, automatización, flujos de datos y productos de software. Mi trabajo combina experimentación, rigor técnico y un enfoque orientado a la implementación en producción.',
     currently: 'Explorando actualmente',
     interests: [
       'Sistemas LLM en producción',

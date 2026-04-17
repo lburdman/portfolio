@@ -11,21 +11,18 @@ const { t } = Astro.props;
 <section class="py-20 border-t border-surface-border" aria-labelledby="about-heading">
   <div class="section-container">
     <div class="grid md:grid-cols-5 gap-12">
-      <!-- Left: Content -->
       <div class="md:col-span-3">
         <h2 id="about-heading" class="section-heading mb-6">{t.about.heading}</h2>
 
-        <!-- Bio -->
         <p class="text-base text-text-secondary leading-relaxed mb-8">{t.about.bio}</p>
 
-        <!-- Currently exploring -->
         <div>
-          <h3 class="text-xs font-medium tracking-widest text-text-muted uppercase mb-4">{t.about.currently}</h3>
+          <h3 class="eyebrow mb-4">{t.about.currently}</h3>
           <ul class="flex flex-col gap-2" role="list">
             {
               t.about.interests.map((interest) => (
                 <li class="flex items-center gap-3 text-sm text-text-secondary">
-                  <span class="h-1 w-1 rounded-full bg-accent shrink-0" aria-hidden="true" />
+                  <span class="h-1.5 w-1.5 rounded-full bg-accent shrink-0" aria-hidden="true" />
                   {interest}
                 </li>
               ))
@@ -34,35 +31,44 @@ const { t } = Astro.props;
         </div>
       </div>
 
-      <!-- Right: Meta / identity -->
       <div class="md:col-span-2 flex flex-col gap-6">
-        <!-- Image placeholder -->
-        <div
-          class="relative aspect-[4/5] rounded-card bg-surface-elevated border border-surface-border overflow-hidden"
-        >
-          <div class="absolute inset-0 flex flex-col items-center justify-center gap-3 text-text-muted">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="32"
-              height="32"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="1.5"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              aria-hidden="true"
-            >
-              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle>
-            </svg>
-            <span class="text-xs">Photo coming soon</span>
+        <div class="hero-panel relative overflow-hidden p-6 md:p-7">
+          <div class="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-accent/70 to-transparent" aria-hidden="true"></div>
+          <div class="flex items-center justify-between gap-4 mb-6">
+            <div>
+              <p class="eyebrow mb-2">{t.about.currently}</p>
+              <h3 class="text-xl font-semibold text-text-primary tracking-tight">{t.hero.tagline}</h3>
+            </div>
+            <div class="h-14 w-14 rounded-2xl border border-accent/20 bg-gradient-to-br from-accent/20 to-cyan-400/10 flex items-center justify-center text-sm font-bold text-accent-hover">
+              LB
+            </div>
           </div>
-          <!-- Recommended asset: public/assets/images/portrait.jpg -->
+
+          <div class="grid grid-cols-2 gap-3 mb-5">
+            <div class="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+              <p class="text-[0.65rem] uppercase tracking-[0.18em] text-text-muted mb-2">FIUBA</p>
+              <p class="text-sm text-text-secondary">Buenos Aires</p>
+            </div>
+            <div class="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+              <p class="text-[0.65rem] uppercase tracking-[0.18em] text-text-muted mb-2">AI</p>
+              <p class="text-sm text-text-secondary">Automation</p>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-3">
+            {['LLM', 'Quantum', 'Systems', 'Production'].map((item) => (
+              <div class="flex items-center justify-between rounded-2xl border border-white/5 bg-black/20 px-4 py-3">
+                <span class="text-sm text-text-secondary">{item}</span>
+                <span class="text-[0.65rem] uppercase tracking-[0.18em] text-accent-hover">Now</span>
+              </div>
+            ))}
+          </div>
         </div>
 
-        <!-- Identity chips -->
         <div class="flex flex-wrap gap-2">
-          {['Electronic Engineer', 'FIUBA', 'Buenos Aires'].map((chip) => <span class="tag">{chip}</span>)}
+          {[t.areas.items.ml, t.areas.items.appliedAI, t.areas.items.backend, t.areas.items.privacyLLM].map((chip) => (
+            <span class="tag">{chip}</span>
+          ))}
         </div>
       </div>
     </div>

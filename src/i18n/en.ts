@@ -12,7 +12,7 @@ export const en: UIStrings = {
     name: 'Lucas Burdman',
     tagline: 'Building Intelligent Systems',
     intro:
-      'Electronic Engineer working across machine learning, applied AI, data workflows, and intelligent systems — with a production-minded approach to implementation.',
+      'Electronic Engineer focused on AI systems, automation, and production-minded software — bridging research rigor with practical delivery.',
     ctaProjects: 'View Projects',
     ctaNotes: 'Notes',
     ctaContact: 'Contact',
@@ -32,7 +32,7 @@ export const en: UIStrings = {
   },
   projects: {
     heading: 'Selected Projects',
-    subtitle: 'A focused set of technical projects across ML, applied AI, and systems engineering.',
+    subtitle: 'A focused set of projects that show how I approach machine learning, applied AI, and systems work.',
     viewAll: 'All Projects',
     viewProject: 'View Project',
     github: 'GitHub',
@@ -70,12 +70,12 @@ export const en: UIStrings = {
     heading: 'Notes & Writing',
     subtitle: 'Engineering notes, case studies, and technical reflections.',
     placeholder:
-      "I'm building out this section. Expect observations on ML systems, applied AI, and engineering trade-offs.",
+      "This section will hold engineering notes, short case studies, and the trade-offs behind real systems decisions.",
     comingSoon: 'Coming soon',
   },
   about: {
     heading: 'About',
-    bio: "I'm an Electronic Engineer with a strong foundation in mathematics, physics, and computational thinking, building practical experience across machine learning, AI-backed applications, data workflows, and software systems. My work combines experimentation, technical rigor, and a production-minded approach to implementation.",
+    bio: "I'm an Electronic Engineer with a strong foundation in mathematics, physics, and computational thinking, building practical experience across AI systems, automation, data workflows, and software products. My work combines experimentation, technical rigor, and a production-minded approach to implementation.",
     currently: 'Currently exploring',
     interests: [
       'LLM systems in production',
