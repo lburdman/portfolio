@@ -70,7 +70,7 @@ export const en: UIStrings = {
     heading: 'Notes & Writing',
     subtitle: 'Engineering notes, case studies, and technical reflections.',
     placeholder:
-      "This section will hold engineering notes, short case studies, and the trade-offs behind real systems decisions.",
+      'This section will hold engineering notes, short case studies, and the trade-offs behind real systems decisions.',
     comingSoon: 'Coming soon',
   },
   about: {
