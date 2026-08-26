@@ -1,0 +1,877 @@
+---
+/**
+ * 02 — Technical Worlds. The site's one large motion moment, and the one place
+ * the paper ground inverts to ink (docs/MOTION_SYSTEM.md §3).
+ *
+ * This wrapper is deliberately thin. It exists to do four things that an
+ * island cannot do for itself:
+ *
+ * 1. **Receive `t` as a prop.** Components never reach for a dictionary
+ *    (docs/ARCHITECTURE.md §3, rule 1); the page resolves the locale once and
+ *    passes the strings down. The island therefore has no locale logic at all.
+ *
+ * 2. **Place the band in the numbered sequence.** `ui/Section.astro` derives
+ *    the element `id`, the figure number and the anchor from one checked prop:
+ *    `section="worlds"` is a member of a union over `SECTION_IDS`, so the `02`
+ *    is `SECTION_IDS.indexOf('worlds')` rather than a literal that reordering
+ *    the array could silently strand. The margin word comes from
+ *    `t.sections.worlds`, authored sentence-case and uppercased in CSS.
+ *
+ *    This replaced a hand-rolled `02` eyebrow inside the island. That literal
+ *    was correct on the day it was written, which is exactly what made it a
+ *    liability — and it also meant the band was the one section on the page
+ *    with no localized margin word and no `id` to link to.
+ *
+ * 3. **Choose the hydration directive.** `client:visible` is load-bearing, not
+ *    a default. React is the only framework runtime on this site and it must
+ *    never touch the critical rendering path (ARCHITECTURE §5). This band sits
+ *    below the fold, so the runtime is fetched only as the reader approaches
+ *    it, and GSAP is fetched later still — the island imports it dynamically,
+ *    and only when the traverse is actually going to run. A phone and a
+ *    reduced-motion visitor download neither the timeline nor its library.
+ *
+ * 4. **Own the band's stylesheet.** The styles are `is:global` because the
+ *    markup they target is rendered by React, which Astro's scoping attribute
+ *    does not reach. Every selector is namespaced under `.tw`/`.tw-`, and every
+ *    colour is a `var(--color-*)` from `src/styles/tokens.css` — there is not
+ *    one raw colour value below, and not one inline `style` attribute in the
+ *    markup (see the CSP note in the island).
+ *
+ * ## Where `data-stops-hero-visual` sits, and why it is not on the `<section>`
+ *
+ * The hero's canvas stops while this band is on screen, and the marker for that
+ * is `data-stops-hero-visual`. It belongs on `<section id="worlds">`, but
+ * `ui/Section.astro` renders a fixed attribute list and does not spread
+ * undeclared props — verified against a production build, where the attribute
+ * was accepted at the call site and silently absent from the output. Rather
+ * than ship a contract that looks right in source and does nothing live, it is
+ * rendered by the island onto `.tw-band`, the section's only child.
+ *
+ * An `IntersectionObserver` on that element reports the same thing: it fills
+ * the section minus its padding, so the band is detected a few rem later on
+ * approach, which any rootMargin absorbs. Moving it onto the `<section>` needs
+ * one line in `ui/Section.astro` (a rest spread onto the element); that file
+ * has another owner.
+ *
+ * ## What gets pinned
+ *
+ * `Section` renders the outer `<section id="worlds">`, and `class="tw on-ink"`
+ * puts the band's own styling and the ink inversion on it. That element — not
+ * the island's root — is what ScrollTrigger pins, so the `02 / TECHNICAL
+ * WORLDS` annotation stays on screen with the traverse rather than scrolling
+ * away above it. The island finds it with `closest('.tw')`; the contract
+ * between these two files is that one `.tw` class.
+ *
+ * The island itself is server-rendered by this file at build time, so all five
+ * domains are complete, semantic HTML in document order before any JavaScript
+ * exists. With scripting off, the section is a readable stack of five panels.
+ */
+
+import Section from '../ui/Section.astro';
+import type { Locale, UIStrings } from '../../i18n/types';
+import TechnicalWorlds from '../visuals/worlds/TechnicalWorlds';
+
+interface Props {
+  /** Resolved dictionary for the current locale. */
+  t: UIStrings;
+  /**
+   * Current locale. Part of the shared home-section prop contract; this band
+   * renders no locale-dependent URL, so it is not forwarded to the island.
+   */
+  locale: Locale;
+  /**
+   * Base path. Same contract, same reason: Technical Worlds links nowhere, so
+   * nothing here concatenates a URL. If that changes, route it through
+   * `src/i18n/routing.ts` rather than building a path by hand.
+   */
+  base: string;
+}
+
+const { t } = Astro.props;
+
+/** Checked against `SECTION_IDS`; supplies the id, the figure number and the word. */
+const SECTION = 'worlds' as const;
+---
+
+<Section
+  section={SECTION}
+  label={t.sections[SECTION]}
+  labelledBy="tw-heading"
+  width="wide"
+  spacing="lg"
+  class="tw on-ink"
+>
+  <TechnicalWorlds client:visible={{ rootMargin: '300px' }} t={t} />
+</Section>
+
+<style is:global>
+  /* ===========================================================================
+     TECHNICAL WORLDS — the ink band
+     Global by necessity (the markup is React's), namespaced by discipline.
+     No raw colour values. All motion is CSS animation over static geometry;
+     the only scripted animation in the section is the GSAP traverse itself.
+     ======================================================================== */
+
+  /* --- Domain accents -----------------------------------------------------
+     `--tw-accent` is the one thing that differs between the five stages, and
+     it is resolved here rather than by an inline `style` on each panel.
+
+     That is a CSP requirement, not a preference. `astro.config.mjs` enables
+     `security.csp` with no `'unsafe-inline'`, and Astro emits no
+     `style-src-attr`, so `style-src` governs style *attributes* too — with no
+     `'unsafe-hashes'`, every inline `style=""` on the page is dropped. An
+     island that painted its accents that way would render five identical grey
+     stages in production and look perfect in `astro dev`.
+
+     `data-domain` is on the panel, the stage and the rail stop, so one rule per
+     domain covers all three and the value inherits to every descendant.
+
+     These five lines mirror `Domain['accentVar']`, which is typed
+     `--color-domain-${DomainId}`. CSS cannot derive the name, so a sixth domain
+     needs a sixth line here — `tests/worlds.test.ts` fails if one is missing.
+
+     Ink ground only, per the warning in tokens.css: the band is `.on-ink`, and
+     these hues measure 1.72:1–2.77:1 on paper.
+     --------------------------------------------------------------------- */
+
+  .tw [data-domain='ai'] {
+    --tw-accent: var(--color-domain-ai);
+  }
+  .tw [data-domain='quantum'] {
+    --tw-accent: var(--color-domain-quantum);
+  }
+  .tw [data-domain='fpga'] {
+    --tw-accent: var(--color-domain-fpga);
+  }
+  .tw [data-domain='electronics'] {
+    --tw-accent: var(--color-domain-electronics);
+  }
+  .tw [data-domain='audio'] {
+    --tw-accent: var(--color-domain-audio);
+  }
+
+  /* The measure, the vertical rhythm and the `02 / TECHNICAL WORLDS` margin
+     annotation all come from `ui/Section.astro` and `ui/Container.astro`, which
+     wrap this island. Only what those two do not know about lives here.
+
+     `spacing="lg"` supplies the stacked padding — the token comment reserves
+     `--spacing-section-lg` for the hero and this band exactly. */
+  .tw {
+    position: relative;
+  }
+
+  /* The pinned composition. `data-traverse` is set imperatively by the island
+     *after* it has confirmed a wide viewport, motion is allowed and GSAP has
+     actually loaded — so a failed import leaves the readable stack rather than
+     a broken slider.
+
+     The extra `.section` in each selector is not decoration. Astro compiles its
+     scoped rules to `.section--lg[data-astro-cid-…]`, which is (0,2,0) — the
+     same specificity as `.tw[data-traverse='true']`, so a plain override would
+     be decided by stylesheet order. `.tw.section[…]` is (0,3,0) and wins
+     outright. */
+  .tw.section[data-traverse='true'] {
+    height: 100svh;
+    padding-block: var(--spacing-block);
+  }
+
+  /* A pinned full-height section needs every wrapper between it and the track
+     to stretch, or the viewport row collapses to its content height. */
+  .tw.section[data-traverse='true'] .section__inner {
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr);
+    height: 100%;
+  }
+
+  .tw.section[data-traverse='true'] .section__figure {
+    margin-bottom: var(--spacing-gutter);
+  }
+
+  .tw-band {
+    min-height: 0;
+  }
+
+  .tw[data-traverse='true'] .tw-band {
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    row-gap: var(--spacing-stack);
+    height: 100%;
+  }
+
+  .tw-header__subtitle {
+    max-width: var(--container-prose);
+    margin-top: var(--spacing-gutter);
+    color: var(--color-on-ink-muted);
+    font-size: var(--text-lg);
+    text-wrap: pretty;
+  }
+
+  .tw[data-traverse='true'] .tw-header__subtitle {
+    margin-top: 0.75rem;
+  }
+
+  /* --- Viewport and track -------------------------------------------------
+     Stacked by default. That is the server-rendered state, the no-JavaScript
+     state, the reduced-motion state and the mobile state — one composition
+     serving four cases rather than four special paths.
+     --------------------------------------------------------------------- */
+
+  .tw-viewport {
+    position: relative;
+  }
+
+  .tw-track {
+    display: grid;
+    row-gap: var(--spacing-section);
+  }
+
+  .tw[data-traverse='true'] .tw-viewport {
+    height: 100%;
+    overflow: hidden;
+  }
+
+  .tw[data-traverse='true'] .tw-track {
+    display: flex;
+    align-items: stretch;
+    height: 100%;
+    row-gap: 0;
+    will-change: transform;
+  }
+
+  .tw-viewport:focus-visible {
+    outline: var(--border-rule) solid var(--focus-ring);
+    outline-offset: 6px;
+  }
+
+  /* --- Panel --------------------------------------------------------------
+     Each domain is one channel of the instrument, so it carries its accent on
+     a left rule — the `--border-heavy` case the token file reserves for
+     exactly this. During the traverse the rule thins to a hairline and only
+     the domain in the viewport is emphatic, which is position feedback that
+     costs no extra element and hides no text.
+     --------------------------------------------------------------------- */
+
+  .tw-panel {
+    display: grid;
+    align-content: center;
+    row-gap: var(--spacing-stack);
+    padding-left: var(--spacing-gutter);
+    border-left: var(--border-heavy) solid var(--tw-accent);
+  }
+
+  .tw[data-traverse='true'] .tw-panel {
+    flex: 0 0 86%;
+    min-width: 0;
+    padding-right: var(--spacing-block);
+    border-left-width: var(--border-hairline);
+    border-left-color: var(--color-ink-rule);
+    transition:
+      border-left-color var(--duration-base) var(--ease-standard),
+      border-left-width var(--duration-base) var(--ease-standard);
+  }
+
+  .tw[data-traverse='true'] .tw-panel[data-current='true'] {
+    border-left-width: var(--border-heavy);
+    border-left-color: var(--tw-accent);
+  }
+
+  .tw-panel__meta {
+    display: flex;
+    align-items: baseline;
+    gap: 0.75rem;
+    letter-spacing: var(--tracking-wide);
+  }
+
+  .tw-panel__layer {
+    color: var(--tw-accent);
+  }
+
+  .tw-panel__name {
+    margin-top: 0.5rem;
+  }
+
+  .tw-panel__summary {
+    max-width: 38ch;
+    margin-top: var(--spacing-gutter);
+    color: var(--color-on-ink-muted);
+    text-wrap: pretty;
+  }
+
+  .tw-panel__stage {
+    min-width: 0;
+    max-width: 34rem;
+  }
+
+  @media (min-width: 48rem) {
+    .tw-panel {
+      grid-template-columns: minmax(0, 24rem) minmax(0, 1fr);
+      column-gap: var(--spacing-block);
+      align-items: center;
+      row-gap: 0;
+    }
+  }
+
+  /* --- Footer: position rail and keyboard hint --------------------------- */
+
+  .tw-footer {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-gutter);
+    margin-top: var(--spacing-block);
+  }
+
+  .tw[data-traverse='true'] .tw-footer {
+    margin-top: 0;
+  }
+
+  .tw-rail {
+    display: none;
+    gap: 6px;
+    list-style: none;
+  }
+
+  .tw[data-traverse='true'] .tw-rail {
+    display: flex;
+  }
+
+  .tw-rail__stop {
+    width: 30px;
+    height: var(--border-rule);
+    background-color: var(--color-ink-rule);
+    transition:
+      background-color var(--duration-fast) var(--ease-standard),
+      width var(--duration-base) var(--ease-standard);
+  }
+
+  .tw-rail__stop[data-current='true'] {
+    width: 60px;
+    background-color: var(--tw-accent);
+  }
+
+  /* Screen-reader available at all times, and visible while the traverse has
+     keyboard focus — so a sighted keyboard user is told what the arrow keys
+     do at the moment the arrow keys start working. */
+  .tw-hint {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+    font-family: var(--font-mono);
+    font-size: var(--text-caption);
+    letter-spacing: var(--tracking-label);
+    color: var(--color-on-ink-muted);
+  }
+
+  .tw-band:has(.tw-viewport:focus-visible) .tw-hint {
+    position: static;
+    width: auto;
+    height: auto;
+    margin: 0;
+    overflow: visible;
+    clip-path: none;
+    white-space: normal;
+  }
+
+  /* ===========================================================================
+     VISUAL STAGES
+
+     One frame, one coordinate space, one annotation voice, five behaviours.
+     `--tw-accent` is set per panel from the domain's `accentVar`, so a stage
+     never names a colour.
+
+     Every animation below is declared ONLY under `[data-active='true']`. An
+     inactive stage has no animation to pause — it simply has none. And no
+     animated element has a hidden resting state: with the animation absent,
+     each one resolves to its visible form (audit 2.3 / MOTION_SYSTEM §6).
+     ======================================================================== */
+
+  .tw-stage {
+    position: relative;
+  }
+
+  .tw-stage__meta {
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+    margin-bottom: 0.625rem;
+    font-family: var(--font-mono);
+    font-stretch: normal;
+    font-size: var(--text-micro);
+    font-weight: 500;
+    letter-spacing: var(--tracking-wide);
+    color: var(--color-on-ink-muted);
+  }
+
+  .tw-stage__channel {
+    display: block;
+    width: 28px;
+    height: var(--border-heavy);
+    background-color: var(--tw-accent);
+  }
+
+  .tw-stage__svg {
+    display: block;
+    width: 100%;
+    height: auto;
+    overflow: visible;
+  }
+
+  /* Shared drawing vocabulary. */
+  .tw-stage__svg .tw-rule {
+    fill: none;
+    stroke: var(--color-ink-rule);
+    stroke-width: 1;
+    vector-effect: non-scaling-stroke;
+  }
+
+  .tw-stage__frame .tw-tick {
+    fill: none;
+    stroke: var(--tw-accent);
+    stroke-width: 1.5;
+    vector-effect: non-scaling-stroke;
+  }
+
+  .tw-annot {
+    fill: var(--color-on-ink-muted);
+    font-family: var(--font-mono);
+    font-size: 8px;
+    letter-spacing: 0.06em;
+  }
+
+  /* --- ai / network ------------------------------------------------------ */
+
+  .tw-net-lattice circle {
+    fill: var(--color-ink-rule);
+    opacity: 0.35;
+  }
+
+  .tw-net-axes line {
+    stroke: var(--color-ink-rule);
+    stroke-width: 1;
+    opacity: 0.5;
+    vector-effect: non-scaling-stroke;
+  }
+
+  .tw-net-edge {
+    stroke: var(--color-ink-rule);
+    stroke-width: 1;
+    opacity: 0.55;
+    vector-effect: non-scaling-stroke;
+    transition:
+      stroke var(--duration-fast) var(--ease-standard),
+      opacity var(--duration-fast) var(--ease-standard);
+  }
+
+  .tw-net-edge[data-related='true'] {
+    stroke: var(--tw-accent);
+    opacity: 1;
+  }
+
+  .tw-net-node {
+    fill: var(--color-ink);
+    stroke: var(--color-on-ink-muted);
+    stroke-width: 1.2;
+    vector-effect: non-scaling-stroke;
+    transition:
+      fill var(--duration-fast) var(--ease-standard),
+      stroke var(--duration-fast) var(--ease-standard);
+  }
+
+  .tw-net-node[data-selected='true'] {
+    fill: var(--tw-accent);
+    stroke: var(--tw-accent);
+  }
+
+  .tw-net-halo {
+    fill: none;
+    stroke: var(--tw-accent);
+    stroke-width: 1;
+    opacity: 0.55;
+    vector-effect: non-scaling-stroke;
+  }
+
+  /* The stagger is `:nth-child()` rather than a per-element custom property,
+     for the CSP reason given at the top of this file. Seven phases read as
+     organic at these counts and cost seven rules instead of one attribute on
+     every node. Negative delays start each element mid-cycle, so nothing waits
+     to begin. */
+  .tw-stage[data-active='true'] .tw-net-node,
+  .tw-stage[data-active='true'] .tw-net-edge {
+    animation: tw-node-pulse 4.8s var(--ease-instrument) infinite;
+  }
+
+  .tw-stage[data-active='true'] .tw-net-edge {
+    animation-name: tw-edge-breathe;
+    animation-duration: 5.6s;
+  }
+
+  .tw-stage[data-active='true'] :is(.tw-net-node, .tw-net-edge):nth-child(7n + 1) {
+    animation-delay: 0s;
+  }
+  .tw-stage[data-active='true'] :is(.tw-net-node, .tw-net-edge):nth-child(7n + 2) {
+    animation-delay: -0.68s;
+  }
+  .tw-stage[data-active='true'] :is(.tw-net-node, .tw-net-edge):nth-child(7n + 3) {
+    animation-delay: -1.36s;
+  }
+  .tw-stage[data-active='true'] :is(.tw-net-node, .tw-net-edge):nth-child(7n + 4) {
+    animation-delay: -2.04s;
+  }
+  .tw-stage[data-active='true'] :is(.tw-net-node, .tw-net-edge):nth-child(7n + 5) {
+    animation-delay: -2.72s;
+  }
+  .tw-stage[data-active='true'] :is(.tw-net-node, .tw-net-edge):nth-child(7n + 6) {
+    animation-delay: -3.4s;
+  }
+  .tw-stage[data-active='true'] :is(.tw-net-node, .tw-net-edge):nth-child(7n + 7) {
+    animation-delay: -4.08s;
+  }
+
+  /* --- quantum / interference -------------------------------------------- */
+
+  .tw-ripple circle {
+    fill: none;
+    stroke: var(--tw-accent);
+    stroke-width: 1;
+    opacity: 0.3;
+    vector-effect: non-scaling-stroke;
+  }
+
+  .tw-emitter {
+    fill: var(--tw-accent);
+  }
+
+  .tw-dimension line {
+    stroke: var(--color-ink-rule);
+    stroke-width: 1;
+    vector-effect: non-scaling-stroke;
+  }
+
+  .tw-histogram rect {
+    fill: var(--color-on-ink-muted);
+    opacity: 0.45;
+  }
+
+  .tw-histogram rect[data-peak='true'] {
+    fill: var(--tw-accent);
+    opacity: 1;
+  }
+
+  /* A wavefront travelling outward, made of nothing but staggered opacity over
+     rings at fixed radii. No transform, no animated geometry, no rAF.
+
+     The delays count *down* with radius (ring 1 is the innermost and starts
+     latest in the cycle), which is what makes the bright front move outward
+     rather than collapse inward. */
+  .tw-stage[data-active='true'] .tw-ripple circle {
+    animation: tw-ripple 3.2s linear infinite;
+  }
+  .tw-stage[data-active='true'] .tw-ripple circle:nth-child(1) {
+    animation-delay: -2.4s;
+  }
+  .tw-stage[data-active='true'] .tw-ripple circle:nth-child(2) {
+    animation-delay: -2s;
+  }
+  .tw-stage[data-active='true'] .tw-ripple circle:nth-child(3) {
+    animation-delay: -1.6s;
+  }
+  .tw-stage[data-active='true'] .tw-ripple circle:nth-child(4) {
+    animation-delay: -1.2s;
+  }
+  .tw-stage[data-active='true'] .tw-ripple circle:nth-child(5) {
+    animation-delay: -0.8s;
+  }
+  .tw-stage[data-active='true'] .tw-ripple circle:nth-child(6) {
+    animation-delay: -0.4s;
+  }
+  .tw-stage[data-active='true'] .tw-ripple circle:nth-child(7) {
+    animation-delay: 0s;
+  }
+
+  /* --- fpga / routing ---------------------------------------------------- */
+
+  .tw-channels line,
+  .tw-clock line {
+    stroke: var(--color-ink-rule);
+    stroke-width: 1;
+    opacity: 0.4;
+    vector-effect: non-scaling-stroke;
+  }
+
+  .tw-clock-active {
+    fill: var(--tw-accent);
+  }
+
+  .tw-cell {
+    fill: var(--color-ink-raised);
+    stroke: var(--color-ink-rule);
+    stroke-width: 1;
+    vector-effect: non-scaling-stroke;
+    transition: stroke var(--duration-fast) var(--ease-standard);
+  }
+
+  .tw-cell[data-claimed='true'] {
+    stroke: var(--tw-accent);
+  }
+
+  .tw-route {
+    fill: none;
+    stroke: var(--color-ink-rule);
+    stroke-width: 1.2;
+    opacity: 0.5;
+    vector-effect: non-scaling-stroke;
+    transition:
+      stroke var(--duration-fast) var(--ease-standard),
+      opacity var(--duration-fast) var(--ease-standard);
+  }
+
+  .tw-route[data-selected='true'] {
+    stroke: var(--tw-accent);
+    stroke-width: 1.6;
+    opacity: 1;
+  }
+
+  /* --- electronics / signal path ----------------------------------------- */
+
+  .tw-trace {
+    fill: none;
+    stroke: var(--color-ink-rule);
+    stroke-width: 1.4;
+    vector-effect: non-scaling-stroke;
+  }
+
+  /* `stroke-dasharray` arrives as a presentation attribute in a `pathLength`
+     normalised 0–100 space, so it cannot be transitioned — attributes are not
+     animatable properties. That is the deliberate trade for a CSP-safe island,
+     and an instant response to a pointer is the more instrument-like reading
+     anyway. */
+  .tw-trace-live {
+    fill: none;
+    stroke: var(--tw-accent);
+    stroke-width: 1.6;
+    vector-effect: non-scaling-stroke;
+  }
+
+  .tw-vias circle {
+    fill: var(--color-ink);
+    stroke: var(--color-ink-rule);
+    stroke-width: 1;
+    vector-effect: non-scaling-stroke;
+  }
+
+  .tw-block {
+    fill: var(--color-ink-raised);
+    stroke: var(--color-ink-rule);
+    stroke-width: 1;
+    vector-effect: non-scaling-stroke;
+    transition: stroke var(--duration-fast) var(--ease-standard);
+  }
+
+  .tw-block-glyph {
+    fill: none;
+    stroke: var(--color-on-ink-muted);
+    stroke-width: 1.3;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    vector-effect: non-scaling-stroke;
+    transition: stroke var(--duration-fast) var(--ease-standard);
+  }
+
+  .tw-blocks g[data-energised='true'] .tw-block {
+    stroke: var(--tw-accent);
+  }
+
+  .tw-blocks g[data-energised='true'] .tw-block-glyph {
+    stroke: var(--color-on-ink);
+  }
+
+  .tw-probe {
+    fill: none;
+    stroke: var(--tw-accent);
+    stroke-width: 1;
+    vector-effect: non-scaling-stroke;
+  }
+
+  /* --- audio / waveform -------------------------------------------------- */
+
+  .tw-graticule line {
+    stroke: var(--color-ink-rule);
+    stroke-width: 1;
+    opacity: 0.4;
+    vector-effect: non-scaling-stroke;
+  }
+
+  .tw-wave {
+    fill: none;
+    stroke: var(--tw-accent);
+    stroke-width: 1.6;
+    stroke-linejoin: round;
+    vector-effect: non-scaling-stroke;
+  }
+
+  /* Declared explicitly so `translateX(-100%)` in the travel keyframe resolves
+     against the view box (one frame width) rather than this group's own
+     bounding box, which is two tiles wide. */
+  .tw-wave-travel {
+    transform-box: view-box;
+    transform-origin: 0 0;
+  }
+
+  .tw-spectrum rect {
+    fill: var(--color-on-ink-muted);
+    opacity: 0.5;
+  }
+
+  .tw-spectrum rect[data-peak='true'] {
+    fill: var(--tw-accent);
+    opacity: 1;
+  }
+
+  .tw-stage[data-active='true'] .tw-wave-travel {
+    animation: tw-wave-travel 9s linear infinite;
+  }
+
+  .tw-stage[data-active='true'] .tw-spectrum rect {
+    animation: tw-bar-breathe 2.6s var(--ease-instrument) infinite;
+  }
+  .tw-stage[data-active='true'] .tw-spectrum rect:nth-child(6n + 2) {
+    animation-delay: -0.43s;
+  }
+  .tw-stage[data-active='true'] .tw-spectrum rect:nth-child(6n + 3) {
+    animation-delay: -0.86s;
+  }
+  .tw-stage[data-active='true'] .tw-spectrum rect:nth-child(6n + 4) {
+    animation-delay: -1.3s;
+  }
+  .tw-stage[data-active='true'] .tw-spectrum rect:nth-child(6n + 5) {
+    animation-delay: -1.73s;
+  }
+  .tw-stage[data-active='true'] .tw-spectrum rect:nth-child(6n + 6) {
+    animation-delay: -2.16s;
+  }
+
+  /* --- Signal pulses -----------------------------------------------------
+     Rendered by the island only while a stage is active, so there is no
+     resting element with `opacity: 0` anywhere in this section. --------- */
+
+  .tw-route-pulse,
+  .tw-trace-pulse {
+    fill: none;
+    stroke: var(--tw-accent);
+    stroke-width: 2.6;
+    stroke-linecap: round;
+    stroke-dasharray: 14 86;
+    vector-effect: non-scaling-stroke;
+    animation: tw-pulse-travel 2.4s linear infinite;
+  }
+
+  .tw-trace-pulse {
+    animation-duration: 3.4s;
+  }
+
+  /* ===========================================================================
+     KEYFRAMES
+     Every one of these perturbs a state that is already visible. None of them
+     is the reason anything is on screen.
+     ======================================================================== */
+
+  @keyframes tw-node-pulse {
+    0%,
+    100% {
+      opacity: 0.55;
+    }
+    50% {
+      opacity: 1;
+    }
+  }
+
+  @keyframes tw-edge-breathe {
+    0%,
+    100% {
+      opacity: 0.28;
+    }
+    50% {
+      opacity: 0.72;
+    }
+  }
+
+  @keyframes tw-ripple {
+    from {
+      opacity: 0.72;
+    }
+    to {
+      opacity: 0.06;
+    }
+  }
+
+  @keyframes tw-bar-breathe {
+    0%,
+    100% {
+      opacity: 0.35;
+    }
+    50% {
+      opacity: 0.9;
+    }
+  }
+
+  /* One tile is one frame width, and `transform-box: view-box` makes 100% mean
+     exactly that — so the shift is expressed without handing CSS a measured
+     length through an inline custom property. The second copy of the wave is
+     drawn one tile to the right, so the loop has no seam. */
+  @keyframes tw-wave-travel {
+    from {
+      transform: translateX(0);
+    }
+    to {
+      transform: translateX(-100%);
+    }
+  }
+
+  /* The pulsed paths declare `pathLength="100"`, so their dash geometry lives
+     in a normalised 0–100 space and one offset serves every route regardless of
+     its real length. */
+  @keyframes tw-pulse-travel {
+    from {
+      stroke-dashoffset: 0;
+    }
+    to {
+      stroke-dashoffset: -100;
+    }
+  }
+
+  /* ===========================================================================
+     REDUCED MOTION — MOTION_SYSTEM §6
+
+     The real gate is in JavaScript: the island's `matchMedia` check means the
+     GSAP timeline and the ScrollTrigger are never constructed, so there is no
+     pin, no horizontal translation and no scroll distance to reclaim. The
+     section stays the vertical stack it was server-rendered as, and every
+     stage renders one static representative frame.
+
+     This block is the second belt. It removes the ambient stage animation at
+     the CSS level as well, and it can do so with `animation: none` precisely
+     because no element here depends on an animation to become visible.
+     ======================================================================== */
+
+  @media (prefers-reduced-motion: reduce) {
+    .tw .tw-stage *,
+    .tw .tw-stage {
+      animation: none !important;
+    }
+
+    .tw-panel,
+    .tw-rail__stop,
+    .tw-net-edge,
+    .tw-net-node,
+    .tw-cell,
+    .tw-route,
+    .tw-trace-live,
+    .tw-block,
+    .tw-block-glyph {
+      transition: none !important;
+    }
+  }
+</style>

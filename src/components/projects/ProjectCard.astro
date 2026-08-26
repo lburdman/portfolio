@@ -1,0 +1,663 @@
+---
+/**
+ * A single project, presented as an entry in an engineering notebook rather
+ * than as a SaaS card.
+ *
+ * ## The whole card is the link
+ *
+ * The title carries the one real `<a>`; a `::after` pseudo-element stretches
+ * that anchor over the entire card. So the card has exactly **one** tab stop
+ * for "open the case study", and its accessible name is the project title —
+ * not "View project", repeated four times down a listing.
+ *
+ * The visible `VIEW PROJECT →` line is `aria-hidden` on purpose. It is the
+ * sighted affordance for a link that already exists; promoting it to a second
+ * anchor would duplicate the destination in the tab order and in the a11y tree.
+ *
+ * `github` / `demo` are genuinely different destinations, so they stay real
+ * anchors. They are lifted above the stretched overlay with `z-index`, and
+ * because they sit after the title in DOM order the tab sequence inside one
+ * card is always:
+ *
+ *   1. card (title link → case study)
+ *   2. GitHub   (only when `links.github` exists)
+ *   3. Live demo (only when `links.demo` exists)
+ *
+ * ## Nothing is hover-only
+ *
+ * Every piece of information — summary, domains, stack, role, year, links — is
+ * in the resting state. Hover and focus change *emphasis*, never content, and
+ * `:focus-within` produces byte-identical styling to `:hover`, so a keyboard
+ * user sees exactly what a pointer user sees. On touch (`hover: none`) the card
+ * simply starts in the stronger state (brief §33, MOTION_SYSTEM §7).
+ *
+ * ## Motion
+ *
+ * One state change: a 2px lift, the top rule darkening from `--color-rule` to
+ * `--color-ink`, and a soft pool of `--color-paper-raised` behind the card —
+ * light falling on a sheet that has risen slightly off the page. That is the
+ * brief's "subtle depth + spotlight" baseline rendered as a *single* effect,
+ * which is also what MOTION_SYSTEM §9 asks for. Deliberately absent: tilt (of
+ * any angle), scale, glare sweep, media zoom, and metadata reveal.
+ *
+ * The spotlight is anchored to the card, not to the pointer. A pointer-tracked
+ * spotlight cannot be reproduced for a keyboard user, and this system does not
+ * ship states that only one input method can reach.
+ *
+ * ## Strings and colour
+ *
+ * Every user-facing string, including `aria-label` and `alt`, comes from `t`
+ * (audit 2.8). No colour literal appears here; domain accents are read as
+ * `var(--color-domain-*)` through the `accentVar` token name that
+ * `src/config/domains.ts` owns.
+ */
+
+import { Image } from 'astro:assets';
+import { domainOrdinal, getDomain } from '@/config/domains';
+import { localizePath, type Locale, type UIStrings } from '@/i18n';
+import type { Project } from '@/lib/projects';
+
+interface Props {
+  /** The joined project: shared metadata plus the localized title and summary. */
+  project: Project;
+  /** The dictionary. Components never look translations up themselves. */
+  t: UIStrings;
+  /** Needed as well as `base` — audit 1.3 was a component that only had `base`. */
+  locale: Locale;
+  /** Deployment base path. Every href goes through `localizePath`. */
+  base: string;
+  /**
+   * Heading level for the card title. The surrounding section owns the level
+   * above it; passing this is how the projects index stops skipping h1 → h3
+   * (audit 2.2).
+   */
+  headingLevel?: 2 | 3 | 4 | undefined;
+  /**
+   * Position in the listing, rendered as a two-digit figure number in the
+   * margin. Locale-independent and `aria-hidden`, so it is annotation rather
+   * than an untranslated string.
+   */
+  index?: number | undefined;
+  /** `lead` is the editorial opener of a listing: larger title, wider measure. */
+  emphasis?: 'lead' | 'default' | undefined;
+}
+
+const { project, t, locale, base, headingLevel = 3, index, emphasis = 'default' } = Astro.props;
+const { meta, title, summary } = project;
+
+const HEADINGS = { 2: 'h2', 3: 'h3', 4: 'h4' } as const;
+const Heading = HEADINGS[headingLevel];
+
+const href = localizePath(`/projects/${meta.slug}`, locale, base);
+
+/**
+ * Cover images are stored as a path string (`"media/cover.webp"`), not as an
+ * `image()` schema field, because `src/content/schema.ts` deliberately imports
+ * no Astro virtual module. Resolving them through `import.meta.glob` gives back
+ * real `ImageMetadata` — which is what `<Image />` needs in order to emit
+ * `width`/`height` and a `srcset`.
+ *
+ * The audit's MEDIUM performance finding was a raw `<img>` with no dimensions.
+ * No project ships a cover today, so this branch is currently unexercised and
+ * the glob resolves to an empty object; the typographic branch below is the one
+ * that actually renders. Raster formats only — `astro:assets` does not
+ * transform SVG, and a diagram cover would want different framing anyway.
+ */
+const covers = import.meta.glob<{ default: ImageMetadata }>(
+  '/src/content/projects/*/media/*.{webp,avif,png,jpg,jpeg}',
+  { eager: true },
+);
+const cover = meta.cover ? covers[`/src/content/projects/${meta.slug}/${meta.cover}`]?.default : undefined;
+
+const domains = meta.domains.map((id) => {
+  const domain = getDomain(id);
+  return { id, ordinal: domainOrdinal(domain), accentVar: domain.accentVar, name: t.worlds.items[id].name };
+});
+
+/** Role and year are optional content. Absent means absent — never a placeholder. */
+const credits: string[] = [];
+if (meta.role) credits.push(meta.role);
+if (meta.year !== undefined) credits.push(String(meta.year));
+
+const links = meta.links;
+const external = [
+  links?.github ? { href: links.github, text: t.projects.github, label: t.a11y.projectGithubLabel(title) } : null,
+  links?.demo ? { href: links.demo, text: t.projects.demo, label: t.a11y.projectDemoLabel(title) } : null,
+].filter((link): link is NonNullable<typeof link> => link !== null);
+
+const figure = index === undefined ? undefined : String(index).padStart(2, '0');
+
+/**
+ * View-transition idents, carried as plain data attributes.
+ *
+ * `SLUG_PATTERN` forbids anything outside `[a-z0-9-]` and the literal prefix
+ * keeps the result a valid `<custom-ident>` even for a slug starting with a
+ * digit, so these are safe to read straight into `view-transition-name`.
+ *
+ * They are attributes rather than an inline `style` because the site ships a
+ * hash-based CSP — see the long note above `.card__title-text` for why that
+ * distinction is load-bearing rather than stylistic.
+ */
+const titleTransition = `project-title-${meta.slug}`;
+const mediaTransition = `project-media-${meta.slug}`;
+---
+
+<article class:list={['card', `card--${emphasis}`, !cover && 'card--typographic']} data-project={meta.slug}>
+  {
+    /* The card's masthead rule: one tinted segment per technical domain, then a
+      hairline running out to the measure. A datasheet channel legend. It is
+      redundant with the domain labels below, hence aria-hidden. */
+  }
+  <div class="card__channels" aria-hidden="true">
+    {domains.map((domain) => <span class="card__channel" data-domain={domain.id} />)}
+    <span class="card__channel-rule"></span>
+    {figure && <span class="card__figure">{figure}</span>}
+  </div>
+
+  {
+    cover && (
+      <div class="card__media" data-vt={mediaTransition}>
+        <Image
+          src={cover}
+          alt={title}
+          widths={[480, 768, 1080]}
+          sizes="(min-width: 60rem) 40rem, 100vw"
+          loading="lazy"
+          decoding="async"
+        />
+      </div>
+    )
+  }
+
+  <Heading class="card__title">
+    <a class="card__link" href={href}><span class="card__title-text" data-vt={titleTransition}>{title}</span></a>
+  </Heading>
+
+  <p class="card__summary">{summary}</p>
+
+  {credits.length > 0 && <p class="card__credits">{credits.join(' · ')}</p>}
+
+  <ul class="card__tags card__tags--domains" aria-label={t.projects.domains}>
+    {
+      domains.map((domain) => (
+        <li class="card__domain" data-domain={domain.id}>
+          <span class="card__domain-mark" aria-hidden="true" />
+          {domain.name}
+        </li>
+      ))
+    }
+  </ul>
+
+  <ul class="card__tags card__tags--stack" aria-label={t.projects.stack}>
+    {meta.stack.map((entry) => <li class="card__stack-item">{entry}</li>)}
+  </ul>
+
+  <div class="card__foot">
+    <p class="card__cta" aria-hidden="true">
+      {t.projects.viewProject}<span class="card__arrow">&#8594;</span>
+    </p>
+
+    {
+      external.length > 0 && (
+        <ul class="card__links" aria-label={t.projects.links}>
+          {external.map((link) => (
+            <li>
+              <a class="card__external" href={link.href} aria-label={link.label}>
+                {link.text}
+                <span class="card__external-mark" aria-hidden="true">
+                  &#8599;
+                </span>
+              </a>
+            </li>
+          ))}
+        </ul>
+      )
+    }
+  </div>
+</article>
+
+<style>
+  /* ---------------------------------------------------------------------------
+     Domain accents
+
+     Resolved from `data-domain` here rather than from an inline `style` on each
+     element. That is a CSP requirement, not a preference: `astro.config.mjs`
+     enables `security.csp`, Astro emits `style-src` with hashes and **no**
+     `style-src-attr` and no `'unsafe-hashes'`, and a hash never authorises a
+     style *attribute* — only a `<style>` element. Every inline `style=""` on
+     the page is therefore dropped in production while working perfectly in
+     `astro dev`. Painting the accents that way shipped a card whose masthead
+     channels and domain markers were invisible on the live site.
+
+     Same pattern as the Technical Worlds island. `--domain-accent` is consumed
+     only as a `background-color` mix; see the NON-TEXT ONLY notes below.
+
+     These five lines mirror `Domain['accentVar']`, typed
+     `--color-domain-${DomainId}`. CSS cannot derive the name, so a sixth domain
+     needs a sixth line — `tests/project-card.test.ts` fails if one is missing.
+     ------------------------------------------------------------------------ */
+
+  .card [data-domain='ai'] {
+    --domain-accent: var(--color-domain-ai);
+  }
+  .card [data-domain='quantum'] {
+    --domain-accent: var(--color-domain-quantum);
+  }
+  .card [data-domain='fpga'] {
+    --domain-accent: var(--color-domain-fpga);
+  }
+  .card [data-domain='electronics'] {
+    --domain-accent: var(--color-domain-electronics);
+  }
+  .card [data-domain='audio'] {
+    --domain-accent: var(--color-domain-audio);
+  }
+
+  /* ---------------------------------------------------------------------------
+     The card box
+     ------------------------------------------------------------------------ */
+
+  .card {
+    position: relative;
+    /* Keeps the spotlight's negative z-index inside this card rather than
+       letting it slide behind the page ground. */
+    isolation: isolate;
+    display: flex;
+    flex-direction: column;
+    gap: 0.875rem;
+    height: 100%;
+    transition: transform var(--duration-base) var(--ease-standard);
+  }
+
+  /* The spotlight: a pool of raised paper, anchored to the card's leading
+     corner. It bleeds outside the card box so the lift reads without any text
+     moving, and it is opacity-only so it costs one composited layer. */
+  .card::before {
+    content: '';
+    position: absolute;
+    inset: calc(-1 * var(--spacing-gutter)) calc(-0.75 * var(--spacing-gutter));
+    z-index: -1;
+    border-radius: var(--radius-sm);
+    background: radial-gradient(115% 90% at 10% 0%, var(--color-paper-raised) 0%, transparent 72%);
+    opacity: 0;
+    transition: opacity var(--duration-fast) var(--ease-standard);
+  }
+
+  .card:hover,
+  .card:focus-within {
+    transform: translateY(-2px);
+  }
+
+  /* :focus-within is listed alongside :hover on every rule in this file. If a
+     pointer can see it, a keyboard can see it. */
+  .card:hover::before,
+  .card:focus-within::before {
+    opacity: 1;
+  }
+
+  /* ---------------------------------------------------------------------------
+     Masthead: domain channels + figure number
+     ------------------------------------------------------------------------ */
+
+  .card__channels {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    width: 100%;
+    padding-bottom: 0.75rem;
+  }
+
+  .card__channel {
+    width: 2.25rem;
+    height: var(--border-rule);
+    /* NON-TEXT ONLY. The oscilloscope accents are balanced for the ink ground,
+       so on paper they are mixed toward ink to recover contrast (tokens.css
+       carries the measured table and the boxed warning).
+
+       68% measures 3.41-4.90:1 on paper: fpga 3.41 / ai 3.51 / quantum 3.88 /
+       audio 4.34 / electronics 5.12. That clears the 3:1 WCAG 1.4.11 needs of a
+       graphic mark, with headroom -- the 73% ceiling would put fpga at 3.04,
+       which is too close to the floor for a 2px bar to be worth the saturation.
+
+       It does NOT clear 4.5:1, so this ratio must never be moved onto a `color`
+       property. Domain-coloured TEXT requires the 56% mix (4.51-6.14:1). No text
+       in this component is domain-tinted; see .card__tags--domains. */
+    background-color: color-mix(in oklab, var(--domain-accent) 68%, var(--color-ink));
+  }
+
+  .card__channel-rule {
+    flex: 1;
+    height: 0;
+    border-top: var(--border-rule) solid var(--color-rule);
+    transition: border-color var(--duration-fast) var(--ease-standard);
+  }
+
+  .card:hover .card__channel-rule,
+  .card:focus-within .card__channel-rule {
+    border-top-color: var(--color-ink);
+  }
+
+  .card__figure {
+    padding-left: 0.75rem;
+    font-family: var(--font-mono);
+    font-stretch: normal;
+    font-size: var(--text-micro);
+    font-weight: 500;
+    letter-spacing: var(--tracking-wide);
+    color: var(--color-slate);
+  }
+
+  /* ---------------------------------------------------------------------------
+     Media — only rendered when a project actually has a cover.
+
+     There is no placeholder branch. A project without a cover is a typographic
+     entry, not a card with a hole in it: the masthead channels and an enlarged
+     title carry the visual weight instead (see `.card--typographic`).
+     ------------------------------------------------------------------------ */
+
+  .card__media {
+    width: 100%;
+    overflow: hidden;
+    border: var(--border-hairline) solid var(--color-rule);
+    border-radius: var(--radius-sm);
+    background-color: var(--color-paper-raised);
+    view-transition-name: var(--vt-media, attr(data-vt type(<custom-ident>), none));
+  }
+
+  /* `<Image />` renders its own <img>, so it is reached through the wrapper
+     rather than through a class the scoper may or may not forward. `<Image />`
+     already emits width/height attributes from the source's `ImageMetadata`;
+     the reserved aspect box below means the card cannot shift even before the
+     bytes arrive (audit: raw <img> without dimensions was the CLS finding). */
+  .card__media :global(img) {
+    width: 100%;
+    aspect-ratio: 16 / 10;
+    object-fit: cover;
+  }
+
+  /* ---------------------------------------------------------------------------
+     Title — the one real link, stretched over the whole card
+     ------------------------------------------------------------------------ */
+
+  .card__title {
+    font-size: var(--text-display-4);
+  }
+
+  /* ---------------------------------------------------------------------------
+     View-transition idents, read from an attribute by static CSS.
+
+     The ident must be unique per document and identical across the two
+     documents being paired, so it is per-slug and cannot be a fixed literal.
+     Every other way of getting a per-element value into CSS is closed here:
+
+       · an inline `style` attribute is DROPPED. `security.csp` emits
+         `style-src` with hashes and no `style-src-attr`; `style-src-attr` falls
+         back to `style-src`, and a hash only ever authorises a `<style>`
+         element, never an attribute. Verified on a real build.
+       · a generated `<style is:inline>` is dropped too — verified: Astro hashes
+         only the style elements it compiles itself, so the element's sha256 is
+         absent from the policy.
+       · `Astro.csp.insertStyleHash()` cannot rescue that. `renderAllHeadContent`
+         serialises the policy at the moment `<head>` renders, which is before
+         any body component runs, so the call is a silent no-op from here.
+
+     So the value comes from `data-vt` and the rule stays completely static, in
+     the bundled stylesheet, under plain `style-src 'self'`.
+
+     `var(--vt-title, …)` wraps it deliberately: `global.css` nulls `--vt-title`
+     with `!important` under reduced motion, and keeping the property in the
+     chain means that guard still wins with no change to the other agent's file.
+
+     Advanced `attr()` is Chromium-only for now. Where it is unsupported the
+     declaration is invalid at computed-value time, `view-transition-name`
+     resolves to `none`, and the browser performs an ordinary navigation — the
+     same graceful degradation as a browser with no view transitions at all.
+     ------------------------------------------------------------------------ */
+  .card__title-text {
+    view-transition-name: var(--vt-title, attr(data-vt type(<custom-ident>), none));
+  }
+
+  .card__link {
+    color: inherit;
+    text-decoration: none;
+  }
+
+  .card__link::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    border-radius: var(--radius-sm);
+  }
+
+  /* The ring belongs around the card, not around the title's text box — but the
+     focused element is the anchor. Moving the outline onto the stretched
+     pseudo-element gives the correct visual without needing :has(). */
+  .card__link:focus-visible {
+    outline: none;
+  }
+
+  .card__link:focus-visible::after {
+    outline: var(--border-rule) solid var(--focus-ring);
+    outline-offset: 4px;
+  }
+
+  /* ---------------------------------------------------------------------------
+     Copy and metadata
+     ------------------------------------------------------------------------ */
+
+  .card__summary {
+    max-width: var(--container-prose);
+    color: var(--color-slate);
+    text-wrap: pretty;
+  }
+
+  .card__credits {
+    font-family: var(--font-mono);
+    font-stretch: normal;
+    font-size: var(--text-caption);
+    letter-spacing: var(--tracking-label);
+    color: var(--color-slate);
+  }
+
+  .card__tags {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.375rem 0.875rem;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    font-family: var(--font-mono);
+    font-stretch: normal;
+    font-size: var(--text-micro);
+    font-weight: 500;
+    line-height: 1.4;
+    letter-spacing: var(--tracking-eyebrow);
+    text-transform: uppercase;
+  }
+
+  .card__tags--domains {
+    color: var(--color-ink);
+  }
+
+  .card__domain {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  /* The one emphatic case tokens.css reserves --border-heavy for: a domain
+     channel marker. An empty, aria-hidden 3px bar, purely redundant with the
+     label beside it -- which is why it may sit at the non-text mix.
+
+     NON-TEXT ONLY, 68% = 3.41-4.90:1 on paper. The `--domain-accent` custom
+     property is *declared* on `.card__domain` (a text-bearing <li>) but is
+     consumed only here, as a background. The label's own colour comes from
+     `.card__tags--domains` and is --color-ink at 14.38:1. Tinting that text
+     would require the 56% mix; do not reach for this variable to do it. */
+  .card__domain-mark {
+    width: var(--border-heavy);
+    height: 0.75em;
+    background-color: color-mix(in oklab, var(--domain-accent) 68%, var(--color-ink));
+  }
+
+  .card__tags--stack {
+    color: var(--color-slate);
+    gap: 0.375rem 0.75rem;
+  }
+
+  .card__stack-item {
+    padding: 0.125rem 0.5rem;
+    border: var(--border-hairline) solid var(--color-rule);
+    border-radius: var(--radius-sm);
+    transition: border-color var(--duration-fast) var(--ease-standard);
+  }
+
+  .card:hover .card__stack-item,
+  .card:focus-within .card__stack-item {
+    border-color: var(--color-slate);
+  }
+
+  /* ---------------------------------------------------------------------------
+     Foot: the sighted affordance, plus the genuinely separate destinations
+     ------------------------------------------------------------------------ */
+
+  .card__foot {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem 1.5rem;
+    width: 100%;
+    /* Pins the action row to the bottom so a row of cards lines up. */
+    margin-top: auto;
+    padding-top: 0.75rem;
+  }
+
+  .card__cta,
+  .card__external {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 0.5em;
+    font-family: var(--font-mono);
+    font-stretch: normal;
+    font-size: var(--text-caption);
+    font-weight: 500;
+    letter-spacing: var(--tracking-label);
+    text-transform: uppercase;
+  }
+
+  .card__cta {
+    color: var(--color-ink);
+    transition: color var(--duration-fast) var(--ease-standard);
+  }
+
+  .card:hover .card__cta,
+  .card:focus-within .card__cta {
+    color: var(--color-accent);
+  }
+
+  .card__arrow {
+    transition: transform var(--duration-fast) var(--ease-standard);
+  }
+
+  .card:hover .card__arrow,
+  .card:focus-within .card__arrow {
+    transform: translateX(0.25em);
+  }
+
+  .card__links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem 1rem;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    /* Above the stretched overlay, so these stay clickable and keep their own
+       tab stops after the card's own link. */
+    position: relative;
+    z-index: 2;
+  }
+
+  .card__external {
+    color: var(--color-slate);
+    text-decoration: underline;
+    text-decoration-thickness: from-font;
+    text-underline-offset: 0.3em;
+    transition: color var(--duration-fast) var(--ease-standard);
+  }
+
+  .card__external:hover,
+  .card__external:focus-visible {
+    color: var(--color-accent);
+  }
+
+  .card__external-mark {
+    font-size: 0.9em;
+  }
+
+  /* ---------------------------------------------------------------------------
+     Editorial emphasis
+     ------------------------------------------------------------------------ */
+
+  .card--lead {
+    gap: 1.125rem;
+  }
+
+  @media (min-width: 48rem) {
+    .card--lead .card__title {
+      font-size: var(--text-display-3);
+    }
+
+    .card--lead .card__summary {
+      font-size: var(--text-lg);
+    }
+
+    .card--lead .card__channel {
+      width: 3.5rem;
+    }
+  }
+
+  /* No cover: the title is the image. Slightly more air and a heavier masthead
+     so the entry reads as deliberate typography rather than a missing slot. */
+  .card--typographic .card__channels {
+    padding-bottom: 1rem;
+  }
+
+  /* ---------------------------------------------------------------------------
+     Touch: the card starts in the stronger state (brief §33).
+     ------------------------------------------------------------------------ */
+
+  @media (hover: none) {
+    .card__channel-rule {
+      border-top-color: var(--color-ink);
+    }
+
+    .card:hover {
+      transform: none;
+    }
+  }
+
+  /* ---------------------------------------------------------------------------
+     Reduced motion.
+
+     Durations already collapse globally (global.css), so the state change is
+     instant rather than removed — nothing disappears and nothing waits on an
+     animation. What must be switched off here is the cross-document view
+     transition: an unnamed element is simply not paired, and the browser
+     performs an ordinary navigation.
+     ------------------------------------------------------------------------ */
+
+  @media (prefers-reduced-motion: reduce) {
+    .card__title-text,
+    .card__media {
+      view-transition-name: none;
+    }
+
+    .card:hover,
+    .card:focus-within {
+      transform: none;
+    }
+  }
+</style>

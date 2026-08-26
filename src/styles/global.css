@@ -1,25 +1,48 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+/* =============================================================================
+   GLOBAL STYLESHEET
 
-/* =========================================
-   CSS Custom Properties — Design System
-   ========================================= */
-:root {
-  --color-bg: #0a0a0f;
-  --color-surface: #12121a;
-  --color-border: #1e1e2e;
-  --color-highlight: #252535;
-  --color-text-primary: #e8e8f0;
-  --color-text-secondary: #8888a0;
-  --color-text-muted: #55556a;
-  --color-accent: #6366f1;
-  --color-accent-hover: #818cf8;
-}
+   Order matters and is load-bearing:
+     1. Tailwind 4 core (declares the theme/base/components/utilities layers)
+     2. src/styles/tokens.css — the only file allowed to hold a raw colour
+     3. self-hosted fonts
 
-/* =========================================
-   Base Resets
-   ========================================= */
+   Nothing below this header contains a literal colour value. Every colour is
+   `var(--color-*)`. If you need a new one, add it to tokens.css.
+   ========================================================================== */
+
+@import 'tailwindcss';
+@import './tokens.css';
+
+/* -----------------------------------------------------------------------------
+   FONTS — self-hosted, no third-party origin on the critical path.
+
+   The audit's HIGH performance finding was a render-blocking Google Fonts
+   stylesheet. These are bundled by Vite and served from our own origin.
+
+   Archivo: `wdth.css` is the only import needed. That file declares
+   `font-weight: 100 900` AND `font-stretch: 62% 125%` over a single woff2 per
+   subset — verified in node_modules/@fontsource-variable/archivo/wdth.css and
+   metadata.json (wght 100-900, wdth 62-125). Importing `index.css` would give
+   the weight axis only and lose the expanded display voice. Italics are
+   deliberately not imported: this system does not use them.
+
+   IBM Plex Mono is a static family, so only the two weights actually used
+   (400, 500) and the two subsets the site needs (latin, latin-ext for Spanish)
+   are imported.
+
+   Every @font-face here ships `font-display: swap` from the packages.
+   -------------------------------------------------------------------------- */
+
+@import '@fontsource-variable/archivo/wdth.css';
+@import '@fontsource/ibm-plex-mono/latin-400.css';
+@import '@fontsource/ibm-plex-mono/latin-500.css';
+@import '@fontsource/ibm-plex-mono/latin-ext-400.css';
+@import '@fontsource/ibm-plex-mono/latin-ext-500.css';
+
+/* =============================================================================
+   BASE
+   ========================================================================== */
+
 @layer base {
   *,
   *::before,
@@ -27,303 +50,590 @@
     box-sizing: border-box;
   }
 
+  :root {
+    /* The focus ring colour is indirected through this variable so the dark
+       inversion can swap it without any component knowing. Ultramarine reads
+       6.10:1 on paper but only 2.36:1 on ink, so it cannot serve both grounds.
+       `.on-ink` below re-points this at --color-phosphor (8.23:1 on ink). */
+    --focus-ring: var(--color-accent);
+
+    color-scheme: light;
+  }
+
   html {
     scroll-behavior: smooth;
     -webkit-text-size-adjust: 100%;
-    font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
-    background-color: #0a0a0f;
+    background-color: var(--color-paper);
   }
 
   body {
-    background-color: #0a0a0f;
-    color: var(--color-text-primary);
-    font-family: 'Inter', system-ui, sans-serif;
-    min-height: 100vh;
-    line-height: 1.6;
+    min-height: 100svh;
+    margin: 0;
+    background-color: var(--color-paper);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    font-stretch: var(--body-width-normal);
+    font-size: var(--text-base);
+    font-weight: 400;
+    line-height: var(--leading-body);
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
   }
 
-  /* Focus rings — accessibility */
-  :focus-visible {
-    outline: 2px solid var(--color-accent);
-    outline-offset: 3px;
-    border-radius: 2px;
-  }
+  /* --- Headings -------------------------------------------------------------
+     One superfamily, two voices. Headings sit on the expanded end of Archivo's
+     width axis (wdth ~112) at 600-700 — industrial signage, panel lettering.
+     Body stays at wdth 100.
 
-  /* Selection color */
-  ::selection {
-    background-color: rgba(99, 102, 241, 0.3);
-    color: var(--color-text-primary);
-  }
-
-  /* Scrollbar */
-  ::-webkit-scrollbar {
-    width: 6px;
-  }
-  ::-webkit-scrollbar-track {
-    background: var(--color-surface);
-  }
-  ::-webkit-scrollbar-thumb {
-    background: var(--color-border);
-    border-radius: 3px;
-  }
-  ::-webkit-scrollbar-thumb:hover {
-    background: var(--color-text-muted);
-  }
-
-  /* Typography */
+     `h1` intentionally defaults to display-2, not display-1. display-1 is the
+     hero's alone; opt into it with `text-display-1` so calmer pages (project
+     case studies) do not inherit a 112px headline.
+     ----------------------------------------------------------------------- */
   h1,
   h2,
   h3,
   h4,
   h5,
   h6 {
-    font-family: 'Inter', system-ui, sans-serif;
+    margin: 0;
+    font-family: var(--font-display);
+    font-stretch: var(--display-width-expanded);
     font-weight: 600;
-    letter-spacing: -0.025em;
-    color: var(--color-text-primary);
-    line-height: 1.25;
+    line-height: var(--leading-heading);
+    letter-spacing: var(--tracking-heading);
+    color: var(--color-ink);
+    text-wrap: balance;
   }
 
-  a {
-    color: inherit;
-    text-decoration: none;
-    transition: color 0.15s ease;
+  h1 {
+    font-size: var(--text-display-2);
+    font-weight: 700;
+    line-height: var(--leading-display);
+    letter-spacing: var(--tracking-display);
+  }
+
+  h2 {
+    font-size: var(--text-display-3);
+  }
+
+  h3 {
+    font-size: var(--text-display-4);
+  }
+
+  h4 {
+    font-size: var(--text-xl);
+    letter-spacing: var(--tracking-normal);
+  }
+
+  h5 {
+    font-size: var(--text-lg);
+    letter-spacing: var(--tracking-normal);
+  }
+
+  h6 {
+    font-family: var(--font-mono);
+    font-stretch: normal;
+    font-size: var(--text-micro);
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: var(--tracking-eyebrow);
+    color: var(--color-slate);
   }
 
   p {
-    line-height: 1.75;
-    color: var(--color-text-secondary);
+    margin: 0;
+    line-height: var(--leading-body);
   }
 
-  code,
-  pre {
-    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  /* Anchors inherit by default so navigation and card wrappers are not fighting
+     a global link style. Editorial links opt in with `.link` (or live inside
+     `.prose`, which styles them automatically). */
+  a {
+    color: inherit;
+    text-decoration: none;
   }
 
-  /* Prose for markdown content */
-  .prose {
-    color: var(--color-text-secondary);
-    line-height: 1.75;
-    max-width: 68ch;
-  }
-  .prose h2 {
-    font-size: 1.25rem;
-    font-weight: 600;
-    color: var(--color-text-primary);
-    margin-top: 2.5rem;
-    margin-bottom: 1rem;
-    padding-top: 2rem;
-    border-top: 1px solid var(--color-border);
-  }
-  .prose h3 {
-    font-size: 1.125rem;
-    font-weight: 600;
-    color: var(--color-text-primary);
-    margin-top: 2rem;
-    margin-bottom: 0.75rem;
-  }
-  .prose p {
-    margin-bottom: 1.25rem;
-  }
-  .prose ul,
-  .prose ol {
-    margin-bottom: 1.25rem;
-    padding-left: 1.25rem;
-  }
-  .prose ul {
-    list-style-type: disc;
-  }
-  .prose ol {
-    list-style-type: decimal;
-  }
-  .prose li {
-    color: var(--color-text-secondary);
-    margin-bottom: 0.5rem;
-  }
-  .prose strong {
-    color: var(--color-text-primary);
-    font-weight: 600;
-  }
-  .prose code {
-    font-family: 'JetBrains Mono', 'Fira Code', monospace;
-    font-size: 0.875rem;
-    background-color: var(--color-surface);
-    color: var(--color-accent-hover);
-    padding: 0.125rem 0.375rem;
-    border-radius: 0.25rem;
-  }
-  .prose pre {
-    background-color: var(--color-surface);
-    border: 1px solid var(--color-border);
-    border-radius: 0.75rem;
-    padding: 1.25rem;
-    overflow-x: auto;
-    margin-bottom: 1.5rem;
-  }
-  .prose pre code {
-    background-color: transparent;
+  ul,
+  ol {
+    margin: 0;
     padding: 0;
   }
+
+  /* --- Datasheet voice ------------------------------------------------------
+     Mono is the annotation layer: section numbers, domain labels, stack tags,
+     dates, code.
+     ----------------------------------------------------------------------- */
+  code,
+  pre,
+  kbd,
+  samp,
+  time {
+    font-family: var(--font-mono);
+    font-stretch: normal;
+    font-variant-ligatures: none;
+  }
+
+  pre {
+    margin: 0;
+  }
+
+  hr {
+    border: 0;
+    border-top: var(--border-hairline) solid var(--color-rule);
+    margin: var(--spacing-stack) 0;
+  }
+
+  img,
+  svg,
+  video,
+  canvas {
+    display: block;
+    max-width: 100%;
+    height: auto;
+  }
+
+  /* --- Focus ---------------------------------------------------------------
+     A single, unmistakable ring. 6.10:1 on paper / 6.57:1 on paper-raised via
+     --color-accent; 8.23:1 on ink / 7.39:1 on ink-raised via --color-phosphor.
+     Both clear the 3:1 that WCAG 1.4.11 requires of a focus indicator.
+     ----------------------------------------------------------------------- */
+  :focus-visible {
+    outline: var(--border-rule) solid var(--focus-ring);
+    outline-offset: 3px;
+    border-radius: var(--radius-sm);
+  }
+
+  /* Only suppress the default ring where :focus-visible is supported and has
+     already taken over, so keyboard focus is never silently removed. */
+  :focus:not(:focus-visible) {
+    outline: none;
+  }
+
+  ::selection {
+    background-color: var(--color-accent);
+    color: var(--color-paper);
+  }
+
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    background-color: var(--color-paper);
+  }
+  ::-webkit-scrollbar-thumb {
+    background-color: var(--color-rule);
+    border: 3px solid var(--color-paper);
+    border-radius: var(--radius-full);
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background-color: var(--color-slate);
+  }
+}
+
+/* =============================================================================
+   COMPONENTS — the small shared vocabulary. Layout and page components are
+   owned elsewhere; this layer holds only what typography and accessibility
+   need in order to be correct everywhere.
+   ========================================================================== */
+
+@layer components {
+  /* --- The dark inversion ---------------------------------------------------
+     The one place the paper ground flips: the Technical Worlds band, read as
+     looking into the instrument. Apply to the band's outermost element; the
+     custom properties inherit to everything inside it.
+     ----------------------------------------------------------------------- */
+  .on-ink {
+    --focus-ring: var(--color-phosphor);
+
+    background-color: var(--color-ink);
+    color: var(--color-on-ink);
+  }
+
+  .on-ink :is(h1, h2, h3, h4, h5) {
+    color: var(--color-on-ink);
+  }
+
+  .on-ink h6 {
+    color: var(--color-on-ink-muted);
+  }
+
+  .on-ink hr {
+    border-top-color: var(--color-ink-rule);
+  }
+
+  /* --- Skip link ------------------------------------------------------------
+     Visually hidden until focused, then unmistakable at the top-left. Sits on
+     paper-raised so the accent focus ring keeps its 6.57:1 against it, and its
+     own 2px accent border gives the element a visible boundary before the ring
+     is even considered.
+     ----------------------------------------------------------------------- */
+  .skip-link {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .skip-link:focus,
+  .skip-link:focus-visible {
+    position: fixed;
+    top: var(--spacing-gutter);
+    left: var(--spacing-gutter);
+    z-index: 999;
+    width: auto;
+    height: auto;
+    margin: 0;
+    padding: 0.625rem 1rem;
+    overflow: visible;
+    clip-path: none;
+    background-color: var(--color-paper-raised);
+    color: var(--color-ink);
+    border: var(--border-rule) solid var(--color-accent);
+    border-radius: var(--radius-sm);
+    font-family: var(--font-mono);
+    font-size: var(--text-caption);
+    font-weight: 500;
+    letter-spacing: var(--tracking-label);
+    text-transform: uppercase;
+  }
+
+  /* --- Editorial link ------------------------------------------------------- */
+  .link {
+    color: var(--color-accent);
+    text-decoration: underline;
+    text-decoration-thickness: from-font;
+    text-underline-offset: 0.2em;
+    transition: text-decoration-color var(--duration-fast) var(--ease-standard);
+  }
+
+  .link:hover {
+    text-decoration-thickness: var(--border-rule);
+  }
+
+  .on-ink .link {
+    color: var(--color-phosphor);
+  }
+
+  /* --- Eyebrow / label ------------------------------------------------------
+     The datasheet annotation voice: section numbers, domain labels, stack tags,
+     dates. Uppercase mono, opened up to 0.08em.
+     ----------------------------------------------------------------------- */
+  .eyebrow {
+    display: inline-block;
+    font-family: var(--font-mono);
+    font-stretch: normal;
+    font-size: var(--text-micro);
+    font-weight: 500;
+    line-height: 1.4;
+    letter-spacing: var(--tracking-eyebrow);
+    text-transform: uppercase;
+    color: var(--color-slate);
+  }
+
+  .on-ink .eyebrow {
+    color: var(--color-on-ink-muted);
+  }
+
+  /* --- Hairline -------------------------------------------------------------
+     The primary structural device in this system. 3.07:1 on paper, so it is a
+     legitimate UI boundary under WCAG 1.4.11 — unlike the 1.14:1 border the
+     audit found.
+     ----------------------------------------------------------------------- */
+  .hairline {
+    border: 0;
+    border-top: var(--border-hairline) solid var(--color-rule);
+  }
+
+  .on-ink .hairline {
+    border-top-color: var(--color-ink-rule);
+  }
+
+  /* --- Prose ----------------------------------------------------------------
+     Long-form case-study body. Measure capped at ~68ch.
+     ----------------------------------------------------------------------- */
+  .prose {
+    max-width: var(--container-prose);
+    color: var(--color-ink);
+    font-size: var(--text-lg);
+    line-height: var(--leading-prose);
+    text-wrap: pretty;
+  }
+
+  .prose > * + * {
+    margin-top: 1.25em;
+  }
+
+  .prose h2 {
+    margin-top: 2.5em;
+    padding-top: 1.25em;
+    border-top: var(--border-hairline) solid var(--color-rule);
+    font-size: var(--text-display-4);
+  }
+
+  .prose h3 {
+    margin-top: 2em;
+    font-size: var(--text-xl);
+  }
+
+  .prose ul {
+    padding-left: 1.25em;
+    list-style: square;
+  }
+
+  .prose ol {
+    padding-left: 1.25em;
+    list-style: decimal;
+  }
+
+  .prose li + li {
+    margin-top: 0.5em;
+  }
+
+  .prose strong {
+    font-weight: 600;
+  }
+
   .prose a {
     color: var(--color-accent);
     text-decoration: underline;
-    text-underline-offset: 2px;
+    text-decoration-thickness: from-font;
+    text-underline-offset: 0.2em;
   }
-  .prose a:hover {
-    color: var(--color-accent-hover);
+
+  .prose code {
+    font-size: 0.875em;
+    padding: 0.1em 0.35em;
+    background-color: var(--color-paper-raised);
+    border: var(--border-hairline) solid var(--color-rule);
+    border-radius: var(--radius-sm);
   }
+
+  .prose pre {
+    padding: var(--spacing-gutter);
+    overflow-x: auto;
+    background-color: var(--color-paper-raised);
+    border: var(--border-hairline) solid var(--color-rule);
+    border-radius: var(--radius-sm);
+    font-size: var(--text-sm);
+    line-height: var(--leading-snug);
+  }
+
+  .prose pre code {
+    padding: 0;
+    background: none;
+    border: 0;
+  }
+
   .prose blockquote {
-    border-left: 2px solid var(--color-accent);
-    padding-left: 1rem;
-    font-style: italic;
-    color: var(--color-text-muted);
-    margin: 1.25rem 0;
+    padding-left: var(--spacing-gutter);
+    border-left: var(--border-rule) solid var(--color-accent);
+    color: var(--color-slate);
+  }
+
+  .prose figcaption {
+    font-family: var(--font-mono);
+    font-size: var(--text-caption);
+    letter-spacing: var(--tracking-label);
+    color: var(--color-slate);
   }
 }
 
-/* =========================================
-   Component utilities
-   ========================================= */
-@layer components {
-  .section-container {
-    max-width: 72rem;
-    margin-left: auto;
-    margin-right: auto;
-    padding-left: 1.5rem;
-    padding-right: 1.5rem;
-  }
+/* =============================================================================
+   UTILITIES
+   ========================================================================== */
 
-  @media (min-width: 1024px) {
-    .section-container {
-      padding-left: 2rem;
-      padding-right: 2rem;
-    }
-  }
-
-  .card {
-    background-color: var(--color-surface);
-    border: 1px solid var(--color-border);
-    border-radius: 0.75rem;
-    padding: 1.5rem;
-    transition: all 0.2s ease;
-    box-shadow:
-      0 1px 3px 0 rgba(0, 0, 0, 0.4),
-      0 0 0 1px rgba(255, 255, 255, 0.04);
-  }
-  .card:hover {
-    box-shadow:
-      0 4px 24px 0 rgba(99, 102, 241, 0.12),
-      0 0 0 1px rgba(99, 102, 241, 0.2);
-    border-color: rgba(99, 102, 241, 0.3);
-  }
-
-  .btn-primary {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.625rem 1.25rem;
-    background-color: var(--color-accent);
-    color: #fff;
-    font-size: 0.875rem;
-    font-weight: 500;
-    border-radius: 0.5rem;
-    transition: all 0.15s ease;
-    text-decoration: none;
-  }
-  .btn-primary:hover {
-    background-color: var(--color-accent-hover);
-    transform: translateY(-1px);
-    box-shadow: 0 4px 16px 0 rgba(99, 102, 241, 0.35);
-  }
-  .btn-primary:active {
-    transform: translateY(0);
-  }
-
-  .btn-ghost {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.625rem 1.25rem;
-    border: 1px solid var(--color-border);
-    color: var(--color-text-secondary);
-    font-size: 0.875rem;
-    font-weight: 500;
-    border-radius: 0.5rem;
-    transition: all 0.15s ease;
-    text-decoration: none;
-  }
-  .btn-ghost:hover {
-    color: var(--color-text-primary);
-    border-color: var(--color-text-muted);
-    background-color: rgba(255, 255, 255, 0.04);
-  }
-
-  .tag {
-    display: inline-flex;
-    align-items: center;
-    padding: 0.125rem 0.625rem;
-    font-size: 0.625rem;
-    font-weight: 500;
-    letter-spacing: 0.05em;
-    border-radius: 9999px;
-    text-transform: uppercase;
-    background-color: rgba(99, 102, 241, 0.12);
-    color: #818cf8;
-    border: 1px solid rgba(99, 102, 241, 0.2);
-  }
-
-  .section-heading {
-    font-size: 1.5rem;
-    font-weight: 600;
-    color: var(--color-text-primary);
-    letter-spacing: -0.025em;
-  }
-
-  @media (min-width: 768px) {
-    .section-heading {
-      font-size: 1.875rem;
-    }
-  }
-
-  .section-subtitle {
-    color: var(--color-text-secondary);
-    margin-top: 0.5rem;
-    font-size: 1rem;
-  }
-}
-
-/* =========================================
-   Animations
-   ========================================= */
 @layer utilities {
+  /* Tailwind ships `sr-only`, but it only emits utilities it finds in scanned
+     source. This declaration guarantees the class exists even when it is
+     applied from a script or from generated markup that the scanner cannot
+     see. Same computed result — deliberately not a second definition of a
+     different thing. */
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+    border-width: 0;
+  }
+
+  /* --- Entrance animation ---------------------------------------------------
+     AUDIT 2.3 — non-negotiable contract.
+
+     The hidden state lives ONLY inside the keyframe. There is no standalone
+     `opacity: 0` declaration anywhere in this file. Therefore:
+       · animation runs        -> fades up, ends visible (`both` fill)
+       · animation never runs  -> element renders VISIBLE, not invisible
+
+     The previous stylesheet made `opacity: 0` the resting state, so a
+     suppressed animation left the hero permanently blank. That cannot happen
+     here by construction rather than by patch.
+     ----------------------------------------------------------------------- */
   .animate-in {
-    animation: fadeUp 0.6s ease-out both;
-    opacity: 0;
+    animation: var(--animate-fade-up);
   }
 
   .animate-in-delay-1 {
-    animation-delay: 0.1s;
+    animation-delay: 60ms;
   }
   .animate-in-delay-2 {
-    animation-delay: 0.2s;
+    animation-delay: 120ms;
   }
   .animate-in-delay-3 {
-    animation-delay: 0.3s;
+    animation-delay: 180ms;
   }
   .animate-in-delay-4 {
-    animation-delay: 0.4s;
+    animation-delay: 240ms;
+  }
+
+  /* Expanded display width, for elements that are not headings (a hero lockup
+     rendered as a <span>, a large pull quote). */
+  .display-expanded {
+    font-family: var(--font-display);
+    font-stretch: var(--display-width-expanded);
+  }
+
+  .display-wide {
+    font-family: var(--font-display);
+    font-stretch: var(--display-width-wide);
   }
 }
 
-@keyframes fadeUp {
+/* =============================================================================
+   VIEW TRANSITIONS
+
+   Native cross-document view transitions (brief §8, docs/MOTION_SYSTEM.md §5).
+   Zero JavaScript. Where the browser does not support it the rule is ignored
+   and navigation is ordinary — there is nothing to feature-detect and nothing
+   to fall back to.
+
+   Deliberately NOT Astro's <ClientRouter />. That is the client-side router,
+   and §8 forbids turning the site into an SPA to buy one transition.
+
+   Individual elements opt in from their own components, e.g. project cards use
+   `view-transition-name: var(--vt-title, none)` fed by an inline
+   `--vt-title: project-title-<slug>`. That indirection is what lets the
+   reduced-motion block below withdraw a name without fighting a component's
+   own `view-transition-name` declaration.
+   ========================================================================== */
+
+@view-transition {
+  navigation: auto;
+}
+
+/* =============================================================================
+   KEYFRAMES
+   Declared at the top level (not inside a cascade layer) so they are always
+   available regardless of layer ordering. Every one of them starts hidden and
+   ends visible — never the other way round.
+   ========================================================================== */
+
+@keyframes fade-up {
   from {
     opacity: 0;
-    transform: translateY(20px);
+    transform: translateY(1rem);
   }
   to {
     opacity: 1;
-    transform: translateY(0);
+    transform: none;
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes rule-draw {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+/* =============================================================================
+   REDUCED MOTION — AUDIT 2.4 (brief §34)
+
+   Because no element's resting state is hidden, this block does NOT need a
+   `.animate-in { opacity: 1 !important }` patch. Collapsing the duration to
+   1ms with `animation-fill-mode: both` still lands every entrance animation on
+   its `to` state, which is the visible one.
+
+   `!important` IS used, for one specific reason: this must also beat Tailwind
+   `duration-*` / `animate-*` utilities (higher cascade layer) and inline
+   styles written by GSAP, neither of which specificity alone can reach. It is
+   scoped to timing properties only — nothing here changes what is displayed.
+   ========================================================================== */
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 1ms !important;
+    animation-delay: 0ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
+    transition-delay: 0ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  /* --- View transitions off -------------------------------------------------
+     Three layers, because no single one of them is sufficient.
+
+     1. Withdraw the opt-in. `@view-transition` is valid inside a conditional
+        group rule, so this overrides the `navigation: auto` declared above and
+        a reduced-motion user simply gets an ordinary navigation. A parser that
+        does not accept the nested form drops this rule silently, which is why
+        layers 2 and 3 exist rather than relying on it alone.
+
+     2. Null the names at their source. `--vt-title` / `--vt-media` arrive as
+        INLINE custom properties, and an inline declaration outranks any
+        stylesheet rule regardless of specificity, so `!important` is the only
+        thing that reaches it. This is precisely what the indirection buys: the
+        override lands on a custom property, never on `view-transition-name`
+        itself, so no component's own styling is being fought — the element
+        falls back to the `none` already written into its own `var()`.
+
+     3. Collapse whatever still starts, including same-document transitions
+        from `document.startViewTransition()`, which no at-rule governs. The
+        `*` rule above cannot reach these: `::view-transition-*` descend from
+        the view-transition pseudo root, not from any element.
+     ----------------------------------------------------------------------- */
+
+  @view-transition {
+    navigation: none;
+  }
+
+  *,
+  *::before,
+  *::after {
+    --vt-title: none !important;
+    --vt-media: none !important;
+  }
+
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation-duration: 1ms !important;
+    animation-delay: 0ms !important;
   }
 }

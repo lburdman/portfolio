@@ -1,0 +1,135 @@
+---
+/**
+ * The site's one call-to-action element. Three weights, no other variants.
+ *
+ * Near-square corners, hairline boundaries, no shadow and no gradient — this
+ * is instrument panel lettering on paper, not a SaaS button. The hover change
+ * is a colour swap plus a 2px travel on the trailing rule; nothing jumps.
+ *
+ * Anchors only. There is no form and no client-side action anywhere in this
+ * layer, so a `<button>` variant would be a component with no caller.
+ */
+
+interface Props {
+  href: string;
+  /**
+   * `primary`   — filled ink, one per view at most.
+   * `secondary` — hairline outline on paper.
+   * `quiet`     — underlined text with a trailing rule.
+   */
+  variant?: 'primary' | 'secondary' | 'quiet' | undefined;
+  /** Accessible name, when the visible text is not sufficient on its own. */
+  label?: string | undefined;
+  /** Set on links leaving the site. */
+  rel?: string | undefined;
+  /** Renders a small trailing arrow. On by default for `quiet`. */
+  arrow?: boolean | undefined;
+  class?: string | undefined;
+}
+
+const { href, variant = 'secondary', label, rel, arrow, class: className } = Astro.props;
+const showArrow = arrow ?? variant === 'quiet';
+---
+
+<a href={href} rel={rel} aria-label={label} class:list={['action', `action--${variant}`, className]}>
+  <span class="action__label"><slot /></span>
+  {
+    showArrow && (
+      <span class="action__arrow" aria-hidden="true">
+        &#8594;
+      </span>
+    )
+  }
+</a>
+
+<style>
+  .action {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 0.5em;
+    font-family: var(--font-mono);
+    font-stretch: normal;
+    font-size: var(--text-caption);
+    font-weight: 500;
+    letter-spacing: var(--tracking-label);
+    text-transform: uppercase;
+    text-decoration: none;
+    border-radius: var(--radius-sm);
+    transition:
+      background-color var(--duration-fast) var(--ease-standard),
+      border-color var(--duration-fast) var(--ease-standard),
+      color var(--duration-fast) var(--ease-standard);
+  }
+
+  .action__arrow {
+    transition: transform var(--duration-fast) var(--ease-standard);
+  }
+
+  .action:hover .action__arrow {
+    transform: translateX(0.25em);
+  }
+
+  /* --- primary: filled ink ------------------------------------------------ */
+  .action--primary {
+    padding: 0.75rem 1.25rem;
+    background-color: var(--color-ink);
+    color: var(--color-paper);
+    border: var(--border-hairline) solid var(--color-ink);
+  }
+
+  .action--primary:hover {
+    background-color: var(--color-accent);
+    border-color: var(--color-accent);
+  }
+
+  /* --- secondary: hairline outline ---------------------------------------- */
+  .action--secondary {
+    padding: 0.75rem 1.25rem;
+    color: var(--color-ink);
+    border: var(--border-hairline) solid var(--color-rule);
+  }
+
+  .action--secondary:hover {
+    color: var(--color-accent);
+    border-color: var(--color-accent);
+  }
+
+  /* --- quiet: underlined text --------------------------------------------- */
+  .action--quiet {
+    padding: 0.25rem 0;
+    color: var(--color-slate);
+    border-bottom: var(--border-hairline) solid var(--color-rule);
+  }
+
+  .action--quiet:hover {
+    color: var(--color-accent);
+    border-bottom-color: var(--color-accent);
+  }
+
+  /* --- on the dark inversion ---------------------------------------------- */
+  :global(.on-ink) .action--primary {
+    background-color: var(--color-phosphor);
+    color: var(--color-ink);
+    border-color: var(--color-phosphor);
+  }
+
+  :global(.on-ink) .action--secondary {
+    color: var(--color-on-ink);
+    border-color: var(--color-ink-rule);
+  }
+
+  :global(.on-ink) .action--secondary:hover {
+    color: var(--color-phosphor);
+    border-color: var(--color-phosphor);
+  }
+
+  :global(.on-ink) .action--quiet {
+    color: var(--color-on-ink-muted);
+    border-bottom-color: var(--color-ink-rule);
+  }
+
+  :global(.on-ink) .action--quiet:hover {
+    color: var(--color-phosphor);
+    border-bottom-color: var(--color-phosphor);
+  }
+</style>

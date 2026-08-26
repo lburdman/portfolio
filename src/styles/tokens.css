@@ -1,0 +1,332 @@
+/* =============================================================================
+   DESIGN TOKENS — the single authoritative source (docs/ARCHITECTURE.md §6)
+   =============================================================================
+
+   Concept: "instrument paper".
+   The site ground is a warm technical paper stock — an engineering notebook or
+   a component datasheet. The one place it inverts to a dark ground is the
+   Technical Worlds band, which reads as looking *into* the instrument.
+
+   Light-first. Editorial, high contrast, generous whitespace, hairline rules.
+   Explicitly NOT: dark near-black + neon, purple AI gradients, glassmorphism,
+   glow, cream + serif + terracotta.
+
+   -----------------------------------------------------------------------------
+   RULES FOR EVERY AGENT TOUCHING THIS REPOSITORY
+   -----------------------------------------------------------------------------
+   1. This file is the ONLY place a raw colour value may appear. Anywhere else,
+      write `var(--color-*)` or the Tailwind utility generated from it.
+   2. Tailwind 4's `@theme` emits a CSS custom property AND a utility class from
+      one declaration, so a value cannot drift between a config file and a
+      stylesheet. That is the entire reason for the Tailwind 3 -> 4 migration;
+      `tailwind.config.ts` is deleted and must not come back.
+   3. Several namespaces below are reset with `--x-*: initial`. That deletes
+      Tailwind's defaults on purpose, so `bg-blue-500`, `text-4xl` and friends
+      produce nothing. If you need a value that is not here, add it here.
+   4. Contrast ratios in the comments are real WCAG 2.1 relative-luminance
+      measurements, not estimates. The audit's finding 2.5 was shipped text
+      below AA and a `1.14:1` border. Do not regress it: if you change a hex,
+      re-measure every pair it participates in.
+
+   5. `@theme static` (not plain `@theme`) is deliberate. By default Tailwind 4
+      tree-shakes theme variables that no generated utility references, which
+      would make `var(--color-domain-ai)` resolve to nothing when read from an
+      inline style, a canvas module or `getComputedStyle`. `static` emits every
+      token below, unconditionally. It costs ~1 KB and buys the guarantee that
+      a token that exists here exists at runtime.
+   6. Every colour token here is safe on the grounds its comment names, with
+      ONE exception: `--color-domain-*` is valid on the ink ground only. Raw,
+      those five measure 1.72:1 - 2.77:1 on paper — worse than the border the
+      audit caught. See the loud block beside them for the two measured
+      `color-mix()` ceilings that make them usable on the paper ground.
+
+   ========================================================================== */
+
+@theme static {
+  /* ---------------------------------------------------------------------------
+     COLOUR
+     Tailwind's default palette is removed so no unowned colour can be used.
+     `transparent` / `currentColor` / `inherit` are keywords, not palette
+     entries, and are restored below.
+     ------------------------------------------------------------------------ */
+  --color-*: initial;
+
+  --color-transparent: transparent;
+  --color-current: currentColor;
+  --color-inherit: inherit;
+
+  /* --- Ground: light / default -------------------------------------------- */
+
+  /* page ground — warm grey paper stock */
+  --color-paper: #e8e6e0;
+  /* raised surface (cards, wells) */
+  --color-paper-raised: #f0eee9;
+
+  /* primary text, and the ground of the dark inversion
+     14.38:1 on paper · 15.48:1 on paper-raised — AAA */
+  --color-ink: #15171b;
+
+  /* secondary text
+     5.38:1 on paper · 5.79:1 on paper-raised — AA */
+  --color-slate: #585c64;
+
+  /* hairlines and borders — WCAG 1.4.11 UI boundary
+     3.07:1 on paper · 3.31:1 on paper-raised — passes 3:1
+     ADJUSTED: the specified #C6C2B8 measured 1.42:1 on paper, which is the
+     same class of defect as the audit's 1.14:1 border. Darkened along the same
+     warm-grey axis (channels scaled 0.67) until it cleared 3:1. */
+  --color-rule: #85827b;
+
+  /* ultramarine — the "annotation pen": links, focus ring, active state
+     6.10:1 on paper · 6.57:1 on paper-raised — AA text, and >=3:1 as a ring.
+     NOTE: 2.36:1 on ink. It is NOT usable on the dark ground; the ink-side
+     focus ring is --color-phosphor. See global.css `--focus-ring`. */
+  --color-accent: #1e3fd8;
+
+  /* --- Dark inversion: the Technical Worlds band only ---------------------- */
+
+  /* raised surface on ink */
+  --color-ink-raised: #1e2127;
+
+  /* hairline on ink — WCAG 1.4.11 UI boundary
+     3.66:1 on ink · 3.29:1 on ink-raised — passes 3:1
+     ADJUSTED: the specified #333842 measured 1.37:1 on ink-raised. Lightened
+     along the same blue-grey axis until it cleared 3:1. Not in the brief's
+     required list, but it is the dark-ground twin of --color-rule and failed
+     the identical criterion. */
+  --color-ink-rule: #6a7180;
+
+  /* text on ink — 14.38:1 on ink · 12.92:1 on ink-raised — AAA */
+  --color-on-ink: #e8e6e0;
+
+  /* secondary text on ink — 6.82:1 on ink · 6.13:1 on ink-raised — AA */
+  --color-on-ink-muted: #9aa0aa;
+
+  /* instrument amber, on ink only — 8.23:1 on ink · 7.39:1 on ink-raised
+     Doubles as the focus-ring colour on the dark ground. */
+  --color-phosphor: #e9a13b;
+
+  /* --- Domain accents ------------------------------------------------------
+     A tempered oscilloscope-channel palette: matched saturation and lightness
+     so the five read as channels of one instrument rather than five brands.
+     Thin strokes and small labels. Never fills. Never glow.
+
+     ###########################################################################
+     ##  INK GROUND ONLY. A RAW --color-domain-* ON PAPER IS AN ACCESSIBILITY  #
+     ##  BUG. THESE ARE THE ONLY TOKENS IN THIS FILE THAT ARE NOT SAFE         #
+     ##  EVERYWHERE — DO NOT REACH FOR ONE OUTSIDE `.on-ink`.                  #
+     ###########################################################################
+
+     They are tuned for --color-ink (5.19:1 - 8.35:1, all AA). The same hexes
+     measured against the paper ground:
+
+       token                       on ink   on paper   on paper-raised
+       --color-domain-ai            8.03      1.79          1.93
+       --color-domain-quantum       7.08      2.03          2.19
+       --color-domain-fpga          8.35      1.72          1.85
+       --color-domain-electronics   5.19      2.77          2.98
+       --color-domain-audio         6.11      2.35          2.53
+
+     1.72:1 - 2.77:1. Every one of them fails even the 3:1 non-text minimum on
+     paper, and the two brightest (fpga, ai) are worse than the 1.14:1 border
+     the audit caught. Matched lightness is exactly why: a palette balanced for
+     a dark ground is by construction unbalanced on a light one.
+
+     ON THE PAPER GROUND, DARKEN TOWARD INK FIRST. Measured with real oklab
+     mixing — these percentages are ceilings, not suggestions:
+
+       color-mix(in oklab, var(--color-domain-x) 73%, var(--color-ink))
+         -> 3.04:1 - 4.48:1  · the most colour that still clears 3:1
+            everywhere. Non-text only: rules, strokes, chart marks, boundaries.
+
+       color-mix(in oklab, var(--color-domain-x) 56%, var(--color-ink))
+         -> 4.51:1 - 6.14:1  · the most colour that still clears 4.5:1
+            everywhere. Required for any domain-coloured TEXT on paper.
+
+     A 68% mix (already shipped by one component) measures 3.41:1 - 4.90:1 on
+     paper: correct as a stroke, but ai / fpga / quantum / audio land under
+     4.5:1, so it must not carry a label. Re-measure if you pick another number.
+     ------------------------------------------------------------------------ */
+
+  /* 8.03:1 on ink · 7.22:1 on ink-raised — 1.79:1 on paper (ink ground only) */
+  --color-domain-ai: #e0a23c;
+  /* 7.08:1 on ink · 6.36:1 on ink-raised — 2.03:1 on paper (ink ground only) */
+  --color-domain-quantum: #5aaec4;
+  /* 8.35:1 on ink · 7.50:1 on ink-raised — 1.72:1 on paper (ink ground only) */
+  --color-domain-fpga: #8fbf5a;
+  /* 5.19:1 on ink · 4.66:1 on ink-raised — 2.77:1 on paper (ink ground only) */
+  --color-domain-electronics: #d9694a;
+  /* 6.11:1 on ink · 5.49:1 on ink-raised — 2.35:1 on paper (ink ground only) */
+  --color-domain-audio: #c9829b;
+
+  /* ---------------------------------------------------------------------------
+     TYPEFACES
+
+     One superfamily doing two jobs through its width axis, plus a mono for
+     annotation. Both are self-hosted through @fontsource (imported in
+     global.css). There is no Google Fonts <link> anywhere — the audit flagged
+     that as a render-blocking HIGH.
+
+     Archivo Variable exposes wght 100-900 and wdth 62-125 (verified in
+     node_modules/@fontsource-variable/archivo/metadata.json). The wdth file
+     carries BOTH axes, so `wdth.css` is the only Archivo import needed.
+     ------------------------------------------------------------------------ */
+  --font-*: initial;
+
+  /* Display / headings — industrial signage, panel lettering.
+     Same family as body; the difference is the width axis. */
+  --font-display:
+    'Archivo Variable', Archivo, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial,
+    sans-serif;
+
+  /* Body — the same face at normal width */
+  --font-sans:
+    'Archivo Variable', Archivo, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial,
+    sans-serif;
+
+  /* Utility / labels / eyebrows / tags / metadata — datasheet annotation */
+  --font-mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace;
+
+  /* Width axis positions. Consumed via `font-stretch` (Archivo declares
+     font-stretch: 62% 125%, so the browser maps it onto wdth directly). */
+  --display-width-expanded: 112%;
+  --display-width-wide: 118%;
+  --body-width-normal: 100%;
+
+  /* ---------------------------------------------------------------------------
+     TYPE SCALE
+     Tailwind's default ladder is removed. These ten steps are the whole scale.
+     Display steps are fluid between a 360px and a 1440px viewport.
+     ------------------------------------------------------------------------ */
+  --text-*: initial;
+
+  /* 11px — mono eyebrows, section numbers, tags. Uppercase, open tracking. */
+  --text-micro: 0.6875rem;
+  --text-micro--line-height: 1.4;
+  --text-micro--letter-spacing: 0.08em;
+
+  /* 12px — metadata, captions, footnotes */
+  --text-caption: 0.75rem;
+  --text-caption--line-height: 1.45;
+  --text-caption--letter-spacing: 0.04em;
+
+  /* 14px — dense UI text, stack tags in prose */
+  --text-sm: 0.875rem;
+  --text-sm--line-height: 1.55;
+
+  /* 16px — body default */
+  --text-base: 1rem;
+  --text-base--line-height: 1.65;
+
+  /* 18px — lead paragraphs, project summaries */
+  --text-lg: 1.125rem;
+  --text-lg--line-height: 1.6;
+
+  /* 20px — standfirst, pull quotes */
+  --text-xl: 1.25rem;
+  --text-xl--line-height: 1.5;
+
+  /* 22 -> 32px — h4 / card titles */
+  --text-display-4: clamp(1.375rem, 1.17rem + 0.93vw, 2rem);
+  --text-display-4--line-height: 1.25;
+  --text-display-4--letter-spacing: -0.005em;
+  --text-display-4--font-weight: 600;
+
+  /* 28 -> 48px — h3 / subsection openers */
+  --text-display-3: clamp(1.75rem, 1.33rem + 1.85vw, 3rem);
+  --text-display-3--line-height: 1.15;
+  --text-display-3--letter-spacing: -0.015em;
+  --text-display-3--font-weight: 600;
+
+  /* 36 -> 72px — h2 / section titles */
+  --text-display-2: clamp(2.25rem, 1.5rem + 3.33vw, 4.5rem);
+  --text-display-2--line-height: 1.05;
+  --text-display-2--letter-spacing: -0.02em;
+  --text-display-2--font-weight: 600;
+
+  /* 44 -> 112px — the hero h1. One per page, at most. */
+  --text-display-1: clamp(2.75rem, 1.33rem + 6.3vw, 7rem);
+  --text-display-1--line-height: 0.95;
+  --text-display-1--letter-spacing: -0.03em;
+  --text-display-1--font-weight: 700;
+
+  /* --- Tracking ------------------------------------------------------------
+     Tighten as size grows; open up on uppercase mono.
+     ------------------------------------------------------------------------ */
+  --tracking-*: initial;
+  --tracking-display: -0.03em;
+  --tracking-heading: -0.015em;
+  --tracking-normal: 0;
+  --tracking-label: 0.04em;
+  --tracking-eyebrow: 0.08em;
+  --tracking-wide: 0.14em;
+
+  /* --- Leading ------------------------------------------------------------- */
+  --leading-*: initial;
+  --leading-display: 0.95;
+  --leading-heading: 1.15;
+  --leading-snug: 1.35;
+  --leading-body: 1.65;
+  --leading-prose: 1.75;
+
+  /* ---------------------------------------------------------------------------
+     SPACING
+     4px base unit for the dynamic scale (p-2 = 8px, gap-6 = 24px), plus named
+     semantic steps for page rhythm. Everything lands on an 8px baseline.
+     ------------------------------------------------------------------------ */
+  --spacing: 0.25rem;
+
+  --spacing-gutter: 1.5rem; /* 24px — mobile page gutter */
+  --spacing-gutter-lg: 2rem; /* 32px — desktop page gutter */
+  --spacing-stack: 2.5rem; /* 40px — between blocks inside a section */
+  --spacing-block: 4rem; /* 64px — between major blocks */
+  --spacing-section: 6rem; /* 96px — between page sections */
+  --spacing-section-lg: 9rem; /* 144px — around the hero and the ink band */
+
+  /* --- Measure / containers ------------------------------------------------ */
+  --container-prose: 38rem; /* ~68ch of body text */
+  --container-content: 68rem; /* the main editorial column */
+  --container-wide: 84rem; /* full-bleed grids and the ink band */
+
+  /* ---------------------------------------------------------------------------
+     RADIUS
+     Near-square on purpose. This is engineering paper, not a SaaS card.
+     ------------------------------------------------------------------------ */
+  --radius-*: initial;
+  --radius-none: 0;
+  --radius-xs: 1px;
+  --radius-sm: 2px;
+  --radius-md: 3px;
+  --radius-lg: 4px; /* the largest allowed on a surface */
+  --radius-full: 9999px; /* status dots only, never a button or a card */
+
+  /* ---------------------------------------------------------------------------
+     BORDER WIDTHS
+     Hairlines are the primary structural device in this system.
+     ------------------------------------------------------------------------ */
+  --border-hairline: 1px;
+  --border-rule: 2px; /* section rules, active-state underlines */
+  --border-heavy: 3px; /* the one emphatic case: a domain channel marker */
+
+  /* ---------------------------------------------------------------------------
+     MOTION
+     Durations are short by design; motion is punctuation (brief §13).
+     All of these collapse to ~0 under prefers-reduced-motion (global.css).
+     ------------------------------------------------------------------------ */
+  --duration-instant: 80ms; /* pressed / active feedback */
+  --duration-fast: 150ms; /* hover, focus, colour changes */
+  --duration-base: 240ms; /* small transforms, disclosure */
+  --duration-slow: 480ms; /* entrance animations */
+  --duration-deliberate: 720ms; /* the one pinned scroll beat */
+
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1); /* default for UI state */
+  --ease-entrance: cubic-bezier(0.16, 1, 0.3, 1); /* decelerate in */
+  --ease-exit: cubic-bezier(0.4, 0, 1, 1); /* accelerate out */
+  --ease-instrument: cubic-bezier(0.65, 0, 0.35, 1); /* symmetric, mechanical */
+
+  /* Entrance animation. The hidden state lives inside the keyframe (see
+     global.css), so an element with no animation resolves to VISIBLE. */
+  --animate-fade-up: fade-up var(--duration-slow) var(--ease-entrance) both;
+  --animate-fade-in: fade-in var(--duration-slow) var(--ease-entrance) both;
+  --animate-rule-draw: rule-draw var(--duration-deliberate) var(--ease-instrument) both;
+}

@@ -1,0 +1,315 @@
+---
+/**
+ * AUDIT 2.7 — the previous menu toggled a `hidden` class and nothing else.
+ * It had four defects; all four are fixed here, and the two things it already
+ * got right (`aria-expanded`, `aria-controls`) are kept unchanged.
+ *
+ *   1. **Escape closes it.** A keyboard user could previously open the menu
+ *      and had no way to dismiss it (WCAG 2.1.2).
+ *   2. **Focus moves in on open and returns to the toggle on close.**
+ *   3. **Focus is trapped** while open. The cycle is `[toggle, …panel links]`,
+ *      so the toggle — which is the visible X — stays reachable rather than
+ *      being stranded outside the trap.
+ *   4. **The hamburger becomes an X**, driven off `aria-expanded` so the
+ *      visual state cannot disagree with the announced one.
+ *
+ * It also closes on outside click, on navigation, and when the viewport grows
+ * past the breakpoint, and it locks body scroll while open.
+ *
+ * Every label comes from `t.a11y`; the script reads them off data attributes
+ * so no English literal is ever assigned to `aria-label` on a Spanish page
+ * (audit 2.8).
+ */
+
+import { localizePath, type Locale, type UIStrings } from '@/i18n';
+import { PRIMARY_NAV, type NavItem } from '@/config/navigation';
+
+interface Props {
+  locale: Locale;
+  t: UIStrings;
+  base: string;
+}
+
+const { locale, t, base } = Astro.props;
+
+const currentPath = Astro.url.pathname;
+
+const items = PRIMARY_NAV.map((item: NavItem, index) => {
+  const path = localizePath(item.path, locale, base);
+  return {
+    id: item.id,
+    href: item.hash ? `${path}#${item.hash}` : path,
+    label: t.nav[item.labelKey],
+    ordinal: String(index + 1).padStart(2, '0'),
+    /** A hash destination is never "the current page" on its own. */
+    isCurrent: !item.hash && currentPath === path,
+  };
+});
+
+const PANEL_ID = 'mobile-menu';
+---
+
+<button
+  type="button"
+  class="menu-toggle"
+  data-menu-toggle
+  aria-expanded="false"
+  aria-controls={PANEL_ID}
+  aria-label={t.a11y.toggleMenu}
+  data-label-open={t.a11y.toggleMenu}
+  data-label-close={t.a11y.closeMenu}
+>
+  <span class="menu-toggle__icon" aria-hidden="true">
+    <span class="menu-toggle__bar"></span>
+    <span class="menu-toggle__bar"></span>
+  </span>
+</button>
+
+<div id={PANEL_ID} class="menu-panel" data-menu-panel hidden>
+  <nav class="menu-panel__nav" aria-label={t.a11y.mobileNavigation}>
+    <ul class="menu-panel__list">
+      {
+        items.map((item) => (
+          <li>
+            <a class="menu-panel__link" href={item.href} aria-current={item.isCurrent ? 'page' : undefined}>
+              <span class="menu-panel__ordinal" aria-hidden="true">
+                {item.ordinal}
+              </span>
+              <span class="menu-panel__label">{item.label}</span>
+            </a>
+          </li>
+        ))
+      }
+    </ul>
+  </nav>
+</div>
+
+<style>
+  /* --- toggle -------------------------------------------------------------- */
+  .menu-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.75rem;
+    height: 2.75rem;
+    padding: 0;
+    margin-right: calc(-1 * 0.5rem);
+    background: none;
+    border: 0;
+    border-radius: var(--radius-sm);
+    color: var(--color-ink);
+    cursor: pointer;
+  }
+
+  @media (min-width: 48rem) {
+    .menu-toggle {
+      display: none;
+    }
+  }
+
+  .menu-toggle__icon {
+    position: relative;
+    display: block;
+    width: 1.25rem;
+    height: 0.75rem;
+  }
+
+  .menu-toggle__bar {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 50%;
+    height: 0;
+    border-top: var(--border-hairline) solid currentColor;
+    transition: transform var(--duration-base) var(--ease-instrument);
+  }
+
+  .menu-toggle__bar:first-child {
+    transform: translateY(-0.25rem);
+  }
+
+  .menu-toggle__bar:last-child {
+    transform: translateY(0.25rem);
+  }
+
+  .menu-toggle[aria-expanded='true'] .menu-toggle__bar:first-child {
+    transform: rotate(45deg);
+  }
+
+  .menu-toggle[aria-expanded='true'] .menu-toggle__bar:last-child {
+    transform: rotate(-45deg);
+  }
+
+  /* --- panel --------------------------------------------------------------- */
+  .menu-panel {
+    position: fixed;
+    inset: var(--nav-height, 4rem) 0 0 0;
+    z-index: 40;
+    background-color: var(--color-paper);
+    border-top: var(--border-hairline) solid var(--color-rule);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
+  /* `hidden` must beat the `position: fixed` display above. */
+  .menu-panel[hidden] {
+    display: none;
+  }
+
+  @media (min-width: 48rem) {
+    .menu-panel {
+      display: none;
+    }
+  }
+
+  .menu-panel__nav {
+    padding: var(--spacing-stack) var(--spacing-gutter);
+  }
+
+  .menu-panel__list {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .menu-panel__link {
+    display: flex;
+    align-items: baseline;
+    gap: 1rem;
+    padding: 1rem 0;
+    border-bottom: var(--border-hairline) solid var(--color-rule);
+    color: var(--color-ink);
+    transition: color var(--duration-fast) var(--ease-standard);
+  }
+
+  .menu-panel__link:hover,
+  .menu-panel__link[aria-current='page'] {
+    color: var(--color-accent);
+  }
+
+  .menu-panel__ordinal {
+    font-family: var(--font-mono);
+    font-stretch: normal;
+    font-size: var(--text-micro);
+    font-weight: 500;
+    letter-spacing: var(--tracking-eyebrow);
+    color: var(--color-slate);
+  }
+
+  .menu-panel__label {
+    font-family: var(--font-display);
+    font-stretch: var(--display-width-expanded);
+    font-size: var(--text-display-4);
+    font-weight: 600;
+    letter-spacing: var(--tracking-heading);
+  }
+
+  /* Body scroll lock. Scoped styles cannot reach `body`, so this one rule is
+     global — it is the only global declaration this component makes. */
+  :global(body[data-menu-open]) {
+    overflow: hidden;
+  }
+</style>
+
+<script>
+  const FOCUSABLE = 'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])';
+  const DESKTOP = '(min-width: 48rem)';
+
+  const toggleEl = document.querySelector<HTMLButtonElement>('[data-menu-toggle]');
+  const panelEl = document.querySelector<HTMLElement>('[data-menu-panel]');
+
+  if (toggleEl && panelEl) {
+    // Rebound so the hoisted `function` declarations below keep the null check.
+    const toggle: HTMLButtonElement = toggleEl;
+    const panel: HTMLElement = panelEl;
+
+    const labelOpen = toggle.dataset.labelOpen ?? '';
+    const labelClose = toggle.dataset.labelClose ?? '';
+    const desktop = window.matchMedia(DESKTOP);
+
+    const isOpen = () => toggle.getAttribute('aria-expanded') === 'true';
+
+    /** The trap cycle: the toggle itself, then everything inside the panel. */
+    const cycle = (): HTMLElement[] => [toggle, ...Array.from(panel.querySelectorAll<HTMLElement>(FOCUSABLE))];
+
+    function open() {
+      panel.hidden = false;
+      toggle.setAttribute('aria-expanded', 'true');
+      toggle.setAttribute('aria-label', labelClose);
+      document.body.setAttribute('data-menu-open', '');
+      // Focus the first item *inside* the panel, not the toggle we came from.
+      cycle()[1]?.focus();
+    }
+
+    function close({ restoreFocus = true } = {}) {
+      panel.hidden = true;
+      toggle.setAttribute('aria-expanded', 'false');
+      toggle.setAttribute('aria-label', labelOpen);
+      document.body.removeAttribute('data-menu-open');
+      if (restoreFocus) toggle.focus();
+    }
+
+    toggle.addEventListener('click', () => {
+      if (isOpen()) close();
+      else open();
+    });
+
+    // Escape dismisses from anywhere, including from the toggle itself.
+    document.addEventListener('keydown', (event) => {
+      if (event.key !== 'Escape' || !isOpen()) return;
+      event.preventDefault();
+      close();
+    });
+
+    // Focus trap. Tab past the end wraps to the toggle; Shift+Tab off the
+    // toggle wraps to the last panel item.
+    document.addEventListener('keydown', (event) => {
+      if (event.key !== 'Tab' || !isOpen()) return;
+
+      const items = cycle();
+      const first = items[0];
+      const last = items[items.length - 1];
+      if (!first || !last) return;
+
+      const active = document.activeElement;
+
+      if (event.shiftKey && active === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && active === last) {
+        event.preventDefault();
+        first.focus();
+      } else if (active instanceof Node && !items.some((item) => item === active || item.contains(active))) {
+        // Focus escaped the cycle entirely (browser chrome, extension); pull it back.
+        event.preventDefault();
+        first.focus();
+      }
+    });
+
+    // Outside click. `pointerdown` fires before focus moves, so the menu is
+    // already closed by the time the click lands on whatever is underneath.
+    document.addEventListener('pointerdown', (event) => {
+      if (!isOpen()) return;
+      const target = event.target;
+      if (!(target instanceof Node)) return;
+      if (panel.contains(target) || toggle.contains(target)) return;
+      close({ restoreFocus: false });
+    });
+
+    // Navigation. Cross-page links tear the document down anyway; this exists
+    // for same-document hash links, which otherwise leave the panel covering
+    // the destination.
+    panel.addEventListener('click', (event) => {
+      const target = event.target;
+      if (target instanceof Element && target.closest('a[href]')) {
+        close({ restoreFocus: false });
+      }
+    });
+
+    // Growing past the breakpoint hides the toggle; restoring focus to a
+    // hidden element would strand the user, so this close does not restore.
+    desktop.addEventListener('change', (event) => {
+      if (event.matches && isOpen()) close({ restoreFocus: false });
+    });
+  }
+</script>

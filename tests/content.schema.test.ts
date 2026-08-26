@@ -1,189 +1,232 @@
-import { describe, it, expect } from 'vitest';
-import { z } from 'zod';
+import { readFileSync, readdirSync } from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { describe, expect, it } from 'vitest';
+import { DOMAIN_IDS } from '../src/config/domains';
+import { PROJECT_STATUSES, externalUrlSchema, projectContentSchema, projectMetaSchema } from '../src/content/schema';
 
-// Mirror the project schema from content/config.ts for unit testing
-const projectSchema = z.object({
-  title: z.string().min(1, 'Project title is required'),
-  projectSlug: z
-    .string()
-    .min(1)
-    .regex(/^[a-z0-9-]+$/, 'Slug must be lowercase alphanumeric with hyphens'),
-  summary: z.string().min(10, 'Summary must be at least 10 characters'),
-  lang: z.enum(['en', 'es']),
-  tags: z.array(z.string().min(1)).min(1, 'At least one tag is required'),
-  featured: z.boolean().default(false),
-  status: z.enum(['published', 'draft', 'wip']).default('published'),
-  github: z.string().url().optional(),
-  demo: z.string().url().optional(),
-  coverImage: z.string().optional(),
-  order: z.number().int().min(0).default(99),
-});
+/**
+ * These tests import the *production* schema — the same object
+ * `src/content.config.ts` hands to Astro and `scripts/project-validate.mjs`
+ * validates against — and run it over the *real* files on disk.
+ *
+ * The suite this replaces did neither. It re-declared the schema under a
+ * comment reading "Mirror the project schema from content/config.ts", so
+ * `src/content/config.ts` had 0% coverage and every one of its 17 tests would
+ * have stayed green through any schema change. Its fixtures had already
+ * drifted from the content they claimed to describe: five tags listed for
+ * `quantum-audio` where the file had six.
+ *
+ * Reading the real files makes that class of drift impossible: there is
+ * nothing left to drift from.
+ */
+const PROJECTS_DIR = fileURLToPath(new URL('../src/content/projects', import.meta.url));
 
-type ProjectFrontmatter = z.infer<typeof projectSchema>;
+function projectSlugs(): string[] {
+  return readdirSync(PROJECTS_DIR, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => entry.name)
+    .sort();
+}
 
-describe('Project Schema Validation', () => {
-  const validProject: ProjectFrontmatter = {
-    title: 'Augmenta',
-    projectSlug: 'augmenta',
-    summary: 'A privacy layer for LLM workflows with PII detection and anonymization.',
-    lang: 'en',
-    tags: ['Privacy', 'LLM', 'Python'],
-    featured: true,
-    status: 'published',
-    github: 'https://github.com/lburdman/augmenta',
-    order: 1,
-  };
+function readMeta(slug: string): unknown {
+  return JSON.parse(readFileSync(path.join(PROJECTS_DIR, slug, 'project.json'), 'utf8'));
+}
 
-  it('accepts a valid project', () => {
-    const result = projectSchema.safeParse(validProject);
-    expect(result.success).toBe(true);
+const SLUGS = projectSlugs();
+
+describe('real project content', () => {
+  it('finds project directories to validate', () => {
+    // Guards the tests below: a bad glob that found nothing would otherwise
+    // make every `it.each` vacuously pass.
+    expect(SLUGS.length).toBeGreaterThan(0);
   });
 
-  it('rejects missing title', () => {
-    const result = projectSchema.safeParse({ ...validProject, title: '' });
-    expect(result.success).toBe(false);
+  it.each(SLUGS)('%s/project.json satisfies the production schema', (slug) => {
+    const result = projectMetaSchema.safeParse(readMeta(slug));
+    const problems = result.success
+      ? ''
+      : result.error.issues.map((issue) => `${issue.path.join('.')}: ${issue.message}`).join('\n');
+    expect(problems).toBe('');
   });
 
-  it('rejects invalid slug (contains uppercase)', () => {
-    const result = projectSchema.safeParse({ ...validProject, projectSlug: 'MyProject' });
-    expect(result.success).toBe(false);
+  it.each(SLUGS)('%s declares a slug equal to its directory name', (slug) => {
+    expect(projectMetaSchema.parse(readMeta(slug)).slug).toBe(slug);
   });
 
-  it('rejects slug with spaces', () => {
-    const result = projectSchema.safeParse({ ...validProject, projectSlug: 'my project' });
-    expect(result.success).toBe(false);
+  it.each(SLUGS)('%s has both an en.md and an es.md', (slug) => {
+    const files = readdirSync(path.join(PROJECTS_DIR, slug));
+    expect(files).toContain('en.md');
+    expect(files).toContain('es.md');
   });
 
-  it('accepts slug with hyphens', () => {
-    const result = projectSchema.safeParse({ ...validProject, projectSlug: 'my-project-123' });
-    expect(result.success).toBe(true);
+  it.each(SLUGS)('%s uses only known domain ids', (slug) => {
+    const { domains } = projectMetaSchema.parse(readMeta(slug));
+    expect(domains.length).toBeGreaterThan(0);
+    for (const domain of domains) expect(DOMAIN_IDS).toContain(domain);
   });
 
-  it('rejects summary that is too short', () => {
-    const result = projectSchema.safeParse({ ...validProject, summary: 'Short' });
-    expect(result.success).toBe(false);
+  it.each(SLUGS)('%s publishes only https links', (slug) => {
+    const { links } = projectMetaSchema.parse(readMeta(slug));
+    for (const url of Object.values(links ?? {})) expect(url?.startsWith('https://')).toBe(true);
   });
 
-  it('rejects invalid language', () => {
-    const result = projectSchema.safeParse({ ...validProject, lang: 'fr' });
-    expect(result.success).toBe(false);
+  it('gives every project a distinct slug', () => {
+    const slugs = SLUGS.map((slug) => projectMetaSchema.parse(readMeta(slug)).slug);
+    expect(new Set(slugs).size).toBe(slugs.length);
   });
 
-  it('rejects empty tags array', () => {
-    const result = projectSchema.safeParse({ ...validProject, tags: [] });
-    expect(result.success).toBe(false);
-  });
-
-  it('rejects invalid GitHub URL', () => {
-    const result = projectSchema.safeParse({ ...validProject, github: 'not-a-url' });
-    expect(result.success).toBe(false);
-  });
-
-  it('accepts project without optional github field', () => {
-    const { github: _, ...withoutGithub } = validProject;
-    const result = projectSchema.safeParse(withoutGithub);
-    expect(result.success).toBe(true);
-  });
-
-  it('defaults featured to false', () => {
-    const { featured: _, ...withoutFeatured } = validProject;
-    const result = projectSchema.safeParse(withoutFeatured);
-    expect(result.success).toBe(true);
-    if (result.success) {
-      expect(result.data.featured).toBe(false);
+  it('resolves every `related` slug to a project that exists', () => {
+    const known = new Set(SLUGS);
+    const dangling: string[] = [];
+    for (const slug of SLUGS) {
+      for (const related of projectMetaSchema.parse(readMeta(slug)).related ?? []) {
+        if (!known.has(related)) dangling.push(`${slug} -> ${related}`);
+      }
     }
-  });
-
-  it('defaults status to published', () => {
-    const { status: _, ...withoutStatus } = validProject;
-    const result = projectSchema.safeParse(withoutStatus);
-    expect(result.success).toBe(true);
-    if (result.success) {
-      expect(result.data.status).toBe('published');
-    }
-  });
-
-  it('rejects invalid status value', () => {
-    const result = projectSchema.safeParse({ ...validProject, status: 'archived' });
-    expect(result.success).toBe(false);
+    expect(dangling).toEqual([]);
   });
 });
 
-describe('All featured projects validate against schema', () => {
-  const featuredProjects: ProjectFrontmatter[] = [
-    {
-      title: 'Augmenta',
-      projectSlug: 'augmenta',
-      summary: 'A proof-of-concept privacy layer for LLM workflows focused on PII detection and anonymization.',
-      lang: 'en',
-      tags: ['Privacy', 'LLM', 'Python', 'FastAPI', 'Docker', 'Applied AI'],
-      featured: true,
-      status: 'published',
-      github: 'https://github.com/lburdman/augmenta',
-      order: 1,
-    },
-    {
-      title: 'Energy Demand Forecasting',
-      projectSlug: 'energy-forecasting',
-      summary:
-        'A 24-hour ahead electricity demand forecasting pipeline with feature engineering and rolling-origin validation.',
-      lang: 'en',
-      tags: ['Machine Learning', 'Time Series', 'Python', 'Scikit-learn', 'Forecasting', 'XGBoost'],
-      featured: true,
-      status: 'published',
-      github: 'https://github.com/lburdman/energy-demand-forecasting',
-      order: 2,
-    },
-    {
-      title: 'Hybrid Classical–Quantum Neural Networks for Audio Emotion Classification',
-      projectSlug: 'quantum-audio',
-      summary:
-        'An end-to-end speech emotion recognition pipeline on CREMA-D using mel-spectrograms and hybrid quantum/classical heads.',
-      lang: 'en',
-      tags: ['Quantum ML', 'PyTorch', 'PennyLane', 'Speech Processing', 'Deep Learning'],
-      featured: true,
-      status: 'published',
-      github: 'https://github.com/lburdman/qnn-speech-recognition',
-      order: 3,
-    },
-    {
-      title: 'Support Ticket Classifier',
-      projectSlug: 'support-classifier',
-      summary:
-        'An AI-assisted support ticket classifier with validated structured outputs and deterministic fallbacks.',
-      lang: 'en',
-      tags: ['AI', 'NLP', 'Python', 'Pydantic', 'Anthropic', 'Classification'],
-      featured: true,
-      status: 'published',
-      github: 'https://github.com/lburdman/support-ticket-classifier',
-      order: 4,
-    },
-  ];
+/**
+ * Rejection cases are built by mutating a real project rather than a literal
+ * declared alongside the assertion, so each one proves the schema rejects a
+ * change to content that is otherwise valid today.
+ */
+const BASE = readMeta(SLUGS[0] as string) as Record<string, unknown>;
 
-  it('all featured projects have valid slugs', () => {
-    for (const project of featuredProjects) {
-      expect(project.projectSlug).toMatch(/^[a-z0-9-]+$/);
+function withField(overrides: Record<string, unknown>): unknown {
+  return { ...BASE, ...overrides };
+}
+
+describe('projectMetaSchema rejections', () => {
+  it('accepts the unmodified real project it mutates', () => {
+    expect(projectMetaSchema.safeParse(withField({})).success).toBe(true);
+  });
+
+  it('rejects an empty domains array', () => {
+    expect(projectMetaSchema.safeParse(withField({ domains: [] })).success).toBe(false);
+  });
+
+  it('rejects a domain id that is not one of DOMAIN_IDS', () => {
+    expect(projectMetaSchema.safeParse(withField({ domains: ['blockchain'] })).success).toBe(false);
+  });
+
+  it('rejects an unknown domain hidden among valid ones', () => {
+    expect(projectMetaSchema.safeParse(withField({ domains: ['ai', 'blockchain'] })).success).toBe(false);
+  });
+
+  it('rejects a slug with uppercase or underscores', () => {
+    expect(projectMetaSchema.safeParse(withField({ slug: 'My_Project' })).success).toBe(false);
+  });
+
+  it('rejects a slug with spaces or leading and trailing hyphens', () => {
+    for (const slug of ['my project', '-leading', 'trailing-', 'double--hyphen', '']) {
+      expect(projectMetaSchema.safeParse(withField({ slug })).success).toBe(false);
     }
   });
 
-  it('all featured projects pass schema validation', () => {
-    for (const project of featuredProjects) {
-      const result = projectSchema.safeParse(project);
-      expect(result.success, `Project "${project.title}" failed schema validation`).toBe(true);
+  it('rejects a negative order', () => {
+    expect(projectMetaSchema.safeParse(withField({ order: -1 })).success).toBe(false);
+  });
+
+  it('rejects a fractional order', () => {
+    expect(projectMetaSchema.safeParse(withField({ order: 1.5 })).success).toBe(false);
+  });
+
+  it('rejects an empty stack', () => {
+    expect(projectMetaSchema.safeParse(withField({ stack: [] })).success).toBe(false);
+  });
+
+  it('rejects an unknown status', () => {
+    expect(projectMetaSchema.safeParse(withField({ status: 'archived' })).success).toBe(false);
+    for (const status of PROJECT_STATUSES) {
+      expect(projectMetaSchema.safeParse(withField({ status })).success).toBe(true);
     }
   });
 
-  it('all featured projects have at least one tag', () => {
-    for (const project of featuredProjects) {
-      expect(project.tags.length).toBeGreaterThan(0);
-    }
+  it('rejects a misspelled field instead of silently dropping it', () => {
+    // `feautred: true` must not parse into a quietly unfeatured project.
+    expect(projectMetaSchema.safeParse(withField({ feautred: true })).success).toBe(false);
   });
 
-  it('featured projects are ordered correctly without gaps', () => {
-    const orders = featuredProjects.map((p) => p.order).sort((a, b) => a - b);
-    expect(orders[0]).toBe(1);
-    for (let i = 1; i < orders.length; i++) {
-      expect(orders[i]).toBe(orders[i - 1]! + 1);
+  it('rejects a cover that escapes the project directory', () => {
+    for (const cover of ['../other/cover.webp', '/media/cover.webp', 'cover.webp']) {
+      expect(projectMetaSchema.safeParse(withField({ cover })).success).toBe(false);
     }
+    expect(projectMetaSchema.safeParse(withField({ cover: 'media/cover.webp' })).success).toBe(true);
+  });
+
+  it('rejects an implausible year and accepts a real one', () => {
+    expect(projectMetaSchema.safeParse(withField({ year: 20024 })).success).toBe(false);
+    expect(projectMetaSchema.safeParse(withField({ year: '2024' })).success).toBe(false);
+    expect(projectMetaSchema.safeParse(withField({ year: 2024 })).success).toBe(true);
+  });
+
+  it('applies the safe defaults when status, featured and order are omitted', () => {
+    const { slug, domains, stack } = projectMetaSchema.parse(BASE);
+    const parsed = projectMetaSchema.parse({ slug, domains, stack });
+    // Defaulting to `draft` means a half-written project cannot leak into a build.
+    expect(parsed.status).toBe('draft');
+    expect(parsed.featured).toBe(false);
+    expect(parsed.order).toBe(99);
+  });
+});
+
+/**
+ * The audit's LOW-severity finding, reproduced as a test: `z.url()` is backed
+ * by `new URL()`, which accepts `javascript:` and `data:` — and these values are
+ * written straight into `href`. It must not be enough on its own.
+ */
+describe('link URLs', () => {
+  it('rejects a javascript: URL', () => {
+    expect(externalUrlSchema.safeParse('javascript:alert(1)').success).toBe(false);
+    expect(projectMetaSchema.safeParse(withField({ links: { github: 'javascript:alert(1)' } })).success).toBe(false);
+  });
+
+  it('rejects a data: URL', () => {
+    expect(externalUrlSchema.safeParse('data:text/html,<script>alert(1)</script>').success).toBe(false);
+  });
+
+  it('rejects plain http', () => {
+    expect(externalUrlSchema.safeParse('http://example.com').success).toBe(false);
+  });
+
+  it('accepts https', () => {
+    expect(externalUrlSchema.safeParse('https://github.com/lburdman/augmenta').success).toBe(true);
+  });
+
+  it('rejects an unknown link kind', () => {
+    expect(projectMetaSchema.safeParse(withField({ links: { twitter: 'https://x.com' } })).success).toBe(false);
+  });
+});
+
+describe('projectContentSchema', () => {
+  it('accepts a localized frontmatter pair', () => {
+    expect(
+      projectContentSchema.safeParse({
+        title: 'Augmenta',
+        summary: 'A privacy layer for LLM workflows with PII detection and anonymization.',
+      }).success,
+    ).toBe(true);
+  });
+
+  it('rejects an empty title', () => {
+    expect(projectContentSchema.safeParse({ title: '', summary: 'Long enough summary.' }).success).toBe(false);
+  });
+
+  it('rejects a summary that is too short to be a summary', () => {
+    expect(projectContentSchema.safeParse({ title: 'A', summary: 'short' }).success).toBe(false);
+  });
+
+  it('rejects shared metadata leaking back into a localized file', () => {
+    // The whole point of the split: `stack` lives in project.json, once.
+    expect(
+      projectContentSchema.safeParse({
+        title: 'Augmenta',
+        summary: 'A privacy layer for LLM workflows.',
+        stack: ['Python'],
+      }).success,
+    ).toBe(false);
   });
 });

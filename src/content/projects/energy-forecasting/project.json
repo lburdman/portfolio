@@ -1,0 +1,11 @@
+{
+  "slug": "energy-forecasting",
+  "status": "published",
+  "featured": true,
+  "domains": ["ai"],
+  "stack": ["Machine Learning", "Time Series", "Python", "Scikit-learn", "Forecasting", "XGBoost"],
+  "links": {
+    "github": "https://github.com/lburdman/energy-demand-forecasting"
+  },
+  "order": 2
+}

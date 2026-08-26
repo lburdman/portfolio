@@ -1,0 +1,20 @@
+---
+/**
+ * The datasheet annotation voice — uppercase mono at `--tracking-eyebrow`.
+ *
+ * The visual treatment already lives in `global.css` as `.eyebrow`; this
+ * component exists only so sections do not repeat the class name and so the
+ * element can vary (`span` inside a heading block, `p` on its own line).
+ */
+
+interface Props {
+  as?: 'span' | 'p' | 'div' | 'dt' | undefined;
+  class?: string | undefined;
+}
+
+const { as: Tag = 'span', class: className }: Props = Astro.props;
+---
+
+<Tag class:list={['eyebrow', className]}>
+  <slot />
+</Tag>

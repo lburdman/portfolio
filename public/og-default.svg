@@ -1,0 +1,117 @@
+<svg
+  xmlns="http://www.w3.org/2000/svg"
+  width="1200"
+  height="630"
+  viewBox="0 0 1200 630"
+  role="img"
+  aria-labelledby="og-title og-desc"
+>
+  <title id="og-title">Lucas Burdman — Electronic Engineer · AI Engineer</title>
+  <desc id="og-desc">
+    A warm paper ground with the name Lucas Burdman set in expanded display type, a hairline rule, and a settling step
+    response drawn as a thin signal line.
+  </desc>
+
+  <!--
+    Colours are the tokens from src/styles/tokens.css, restated here because an
+    SVG served from /public is outside the stylesheet pipeline and cannot read
+    CSS custom properties:
+      paper  #E8E6E0 · ink    #15171B · slate  #585C64
+      rule   #85827B · accent #1E3FD8
+
+    Typography degrades deliberately: the @fontsource files are not embedded, so
+    the display stack falls back to Helvetica Neue / Arial (grotesque, same
+    voice) and the mono stack to SF Mono / Menlo / Consolas.
+  -->
+
+  <rect width="1200" height="630" fill="#E8E6E0" />
+
+  <!-- Registration marks — datasheet corners -->
+  <g stroke="#85827B" stroke-width="1" fill="none">
+    <path d="M88 56 v20 M78 66 h20" />
+    <path d="M1112 574 v-20 M1122 564 h-20" />
+  </g>
+
+  <!-- Eyebrow -->
+  <text
+    x="88"
+    y="122"
+    fill="#585C64"
+    font-family="'IBM Plex Mono', 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace"
+    font-size="20"
+    font-weight="500"
+    letter-spacing="1.6"
+  >
+    PORTFOLIO / 2026
+  </text>
+
+  <!-- Name — expanded display voice -->
+  <text
+    x="88"
+    y="300"
+    fill="#15171B"
+    font-family="Archivo, 'Helvetica Neue', Helvetica, Arial, sans-serif"
+    font-size="118"
+    font-weight="700"
+    font-stretch="112%"
+    letter-spacing="-3.5"
+  >
+    Lucas Burdman
+  </text>
+
+  <!-- Hairline rule -->
+  <path d="M88 352 H1112" stroke="#85827B" stroke-width="1" />
+
+  <!-- Role — datasheet annotation voice -->
+  <text
+    x="88"
+    y="402"
+    fill="#585C64"
+    font-family="'IBM Plex Mono', 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace"
+    font-size="26"
+    font-weight="400"
+    letter-spacing="2"
+  >
+    Electronic Engineer · AI Engineer
+  </text>
+
+  <!-- Signal motif: a step response overshooting and settling. -->
+  <g fill="none">
+    <!-- Zero line and time ticks -->
+    <path d="M88 545 H1112" stroke="#85827B" stroke-width="1" stroke-dasharray="2 6" />
+    <g stroke="#85827B" stroke-width="1">
+      <path d="M88 545 v10" />
+      <path d="M344 545 v10" />
+      <path d="M600 545 v10" />
+      <path d="M856 545 v10" />
+      <path d="M1112 545 v10" />
+    </g>
+
+    <!-- Settled value -->
+    <path d="M88 505 H1112" stroke="#85827B" stroke-width="1" stroke-dasharray="1 7" />
+
+    <!-- The response -->
+    <path
+      d="M88 545 H344 L372 470 L410 528 L452 494 L496 514 L542 502 L590 509 L640 504 L700 506 L760 505 H1112"
+      stroke="#1E3FD8"
+      stroke-width="2.5"
+      stroke-linejoin="round"
+      stroke-linecap="round"
+    />
+    <circle cx="372" cy="470" r="4" fill="#1E3FD8" />
+  </g>
+
+  <!-- Domain register -->
+  <text
+    x="1112"
+    y="122"
+    fill="#585C64"
+    text-anchor="end"
+    font-family="'IBM Plex Mono', 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace"
+    font-size="20"
+    font-weight="500"
+    letter-spacing="1.6"
+  >
+    AI · QUANTUM · FPGA · ELECTRONICS · AUDIO
+  </text>
+</svg>

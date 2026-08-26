@@ -1,10 +1,11 @@
 {
   "name": "lucas-burdman-portfolio",
   "type": "module",
-  "version": "0.1.0",
-  "description": "Lucas Burdman — Personal Portfolio | Building Intelligent Systems",
+  "version": "0.2.0",
+  "private": true,
+  "description": "Lucas Burdman — Electronic Engineer & AI Engineer. Portfolio built across layers.",
   "engines": {
-    "node": ">=20.0.0"
+    "node": ">=22.12.0"
   },
   "scripts": {
     "dev": "astro dev",
@@ -12,34 +13,44 @@
     "preview": "astro preview",
     "astro": "astro",
     "type-check": "astro check && tsc --noEmit",
-    "lint": "eslint . --ext .ts,.tsx,.astro --report-unused-disable-directives --max-warnings 0",
-    "lint:fix": "eslint . --ext .ts,.tsx,.astro --fix",
+    "lint": "eslint . --report-unused-disable-directives --max-warnings 0",
+    "lint:fix": "eslint . --fix",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage",
+    "project:new": "node scripts/project-new.mjs",
+    "project:validate": "node scripts/project-validate.mjs",
+    "verify": "astro sync && npm run format:check && npm run lint && npm run type-check && npm run test && npm run build"
   },
   "dependencies": {
-    "@astrojs/sitemap": "^3.2.1",
-    "@astrojs/tailwind": "^5.1.4",
-    "astro": "^4.16.18",
-    "tailwindcss": "^3.4.17",
-    "zod": "^3.23.8"
+    "@astrojs/react": "^6.0.4",
+    "@astrojs/sitemap": "^3.7.3",
+    "@fontsource-variable/archivo": "^5.3.0",
+    "@fontsource/ibm-plex-mono": "^5.3.0",
+    "@tailwindcss/vite": "^4.3.3",
+    "astro": "^7.2.8",
+    "gsap": "^3.15.0",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "tailwindcss": "^4.3.3"
   },
   "devDependencies": {
-    "@astrojs/check": "^0.9.4",
-    "@astrojs/ts-plugin": "^1.10.4",
+    "@astrojs/check": "^0.9.10",
     "@eslint/js": "^10.0.1",
-    "@typescript-eslint/eslint-plugin": "^8.29.0",
-    "@typescript-eslint/parser": "^8.29.0",
-    "@vitest/coverage-v8": "^2.1.9",
-    "eslint": "^10.1.0",
-    "eslint-plugin-astro": "^1.3.1",
-    "prettier": "^3.5.3",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.5",
+    "@vitest/coverage-v8": "^4.1.11",
+    "eslint": "^10.9.1",
+    "eslint-plugin-astro": "^1.7.0",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "globals": "^17.11.0",
+    "prettier": "^3.9.6",
     "prettier-plugin-astro": "^0.14.1",
-    "typescript": "^5.8.2",
-    "typescript-eslint": "^8.57.2",
-    "vitest": "^2.1.9"
+    "prettier-plugin-tailwindcss": "^0.8.1",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.68.0",
+    "vitest": "^4.1.11"
   }
 }

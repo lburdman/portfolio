@@ -6,13 +6,14 @@
     "noImplicitReturns": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
+    "noUncheckedIndexedAccess": true,
     "exactOptionalPropertyTypes": true,
-    "baseUrl": ".",
     "paths": {
-      "@/*": ["src/*"]
+      "@/*": ["./src/*"]
     },
-    "types": ["astro/astro-jsx"]
+    "jsx": "react-jsx",
+    "jsxImportSource": "react"
   },
-  "include": ["src", "tests", "tailwind.config.ts"],
-  "exclude": ["node_modules", "dist"]
+  "include": [".astro/types.d.ts", "src", "tests", "scripts", "vitest.config.ts"],
+  "exclude": ["node_modules", "dist", "coverage"]
 }

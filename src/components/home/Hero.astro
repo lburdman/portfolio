@@ -1,0 +1,258 @@
+---
+/**
+ * SECTION 00 — identity understood in about thirty seconds (brief §5).
+ *
+ * Everything semantic is plain HTML and renders immediately. It never waits on
+ * the canvas, on a font, or on a script; there is no preloader, and the `<h1>`
+ * has no resting `opacity: 0` (audit 2.3). If JavaScript never runs, the only
+ * thing missing is texture.
+ *
+ * `locale` is a required prop, not an optional one. Audit 1.3 was `Hero`
+ * receiving `base` without `locale`, so every CTA on the Spanish homepage
+ * pointed at an English page. Every href below goes through `localizePath`
+ * with the locale it was handed.
+ *
+ * The technical-area row is a real `<nav>` of real links. Nothing about it is
+ * hover-only — brief §14 requires that anything a pointer reveals be reachable
+ * by tap and by keyboard, so there is nothing to reveal in the first place.
+ */
+
+import ActionLink from '@/components/ui/ActionLink.astro';
+import Section from '@/components/ui/Section.astro';
+import { DOMAINS, domainOrdinal } from '@/config/domains';
+import { CONTACT_SECTION_ID, HOME_PATH } from '@/config/navigation';
+import { SITE } from '@/config/site';
+import { localizePath, type Locale, type UIStrings } from '@/i18n';
+
+interface Props {
+  locale: Locale;
+  t: UIStrings;
+  base: string;
+}
+
+const { locale, t, base } = Astro.props;
+
+const homeHref = localizePath(HOME_PATH, locale, base);
+const projectsHref = localizePath('/projects', locale, base);
+const contactHref = `${homeHref}#${CONTACT_SECTION_ID}`;
+const resumeHref = SITE.resumePath === null ? null : `${base}${SITE.resumePath}`;
+
+/** Localized label per social id, so no profile name is written twice. */
+const socialLabels = {
+  github: t.contact.githubLabel,
+  linkedin: t.contact.linkedinLabel,
+  email: t.contact.emailLabel,
+} as const;
+
+const profiles = SITE.social.filter((link) => link.id !== 'email');
+
+/**
+ * Anchors into the Technical Worlds band. The ids are owned by that component;
+ * this is the contract between the two — `world-<domain id>`.
+ */
+const areas = DOMAINS.map((domain) => ({
+  id: domain.id,
+  ordinal: domainOrdinal(domain),
+  name: t.worlds.items[domain.id].name,
+  href: `${homeHref}#world-${domain.id}`,
+}));
+
+const HEADING_ID = 'hero-heading';
+---
+
+<Section section="hero" label={t.sections.hero} labelledBy={HEADING_ID} spacing="lg" class="hero">
+  <canvas slot="bleed" class="section__bleed hero__field" data-signal-field aria-hidden="true"></canvas>
+
+  <div class="hero__lockup">
+    <h1 id={HEADING_ID} class="hero__name">{t.hero.name}</h1>
+    <p class="hero__role">{t.hero.role}</p>
+  </div>
+
+  <p class="hero__positioning">{t.hero.positioning}</p>
+
+  <div class="hero__actions">
+    <ActionLink href={projectsHref} variant="primary" arrow>{t.hero.ctaProjects}</ActionLink>
+    <ActionLink href={contactHref} variant="secondary">{t.hero.ctaContact}</ActionLink>
+    {
+      resumeHref && (
+        <ActionLink href={resumeHref} variant="secondary">
+          {t.hero.ctaResume}
+        </ActionLink>
+      )
+    }
+    {
+      profiles.map((link) => (
+        <ActionLink href={link.href} variant="quiet">
+          {socialLabels[link.id]}
+        </ActionLink>
+      ))
+    }
+  </div>
+
+  <nav class="hero__areas" aria-label={t.worlds.heading}>
+    <ul class="hero__areas-list">
+      {
+        areas.map((area) => (
+          <li>
+            <a class="hero__area" href={area.href}>
+              <span class="hero__area-ordinal" aria-hidden="true">
+                {area.ordinal}
+              </span>
+              <span class="hero__area-name">{area.name}</span>
+            </a>
+          </li>
+        ))
+      }
+    </ul>
+  </nav>
+</Section>
+
+<style>
+  .hero {
+    /* Tall enough to be a threshold, never so tall that the next section is a
+       surprise. `svh` avoids the mobile URL-bar jump. */
+    min-height: min(92svh, 60rem);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    overflow: hidden;
+  }
+
+  /* The canvas inherits this `color`; `signal-field.ts` reads it back rather
+     than naming a colour, so tokens.css stays the only file with a value. */
+  .hero__field {
+    color: var(--color-ink);
+    width: 100%;
+    height: 100%;
+    /* Decorative: it must never intercept a click meant for a link beneath it.
+       Pointer input reaches the field through the section, not the canvas. */
+    pointer-events: none;
+  }
+
+  .hero__lockup {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .hero__name {
+    font-size: var(--text-display-1);
+    font-weight: 700;
+    line-height: var(--leading-display);
+    letter-spacing: var(--tracking-display);
+    font-stretch: var(--display-width-expanded);
+    max-width: 14ch;
+  }
+
+  .hero__role {
+    font-family: var(--font-mono);
+    font-stretch: normal;
+    font-size: var(--text-caption);
+    font-weight: 500;
+    letter-spacing: var(--tracking-eyebrow);
+    text-transform: uppercase;
+    color: var(--color-slate);
+  }
+
+  .hero__positioning {
+    max-width: var(--container-prose);
+    margin-top: var(--spacing-stack);
+    font-size: var(--text-xl);
+    line-height: var(--leading-snug);
+    text-wrap: pretty;
+  }
+
+  .hero__actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 1rem 1.5rem;
+    margin-top: var(--spacing-stack);
+  }
+
+  /* --- technical areas ------------------------------------------------------ */
+  .hero__areas {
+    margin-top: var(--spacing-block);
+    padding-top: var(--spacing-gutter);
+    border-top: var(--border-hairline) solid var(--color-rule);
+  }
+
+  .hero__areas-list {
+    display: grid;
+    gap: 0.75rem 2rem;
+    list-style: none;
+    grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+  }
+
+  .hero__area {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 0.625rem;
+    padding: 0.125rem 0;
+    border-radius: var(--radius-sm);
+    color: var(--color-slate);
+    transition: color var(--duration-fast) var(--ease-standard);
+  }
+
+  .hero__area:hover {
+    color: var(--color-accent);
+  }
+
+  .hero__area-ordinal {
+    font-family: var(--font-mono);
+    font-stretch: normal;
+    font-size: var(--text-micro);
+    font-weight: 500;
+    letter-spacing: var(--tracking-eyebrow);
+    color: var(--color-rule);
+  }
+
+  .hero__area:hover .hero__area-ordinal {
+    color: var(--color-accent);
+  }
+
+  .hero__area-name {
+    font-family: var(--font-mono);
+    font-stretch: normal;
+    font-size: var(--text-caption);
+    font-weight: 500;
+    letter-spacing: var(--tracking-label);
+    text-transform: uppercase;
+  }
+</style>
+
+<script>
+  import { createSignalField } from '../visuals/hero/signal-field';
+
+  const canvas = document.querySelector<HTMLCanvasElement>('[data-signal-field]');
+
+  if (canvas) {
+    const field = createSignalField(canvas, {
+      pointerTarget: canvas.closest<HTMLElement>('section') ?? canvas,
+    });
+
+    field.start();
+
+    /**
+     * At most one expensive visual runs at a time (docs/MOTION_SYSTEM.md §4).
+     * The hero cannot know about Technical Worlds, so the contract is
+     * declarative: any element carrying `data-stops-hero-visual` stops this
+     * field while it is on screen. That is the whole coupling — no global
+     * store, no event bus, no import across islands.
+     */
+    const rival = document.querySelector('[data-stops-hero-visual]');
+
+    if (rival && 'IntersectionObserver' in window) {
+      const observer = new IntersectionObserver(
+        (entries) => {
+          for (const entry of entries) {
+            if (entry.isIntersecting) field.stop();
+            else field.start();
+          }
+        },
+        { threshold: 0 },
+      );
+      observer.observe(rival);
+    }
+  }
+</script>

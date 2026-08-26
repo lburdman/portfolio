@@ -1,0 +1,148 @@
+---
+/**
+ * The document shell: `<html lang>`, `<head>`, the skip link and the `<main>`
+ * landmark. Nothing above this file exists.
+ *
+ * It lives in `src/layouts/` rather than `src/components/` — audit 5.5 flagged
+ * the previous placement as a layout filed as a component.
+ *
+ * Three things it owns outright, because each was a shipped defect:
+ *
+ * 1. **Canonical and hreflang** come from `canonicalFor()` / `getAlternates()`.
+ *    No URL in this file is built by string concatenation, and every hreflang
+ *    value is absolute (audit 1.2).
+ * 2. **The skip link** is the first focusable element in the body (audit 2.6).
+ * 3. **`og:image`** is emitted on every page, absolute, with dimensions and
+ *    alt text — the previous layout declared `twitter:card` =
+ *    `summary_large_image` while emitting no image at all (audit 1.4).
+ *
+ * **The CSP does not live here.** GitHub Pages cannot set headers, so `<meta>`
+ * is the only vehicle — but the policy is emitted by Astro's `security.csp`
+ * in `astro.config.mjs`, not hand-written below. It has to be: every client
+ * script on this site ships as an INLINE `<script type="module">`, so the only
+ * usable `script-src` is a hash-based one, and a hash cannot be written from a
+ * layout that renders before those scripts are inlined. Astro computes them at
+ * build time. Change the policy there; do not add a second `<meta>` here —
+ * two CSP meta tags intersect per directive, which is a trap for the next
+ * reader rather than extra safety.
+ */
+
+import '@/styles/global.css';
+
+import SkipLink from '@/components/ui/SkipLink.astro';
+import { MAIN_CONTENT_ID } from '@/config/navigation';
+import { SITE } from '@/config/site';
+import { canonicalFor, getAlternates, useTranslations, type Locale } from '@/i18n';
+
+interface Props {
+  locale: Locale;
+  /** Page title. Sourced from `t.seo.*` by the page — never a literal. */
+  title: string;
+  /** Meta description. Sourced from `t.seo.*` by the page. */
+  description: string;
+  /** Share-card image, as a path inside `public/`. Defaults to `SITE.ogImage`. */
+  ogImage?: string | undefined;
+  /**
+   * Alt text for the share card. Defaults to `t.seo.ogImageAlt`, which
+   * describes what is actually *in* the image. The page title says what the
+   * page is about, which is a different fact — a test now asserts the two are
+   * never equal, so that old fallback cannot creep back in silently.
+   */
+  ogImageAlt?: string | undefined;
+}
+
+const { locale, title, description, ogImage = SITE.ogImage, ogImageAlt } = Astro.props;
+
+const t = useTranslations(locale);
+const { origin, basePath } = SITE;
+
+const shareImageAlt = ogImageAlt ?? t.seo.ogImageAlt;
+
+const currentPath = Astro.url.pathname;
+const canonical = canonicalFor(currentPath, origin, basePath);
+const alternates = getAlternates(currentPath, origin, basePath);
+
+/**
+ * `ogImage` is a path inside `public/`, so it is served from under the
+ * deployment base. `new URL` against the origin makes it absolute — scrapers
+ * discard a relative `og:image`, which is half of why audit 1.4 existed.
+ */
+const ogImageURL = new URL(`${basePath}${ogImage}`, origin).href;
+const ogImageIsRaster = !ogImage.endsWith('.svg');
+
+/**
+ * A card type that promises a large image is only honest once the image is one
+ * scrapers actually decode. LinkedIn, Slack and WhatsApp all reject SVG, so an
+ * SVG share image downgrades the card rather than shipping a broken promise.
+ */
+const twitterCard = ogImageIsRaster ? 'summary_large_image' : 'summary';
+
+const faviconSVG = `${basePath}/favicon.svg`;
+const faviconICO = `${basePath}/favicon.ico`;
+---
+
+<!doctype html>
+<html lang={locale}>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <meta name="author" content={SITE.author} />
+    <meta name="generator" content={Astro.generator} />
+
+    <link rel="canonical" href={canonical} />
+    <link rel="alternate" hreflang="en" href={alternates.en} />
+    <link rel="alternate" hreflang="es" href={alternates.es} />
+    <link rel="alternate" hreflang="x-default" href={alternates['x-default']} />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:locale" content={locale} />
+    <meta property="og:site_name" content={SITE.author} />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={canonical} />
+    <meta property="og:image" content={ogImageURL} />
+    <meta property="og:image:width" content={String(SITE.ogImageWidth)} />
+    <meta property="og:image:height" content={String(SITE.ogImageHeight)} />
+    <meta property="og:image:alt" content={shareImageAlt} />
+
+    <meta name="twitter:card" content={twitterCard} />
+    <meta name="twitter:title" content={title} />
+    <meta name="twitter:description" content={description} />
+    <meta name="twitter:image" content={ogImageURL} />
+    <meta name="twitter:image:alt" content={shareImageAlt} />
+
+    <link rel="icon" type="image/svg+xml" href={faviconSVG} />
+    <link rel="alternate icon" href={faviconICO} sizes="any" />
+
+    <slot name="head" />
+  </head>
+
+  <body>
+    <SkipLink label={t.a11y.skipToContent} />
+
+    <slot name="header" />
+
+    <main id={MAIN_CONTENT_ID} tabindex="-1">
+      <slot />
+    </main>
+
+    <slot name="footer" />
+  </body>
+</html>
+
+<style>
+  /* The layer spine positions itself against this. `<main>` spans exactly the
+     page's content height, which is the run the spine is meant to describe. */
+  main {
+    position: relative;
+  }
+
+  /* A programmatically focused landmark must not draw a ring the user did not
+     ask for; `:focus-visible` in global.css still shows one for keyboard use. */
+  main:focus {
+    outline: none;
+  }
+</style>

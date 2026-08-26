@@ -1,0 +1,234 @@
+---
+/**
+ * `/projects/` and `/es/projects/`, from one file.
+ *
+ * Three audit findings close here:
+ *
+ * - **2.1 — one visibility predicate.** This page does not filter on `status`.
+ *   It calls `getVisibleProjects()`, which is the same `isVisible()` the detail
+ *   route's `getStaticPaths` uses. The previous pair disagreed (`=== 'published'`
+ *   here, `!== 'draft'` there), which would have published unlisted `wip` detail
+ *   pages the moment a project stopped being `published`.
+ * - **2.2 — heading hierarchy.** The old index went `<h1>` → `<h3>`. The cards
+ *   are now `headingLevel={2}`, one level below this page's single `<h1>`, so
+ *   nothing is skipped. There is no invented `<h2>` band between them: a heading
+ *   is a promise of a localized name, and the dictionary has no string for
+ *   "the listing" that is not already the `<h1>`.
+ * - **5.1 — drift.** The Spanish filter chips had lost their hover styling
+ *   because they were a second copy. There is now one implementation.
+ *
+ * The filter is a progressive enhancement, in the strict sense:
+ *
+ *   - Every project is in the HTML and visible with no JavaScript at all.
+ *   - The chip group ships `hidden` and the script removes that attribute, so a
+ *     visitor without JS is never shown a control that cannot work.
+ *   - The chips are real `<button>`s carrying `aria-pressed`, so they are
+ *     keyboard operable and their state is announced.
+ *   - The domain list comes from `getVisibleDomains()` — the domains that
+ *     actually occur in public content — so no chip can return an empty result,
+ *     and the group is omitted entirely when there is nothing to choose between.
+ *
+ * The per-project domain map travels as one plain `data-` attribute on the
+ * listing wrapper rather than as an attribute on each card: `ProjectGrid` owns
+ * its own markup, and reaching into another component's elements to stamp data
+ * on them is precisely the coupling this route layer is being rebuilt to avoid.
+ */
+
+import ProjectGrid from '@/components/projects/ProjectGrid.astro';
+import Container from '@/components/ui/Container.astro';
+import { SITE } from '@/config/site';
+import { DEFAULT_LOCALE, LOCALES, useTranslations, type Locale } from '@/i18n';
+import { getVisibleDomains, getVisibleProjects } from '@/lib/projects';
+import PageLayout from '@/layouts/PageLayout.astro';
+
+export function getStaticPaths() {
+  return LOCALES.map((locale) => ({
+    params: { locale: locale === DEFAULT_LOCALE ? undefined : locale },
+    props: { locale },
+  }));
+}
+
+interface Props {
+  locale: Locale;
+}
+
+const { locale } = Astro.props;
+
+const t = useTranslations(locale);
+const base = SITE.basePath;
+
+const projects = await getVisibleProjects(locale);
+const domains = await getVisibleDomains(locale);
+
+/** A single chip offering nothing to narrow down is a control with no purpose. */
+const showFilters = domains.length > 1;
+
+/**
+ * `"ai quantum|audio|ai"` — one group per project, in render order, matching
+ * the array handed to `ProjectGrid`. Space-and-pipe rather than JSON so the
+ * client script parses it into `string[][]` with no `any` and no cast.
+ */
+const domainMap = projects.map((project) => project.meta.domains.join(' ')).join('|');
+
+const ALL = 'all';
+const HEADING_ID = 'projects-heading';
+---
+
+<PageLayout
+  locale={locale}
+  title={t.seo.projectsIndex.title}
+  description={t.seo.projectsIndex.description}
+  ogImageAlt={t.seo.ogImageAlt}
+>
+  <div class="index" aria-labelledby={HEADING_ID}>
+    <Container width="wide">
+      <header class="index__header">
+        <h1 id={HEADING_ID}>{t.projects.heading}</h1>
+        <p class="index__lede">{t.projects.subtitle}</p>
+      </header>
+
+      {
+        showFilters && (
+          <div class="index__filters" role="group" aria-label={t.projects.domains} data-project-filters hidden>
+            <button type="button" class="index__chip" data-domain={ALL} aria-pressed="true">
+              {t.projects.filterAll}
+            </button>
+            {domains.map((domain) => (
+              <button type="button" class="index__chip" data-domain={domain} aria-pressed="false">
+                {t.worlds.items[domain].name}
+              </button>
+            ))}
+          </div>
+        )
+      }
+
+      <div class="index__listing" data-project-listing data-domains={domainMap}>
+        <ProjectGrid projects={projects} t={t} locale={locale} base={base} headingLevel={2} lead numbered />
+      </div>
+    </Container>
+  </div>
+</PageLayout>
+
+<script>
+  /**
+   * Domain filtering. Everything below is enhancement — the page is complete
+   * and fully readable before this runs, and the chip group is not revealed
+   * until the handlers are attached.
+   */
+  const ALL = 'all';
+
+  const listing = document.querySelector<HTMLElement>('[data-project-listing]');
+  const filters = document.querySelector<HTMLElement>('[data-project-filters]');
+
+  if (listing && filters) {
+    // Direct children of the grid list. Matching on `li` alone would also catch
+    // the domain and stack tags inside each card.
+    const items = Array.from(listing.querySelectorAll<HTMLElement>(':scope > ul > li'));
+
+    // `"ai quantum|audio"` → [['ai','quantum'], ['audio']], positionally aligned
+    // with `items` because both come from the same server-rendered array.
+    const groups = (listing.dataset.domains ?? '')
+      .split('|')
+      .map((group) => group.split(' ').filter((domain) => domain.length > 0));
+
+    const chips = Array.from(filters.querySelectorAll<HTMLButtonElement>('[data-domain]'));
+
+    const apply = (selected: string): void => {
+      items.forEach((item, position) => {
+        const domains = groups[position] ?? [];
+        item.hidden = selected !== ALL && !domains.includes(selected);
+      });
+
+      for (const chip of chips) {
+        chip.setAttribute('aria-pressed', String(chip.dataset.domain === selected));
+      }
+    };
+
+    for (const chip of chips) {
+      chip.addEventListener('click', () => {
+        apply(chip.dataset.domain ?? ALL);
+      });
+    }
+
+    // The control now works, so it may be seen.
+    filters.hidden = false;
+  }
+</script>
+
+<style>
+  .index {
+    padding-block: var(--spacing-section);
+  }
+
+  .index__header {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-gutter);
+    max-width: var(--container-prose);
+  }
+
+  .index__lede {
+    font-size: var(--text-lg);
+    line-height: var(--leading-prose);
+    color: var(--color-slate);
+    text-wrap: pretty;
+  }
+
+  /* --- Filter chips ---------------------------------------------------------
+     One implementation for both locales. The hover and focus treatments are
+     byte-identical because there is only one rule — which is the structural
+     answer to the Spanish chips having silently lost theirs (AUDIT.md 5.1).
+     ----------------------------------------------------------------------- */
+
+  .index__filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-top: var(--spacing-stack);
+    padding-top: var(--spacing-gutter);
+    border-top: var(--border-hairline) solid var(--color-rule);
+  }
+
+  .index__chip {
+    padding: 0.3125rem 0.75rem;
+    border: var(--border-hairline) solid var(--color-rule);
+    border-radius: var(--radius-sm);
+    background-color: transparent;
+    font-family: var(--font-mono);
+    font-stretch: normal;
+    font-size: var(--text-micro);
+    font-weight: 500;
+    letter-spacing: var(--tracking-eyebrow);
+    text-transform: uppercase;
+    color: var(--color-slate);
+    cursor: pointer;
+    transition:
+      background-color var(--duration-fast) var(--ease-standard),
+      border-color var(--duration-fast) var(--ease-standard),
+      color var(--duration-fast) var(--ease-standard);
+  }
+
+  .index__chip:hover {
+    border-color: var(--color-ink);
+    color: var(--color-ink);
+  }
+
+  /* The selected chip is not signalled by colour alone: it is filled, which
+     survives both a monochrome rendering and a colour-vision difference. */
+  .index__chip[aria-pressed='true'] {
+    border-color: var(--color-ink);
+    background-color: var(--color-ink);
+    color: var(--color-paper);
+  }
+
+  .index__listing {
+    margin-top: var(--spacing-block);
+  }
+
+  /* `ProjectGrid` gives its items `display: flex`, which outranks the user
+     agent's `[hidden] { display: none }`. Filtering therefore needs a rule of
+     its own; `:global` because those `<li>`s belong to that component. */
+  .index__listing :global(li[hidden]) {
+    display: none;
+  }
+</style>

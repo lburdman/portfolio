@@ -1,0 +1,11 @@
+{
+  "slug": "quantum-audio",
+  "status": "published",
+  "featured": true,
+  "domains": ["quantum", "ai", "audio"],
+  "stack": ["Quantum ML", "PyTorch", "PennyLane", "Speech Processing", "Deep Learning", "CREMA-D"],
+  "links": {
+    "github": "https://github.com/lburdman/qnn-speech-recognition"
+  },
+  "order": 3
+}
