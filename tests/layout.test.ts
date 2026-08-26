@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { experimental_AstroContainer as AstroContainer } from 'astro/container';
-import { SECTION_IDS } from '../src/config/navigation';
+import { HOME_PATH, SECTION_IDS } from '../src/config/navigation';
+import { SITE } from '../src/config/site';
+import { localizePath } from '../src/i18n';
 import { en } from '../src/i18n/en';
 import { es } from '../src/i18n/es';
 
@@ -209,5 +211,80 @@ describe('section numbering is derived from SECTION_IDS', () => {
     // well as in the i18n suite.
     expect(html).toContain(es.sections.hero);
     expect(html).not.toContain(es.sections.hero.toUpperCase());
+  });
+});
+
+describe('the head slot and the indexable flag', () => {
+  it('renders page-supplied head content inside <head>, not the body', async () => {
+    // `PageLayout` used to drop this slot, which forced document-level
+    // metadata into the body. Presence alone is not enough — the assertion is
+    // about *position*, because content that lands after </head> is exactly
+    // the bug this fixes.
+    const html = await renderComponent(
+      '../src/layouts/PageLayout.astro',
+      { locale: 'en', t: en, title: en.seo.home.title, description: en.seo.home.description },
+      { slots: { head: '<meta name="probe-head" content="landed" />', default: '<p>body</p>' } },
+    );
+
+    const headEnd = html.indexOf('</head>');
+    const probe = html.indexOf('probe-head');
+    expect(headEnd).toBeGreaterThan(-1);
+    expect(probe).toBeGreaterThan(-1);
+    expect(probe).toBeLessThan(headEnd);
+  });
+
+  it('emits canonical, every hreflang and og:url by default', async () => {
+    const html = await renderComponent(
+      '../src/layouts/PageLayout.astro',
+      { locale: 'en', t: en, title: en.seo.home.title, description: en.seo.home.description },
+      { slots: { default: '<p>body</p>' } },
+    );
+    expect(html).toContain('rel="canonical"');
+    expect(html).toContain('hreflang="en"');
+    expect(html).toContain('hreflang="es"');
+    expect(html).toContain('hreflang="x-default"');
+    expect(html).toContain('property="og:url"');
+    expect(html).not.toContain('name="robots"');
+  });
+
+  it('withdraws them and declares noindex when the document has no URL of its own', async () => {
+    const html = await renderComponent(
+      '../src/layouts/PageLayout.astro',
+      {
+        locale: 'en',
+        t: en,
+        title: en.seo.notFound.title,
+        description: en.seo.notFound.description,
+        indexable: false,
+      },
+      { slots: { default: '<p>body</p>' } },
+    );
+    expect(html).not.toContain('rel="canonical"');
+    expect(html).not.toContain('hreflang="x-default"');
+    expect(html).not.toContain('property="og:url"');
+    expect(html).toContain('content="noindex, follow"');
+  });
+
+  it('points the language switcher at the other locale home when there is no equivalent page', async () => {
+    // Otherwise the switcher on the 404 offers `/es/404/`, which does not
+    // exist — Pages answers it with the same English 404 and the control
+    // silently does nothing.
+    //
+    // Asserted against `localizePath` rather than a literal, because the
+    // container renders with `BASE_URL='/'` while the build uses `/portfolio`.
+    // Hardcoding either one would make this pass in the wrong environment.
+    const notFound = new Request('https://lburdman.github.io/portfolio/404/');
+    const langHref = (html: string) => /<a class="lang__link" href="([^"]*)"/.exec(html)?.[1];
+
+    const base = { locale: 'en', t: en, title: en.seo.notFound.title, description: en.seo.notFound.description };
+    const opts = { slots: { default: '<p>body</p>' }, request: notFound };
+
+    const stable = await renderComponent('../src/layouts/PageLayout.astro', base, opts);
+    // Default behaviour is unchanged: the switcher still translates the path.
+    expect(langHref(stable)).toContain('404');
+
+    const unstable = await renderComponent('../src/layouts/PageLayout.astro', { ...base, indexable: false }, opts);
+    expect(langHref(unstable)).not.toContain('404');
+    expect(langHref(unstable)).toBe(localizePath(HOME_PATH, 'es', SITE.basePath));
   });
 });

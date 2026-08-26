@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { experimental_AstroContainer as AstroContainer } from 'astro/container';
 import { describe, expect, it } from 'vitest';
 import { DOMAIN_IDS } from '../src/config/domains';
+import { projectLinksSchema } from '../src/content/schema';
 import { en } from '../src/i18n/en';
 import { es } from '../src/i18n/es';
 
@@ -194,6 +195,27 @@ describe('the detail page carries the CSP-safe replacements', () => {
    * block — `[data-domain='ai']` would ship globally and repaint other
    * components' elements. Every accent rule must carry the `.detail` prefix.
    */
+  /**
+   * The dictionary side is already covered: an existing test driven by
+   * `Object.keys(projectLinksSchema.shape)` fails if the schema gains a link
+   * type `UIStrings` cannot name. This is the *rendering* side of the same
+   * question, and it is a genuinely different failure — a link type that is
+   * named but never rendered passes that test and still disappears from the
+   * page. `paper` and `article` sat in exactly that state.
+   *
+   * `LINK_TEXT` is typed `Record<keyof ProjectLinks, …>`, so a new schema key
+   * is already a compile error there. `LINK_ORDER` is what this covers: it
+   * cannot express completeness in the type system without a dummy assertion,
+   * so the ordering is asserted here instead.
+   */
+  it('renders every link type the schema accepts', () => {
+    const order = /const LINK_ORDER = \[([^\]]*)\]/.exec(source)?.[1] ?? '';
+    const rendered = [...order.matchAll(/'([a-z]+)'/g)].map((m) => m[1]);
+
+    expect(rendered).toEqual(expect.arrayContaining(Object.keys(projectLinksSchema.shape)));
+    expect(rendered).toHaveLength(Object.keys(projectLinksSchema.shape).length);
+  });
+
   it('scopes every accent rule behind .detail', () => {
     for (const match of source.matchAll(/\[data-domain='[a-z]+'\]/g)) {
       const before = source.slice(Math.max(0, match.index - 9), match.index);

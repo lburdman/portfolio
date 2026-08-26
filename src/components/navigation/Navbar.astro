@@ -22,9 +22,11 @@ interface Props {
   locale: Locale;
   t: UIStrings;
   base: string;
+  /** Forwarded to the language switcher — see its `stableURL` note. */
+  stableURL?: boolean | undefined;
 }
 
-const { locale, t, base } = Astro.props;
+const { locale, t, base, stableURL } = Astro.props;
 
 const currentPath = Astro.url.pathname;
 const homeHref = localizePath(HOME_PATH, locale, base);
@@ -75,7 +77,7 @@ const monogram = SITE.author
     </nav>
 
     <div class="nav__aside">
-      <LanguageSwitcher locale={locale} t={t} base={base} />
+      <LanguageSwitcher locale={locale} t={t} base={base} stableURL={stableURL} />
       <MobileMenu locale={locale} t={t} base={base} />
     </div>
   </div>

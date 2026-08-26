@@ -49,9 +49,30 @@ interface Props {
    * never equal, so that old fallback cannot creep back in silently.
    */
   ogImageAlt?: string | undefined;
+  /**
+   * Whether this document has a place in the site's URL graph.
+   *
+   * `false` suppresses the canonical link, every `hreflang` alternate and
+   * `og:url`, and emits `robots: noindex, follow` instead. The 404 is the case
+   * it exists for: GitHub Pages serves one `404.html` for every unmatched path,
+   * so the document has no stable URL of its own — a canonical pointing at
+   * `/404/` and alternates pointing at `/es/404/` advertise three URLs that do
+   * not exist.
+   *
+   * This is a prop rather than something a page adds through the `head` slot
+   * because the slot can only *append*. A page could add `noindex` but could
+   * not remove the canonical and the alternates already emitted above it,
+   * leaving markup that contradicts itself. Gating it here makes the wrong
+   * combination unexpressible — the same reason `SITE.resumePath === null`
+   * makes a dead résumé link unexpressible rather than merely discouraged.
+   *
+   * `follow` is deliberate: the links *out* of a 404 (home, projects, the
+   * language switcher) are still worth crawling.
+   */
+  indexable?: boolean | undefined;
 }
 
-const { locale, title, description, ogImage = SITE.ogImage, ogImageAlt } = Astro.props;
+const { locale, title, description, ogImage = SITE.ogImage, ogImageAlt, indexable = true } = Astro.props;
 
 const t = useTranslations(locale);
 const { origin, basePath } = SITE;
@@ -92,17 +113,25 @@ const faviconICO = `${basePath}/favicon.ico`;
     <meta name="author" content={SITE.author} />
     <meta name="generator" content={Astro.generator} />
 
-    <link rel="canonical" href={canonical} />
-    <link rel="alternate" hreflang="en" href={alternates.en} />
-    <link rel="alternate" hreflang="es" href={alternates.es} />
-    <link rel="alternate" hreflang="x-default" href={alternates['x-default']} />
+    {
+      indexable ? (
+        <Fragment>
+          <link rel="canonical" href={canonical} />
+          <link rel="alternate" hreflang="en" href={alternates.en} />
+          <link rel="alternate" hreflang="es" href={alternates.es} />
+          <link rel="alternate" hreflang="x-default" href={alternates['x-default']} />
+        </Fragment>
+      ) : (
+        <meta name="robots" content="noindex, follow" />
+      )
+    }
 
     <meta property="og:type" content="website" />
     <meta property="og:locale" content={locale} />
     <meta property="og:site_name" content={SITE.author} />
     <meta property="og:title" content={title} />
     <meta property="og:description" content={description} />
-    <meta property="og:url" content={canonical} />
+    {indexable && <meta property="og:url" content={canonical} />}
     <meta property="og:image" content={ogImageURL} />
     <meta property="og:image:width" content={String(SITE.ogImageWidth)} />
     <meta property="og:image:height" content={String(SITE.ogImageHeight)} />

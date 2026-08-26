@@ -20,8 +20,8 @@
  * ## The information model (brief §9)
  *
  * Title, statement, contribution, stack, links, media, related work — and the
- * template adapts by **omission**. `year`, `role`, `links.demo`, `cover` and
- * `related` each render nothing at all when absent. No placeholder, no empty
+ * template adapts by **omission**. `year`, `role`, `cover`, `related` and every
+ * one of the four `links` types each render nothing at all when absent. No placeholder, no empty
  * frame, no "coming soon": the previous template's missing-cover branch drew a
  * bordered box with an icon and the literal `Project image coming soon`, which
  * is a hardcoded string advertising an absence.
@@ -54,6 +54,7 @@ import { Image } from 'astro:assets';
 import { render } from 'astro:content';
 import ProjectGrid from '@/components/projects/ProjectGrid.astro';
 import Container from '@/components/ui/Container.astro';
+import type { ProjectLinks } from '@/content/schema';
 import { SITE } from '@/config/site';
 import { DEFAULT_LOCALE, LOCALES, localizePath, useTranslations, type Locale } from '@/i18n';
 import {
@@ -87,7 +88,21 @@ interface Props {
   project: Project;
 }
 
-const { locale, project } = Astro.props;
+/**
+ * The `: Props` annotation is explicit rather than inferred, and it is
+ * load-bearing here in a way it is not on the sibling routes.
+ *
+ * `@astrojs/check` normally links `Astro.props` to a page's `Props` interface
+ * on its own. It stops doing so once the frontmatter contains a `satisfies`
+ * expression — `LINK_ORDER` below — at which point `Props` is reported as
+ * declared-but-never-used and `astro check` fails. Annotating the destructure
+ * restores the link by using the type outright.
+ *
+ * This is the same form `ui/Container.astro` already uses. It is a type
+ * annotation, not a cast: it constrains `Astro.props` rather than reinterpreting
+ * it, so a mismatch with what `getStaticPaths` supplies is still an error.
+ */
+const { locale, project }: Props = Astro.props;
 const { meta, title, summary } = project;
 
 const t = useTranslations(locale);
@@ -130,20 +145,39 @@ const credits: string[] = [];
 if (meta.role) credits.push(meta.role);
 if (meta.year !== undefined) credits.push(String(meta.year));
 
+/** The schema's own link keys. Not re-declared here — derived. */
+type ProjectLinkId = keyof ProjectLinks;
+
 /**
- * `github` and `demo` are the two destinations the dictionary can name
- * (`t.projects.github` / `t.projects.demo` plus their `t.a11y.*` labels), and
- * they are the two `ProjectCard` renders. `links.paper` and `links.article`
- * are accepted by the schema but have no localized label anywhere in
- * `UIStrings`, so rendering them would mean writing a user-facing string in a
- * route file — the exact defect AUDIT.md 2.8 catalogued. They are omitted, and
- * the missing keys are reported rather than invented.
+ * Every link type the schema accepts, in render order.
+ *
+ * `LINK_TEXT` is typed `Record<ProjectLinkId, …>`, and `ProjectLinkId` is
+ * `keyof ProjectLinks` — the schema's own shape. That is the point: adding a
+ * fifth link type to `projectLinksSchema` makes this object a **compile
+ * error** until it is named in both dictionaries, rather than a link that the
+ * schema happily accepts and the page silently never renders. `paper` and
+ * `article` were exactly that gap until their keys landed.
+ *
+ * The ordering array cannot express completeness in the type system without a
+ * dummy assertion, so it is guarded from the rendering side instead — see the
+ * `projectLinksSchema.shape` case in `tests/pages.test.ts`.
  */
+const LINK_ORDER = ['github', 'demo', 'paper', 'article'] as const satisfies readonly ProjectLinkId[];
+
+const LINK_TEXT: Record<ProjectLinkId, { text: string; label: (projectTitle: string) => string }> = {
+  github: { text: t.projects.github, label: t.a11y.projectGithubLabel },
+  demo: { text: t.projects.demo, label: t.a11y.projectDemoLabel },
+  paper: { text: t.projects.paper, label: t.a11y.projectPaperLabel },
+  article: { text: t.projects.article, label: t.a11y.projectArticleLabel },
+};
+
 const links = meta.links;
-const external = [
-  links?.github ? { href: links.github, text: t.projects.github, label: t.a11y.projectGithubLabel(title) } : null,
-  links?.demo ? { href: links.demo, text: t.projects.demo, label: t.a11y.projectDemoLabel(title) } : null,
-].filter((link): link is NonNullable<typeof link> => link !== null);
+const external = LINK_ORDER.flatMap((id) => {
+  const href = links?.[id];
+  if (href === undefined) return [];
+  const { text, label } = LINK_TEXT[id];
+  return [{ href, text, label: label(title) }];
+});
 
 const HEADING_ID = 'project-heading';
 const RELATED_ID = 'project-related';
@@ -249,11 +283,8 @@ const mediaTransition = `project-media-${meta.slug}`;
       {
         related.length > 0 && (
           <section class="detail__related" aria-labelledby={RELATED_ID}>
-            {/* `UIStrings` has no key for "related work"; `t.projects.heading` is the
-                nearest true localized name for a block that lists projects. Inventing
-                a literal here is what AUDIT.md 2.8 forbids. Reported as a gap. */}
             <h2 id={RELATED_ID} class="detail__related-heading">
-              {t.projects.heading}
+              {t.projects.relatedWork}
             </h2>
             <ProjectGrid projects={related} t={t} locale={locale} base={base} headingLevel={3} numbered={false} />
           </section>

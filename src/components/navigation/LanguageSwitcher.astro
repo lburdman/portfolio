@@ -9,19 +9,31 @@
  * reported `en` for every Spanish page under `base: '/portfolio'` (5.3).
  */
 
+import { HOME_PATH } from '@/config/navigation';
 import { localizePath, otherLocale, type Locale, type UIStrings } from '@/i18n';
 
 interface Props {
   locale: Locale;
   t: UIStrings;
   base: string;
+  /**
+   * Whether the current document has a URL of its own.
+   *
+   * `false` means there is no equivalent page in the other locale to switch
+   * to, so the switcher targets that locale's home instead. The 404 is the
+   * case: GitHub Pages serves one `404.html` for every unmatched path, so
+   * translating `/404/` into `/es/404/` produces a URL that does not exist —
+   * and Pages answers it with the same English 404, leaving the reader exactly
+   * where they were while the control appeared to do something.
+   */
+  stableURL?: boolean | undefined;
   class?: string | undefined;
 }
 
-const { locale, t, base, class: className } = Astro.props;
+const { locale, t, base, stableURL = true, class: className } = Astro.props;
 
 const target = otherLocale(locale);
-const href = localizePath(Astro.url.pathname, target, base);
+const href = localizePath(stableURL ? Astro.url.pathname : HOME_PATH, target, base);
 ---
 
 <nav class:list={['lang', className]} aria-label={t.a11y.languageSwitcher}>

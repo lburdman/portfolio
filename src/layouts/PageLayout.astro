@@ -23,6 +23,11 @@ interface Props {
   ogImage?: string | undefined;
   ogImageAlt?: string | undefined;
   /**
+   * Forwarded to `BaseLayout`. `false` suppresses canonical, `hreflang` and
+   * `og:url` and emits `robots: noindex, follow` — see the prop's note there.
+   */
+  indexable?: boolean | undefined;
+  /**
    * Renders the layer spine down the left margin. The homepage opts in; no
    * other page does, because only the homepage is the ordered descent the
    * spine describes (docs/MOTION_SYSTEM.md §2).
@@ -30,14 +35,26 @@ interface Props {
   spine?: boolean | undefined;
 }
 
-const { locale, title, description, ogImage, ogImageAlt, spine = false } = Astro.props;
+const { locale, title, description, ogImage, ogImageAlt, indexable, spine = false } = Astro.props;
 
 const t = useTranslations(locale);
 const base = SITE.basePath;
 ---
 
-<BaseLayout locale={locale} title={title} description={description} ogImage={ogImage} ogImageAlt={ogImageAlt}>
-  <Navbar slot="header" locale={locale} t={t} base={base} />
+<BaseLayout
+  locale={locale}
+  title={title}
+  description={description}
+  ogImage={ogImage}
+  ogImageAlt={ogImageAlt}
+  indexable={indexable}
+>
+  {
+    /* Forwarded, not dropped: a page needs somewhere to put document-level
+      metadata, and without this the only place left is the body. */
+  }
+  <slot name="head" slot="head" />
+  <Navbar slot="header" locale={locale} t={t} base={base} stableURL={indexable} />
   {spine && <LayerSpine />}
   <slot />
   <Footer slot="footer" locale={locale} t={t} base={base} />
