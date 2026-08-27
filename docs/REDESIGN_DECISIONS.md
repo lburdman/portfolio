@@ -1,9 +1,65 @@
 # Redesign decisions — pass 2
 
-**Date:** 2026-08-27 · **Status:** reviewed, not yet implemented
-**Method:** five parallel reviews — live UX (real Chrome + Playwright), motion semantics, content, GitHub evidence, performance.
+**Date:** 2026-08-27 · **Status: implemented** (`0b05cf2`, `005924d`)
+**Method:** five parallel reviews — live UX (real Chrome + Playwright), motion semantics, content, GitHub evidence, performance — then three implementation waves.
 
 Every figure below was measured. Nothing here is an impression.
+
+---
+
+## What shipped
+
+|                                              | Before     | After                       |
+| -------------------------------------------- | ---------- | --------------------------- |
+| GitHub links that resolve                    | 1 of 4     | **4 of 4**                  |
+| Case-study claims contradicted by their repo | 16         | **0**                       |
+| `#contact` anchors with a target             | 0 of 4     | **4 of 4**                  |
+| JS on the mobile / reduced-motion path       | 67.2 KB gz | **0 B**                     |
+| Hero field contrast                          | 1.32:1     | **3.85:1** (4.74:1 darkest) |
+| Hero pointer response, peak                  | 30/255     | **120/255**                 |
+| Electronics world, arrival                   | 0.18%      | **6.51%**                   |
+| FPGA world, arrival                          | 0.29%      | **2.64%**                   |
+| Pinned traverse, share of document           | 43.1%      | **30.4%**                   |
+| Audio (finale) dwell at centre               | 0          | **755** — the longest       |
+| Project media on the site                    | none       | **4 committed assets**      |
+| Tests                                        | 288        | **370**                     |
+
+**Budget after all of it:** critical path 0 blocking bytes · desktop traverse
+109.5 KB of 115 · CSS 14.62 KB of 15 — **0.38 KB of headroom left, so the next
+addition has to buy its way in.**
+
+### Still open
+
+- **Confirm with Lucas** — the list at the end of this document. Five credential
+  facts are live on the site as claims and none are verified.
+- **`augmenta` was demoted on legibility, not merit.** It is the strongest
+  engineering of the four (four services, two languages, AES-GCM envelope
+  encryption, a typed fail-closed error taxonomy) and the only one a reader
+  cannot check. One architecture diagram or a tokenize→echo→rehydrate
+  transcript earns position 20 back.
+- **`leaderPruebaTecnica`** — the support-classifier link now resolves, but the
+  repo name announces a technical test. Unfeaturing does not help (the listing
+  renders the same link); renaming the repo does.
+- **The forecast plot is a matplotlib export on an editorial page.** White
+  ground, matplotlib blue, foreign to the paper/ink system. Shipping it is the
+  right trade — real evidence beats palette harmony, and restyling someone's
+  chart risks misrepresenting it — but it wants a more deliberate frame.
+- **Not verified anywhere in this pass:** frame rate (pixel diffing measures
+  amount of change, not jank), real touch gestures, and appearance on a
+  physical display. All contrast figures are headless sRGB.
+
+### The pattern worth keeping
+
+Every serious defect found in this pass was in something already green. Three
+404 links passed a schema that validated URL _shape_. A primary CTA pointed at
+nothing through 288 tests. A link test validated **7 of 266** internal links
+while reporting success. Sixteen false claims survived a migration verified
+byte-for-byte against `git show HEAD:` — fidelity to a source nobody had
+checked. The spine's progress marker was measured as "static" and read as
+intentional; it was a zero-duration animation sitting at progress 0.
+
+None of these were caught by running the checks. They were caught by asking
+what the checks actually prove.
 
 ---
 
