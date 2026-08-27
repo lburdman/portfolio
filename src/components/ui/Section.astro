@@ -1,0 +1,191 @@
+---
+/**
+ * A numbered page section, annotated the way a datasheet labels a figure.
+ *
+ * The homepage genuinely is an ordered descent — Intro, Layers, Technical
+ * Worlds, Projects — and the brief's navigation model (§32) is numbered, so
+ * the numbering is earned rather than decorative.
+ *
+ * **One source for three things.** Pass `section` and the component derives the
+ * element's `id`, its figure number (`SECTION_IDS` position: 0 → `00`) and the
+ * anchor an in-page link targets. Renumbering the site is then reordering one
+ * array in `src/config/navigation.ts`, not editing literals across components
+ * that can silently drift out of step.
+ *
+ * `label` carries the localized section word from `t.sections[id]`, so the
+ * annotation reads `00 / INTRO` on English pages and `00 / INTRODUCCIÓN` on
+ * Spanish ones. The dictionary authors it in sentence case and the stylesheet
+ * below does the uppercasing — shouting in the dictionary would leak into any
+ * future non-uppercased usage, and there is a test that fails if it happens.
+ *
+ * The annotation is `aria-hidden`. It is a visual wayfinding mark that repeats
+ * information already carried by the section's own heading via `aria-labelledby`;
+ * announcing "zero zero slash intro" ahead of every heading is noise, not access.
+ *
+ * `id` and `index` remain accepted as explicit overrides for callers that are
+ * not part of the `SECTION_IDS` sequence.
+ *
+ * ── Undeclared attributes are forwarded, not dropped ────────────────────────
+ *
+ * Everything not named in `Props` is collected by a rest spread and rendered
+ * onto the `<section>`. Before that, a `data-*` hook passed at a call site was
+ * accepted by the type checker and then silently absent from the built output
+ * — valid-looking source, missing behaviour, visible only in a production
+ * build. The same class of defect as an inline style under a hash-based CSP.
+ *
+ * The three attributes this component derives — `id`, `aria-labelledby` and
+ * `class` — are **destructured out** of the rest object rather than being
+ * relied on to win by source order. Exclusion is structural: the keys are not
+ * in `attrs` at all, so no spread can reach them, in either order. Ordering
+ * would have meant betting on how Astro merges an explicitly-`undefined`
+ * attribute against a spread that defines it, which is not obvious enough to
+ * rest a silent-failure guarantee on. A caller passing raw `aria-labelledby`
+ * instead of `labelledBy` is still honoured, as a fallback.
+ */
+
+import type { HTMLAttributes } from 'astro/types';
+import Container from './Container.astro';
+import { SECTION_IDS, type SectionId } from '@/config/navigation';
+
+/**
+ * Extends `HTMLAttributes<'section'>` so any other valid attribute — `data-*`,
+ * `aria-*`, `role`, `hidden` — is both typed and forwarded onto the element by
+ * the rest spread below.
+ */
+interface Props extends HTMLAttributes<'section'> {
+  /** Position in `SECTION_IDS`. Supplies the element `id` and the figure number. */
+  section?: SectionId | undefined;
+  /** Explicit element `id`, for sections outside the numbered sequence. */
+  id?: string | undefined;
+  /** Explicit figure number, overriding the one derived from `section`. */
+  index?: string | undefined;
+  /** Localized section word — always `t.sections[id]`, never a literal. */
+  label?: string | undefined;
+  /** `id` of the heading that names this section, for `aria-labelledby`. */
+  labelledBy?: string | undefined;
+  /** Measure of the inner column. */
+  width?: 'prose' | 'content' | 'wide' | 'full' | undefined;
+  /** Vertical rhythm. `lg` is reserved for the hero and the ink band. */
+  spacing?: 'base' | 'lg' | 'none' | undefined;
+  class?: string | undefined;
+}
+
+const {
+  section,
+  id,
+  index,
+  label,
+  labelledBy,
+  width = 'content',
+  spacing = 'base',
+  class: className,
+  'aria-labelledby': ariaLabelledByAttr,
+  ...attrs
+} = Astro.props;
+
+/** `SECTION_IDS` position as a two-digit figure number. Index 0 is `00`. */
+function figureNumber(sectionId: SectionId): string {
+  return String(SECTION_IDS.indexOf(sectionId)).padStart(2, '0');
+}
+
+const resolvedId = id ?? section;
+/** `labelledBy` is the documented prop; a raw `aria-labelledby` still works. */
+const resolvedLabelledBy = labelledBy ?? ariaLabelledByAttr;
+const resolvedIndex = index ?? (section === undefined ? undefined : figureNumber(section));
+---
+
+<section
+  {...attrs}
+  id={resolvedId}
+  aria-labelledby={resolvedLabelledBy}
+  class:list={['section', `section--${spacing}`, className]}
+>
+  <slot name="bleed" />
+  <Container width={width} class="section__inner">
+    <p class="section__figure" aria-hidden="true">
+      {resolvedIndex && <span class="section__index">{resolvedIndex}</span>}
+      {
+        label && (
+          <Fragment>
+            <span class="section__slash">/</span>
+            <span class="section__label">{label}</span>
+          </Fragment>
+        )
+      }
+      <span class="section__rule"></span>
+    </p>
+    <slot />
+  </Container>
+</section>
+
+<style>
+  .section {
+    position: relative;
+  }
+
+  /* The `bleed` slot renders outside the measure — full-width backgrounds and
+     decorative canvases. Anything placed there must be `aria-hidden`. */
+  .section :global(.section__bleed) {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+  }
+
+  .section :global(.section__inner) {
+    position: relative;
+    z-index: 1;
+  }
+
+  .section--base {
+    padding-block: var(--spacing-section);
+  }
+
+  .section--lg {
+    padding-block: var(--spacing-section-lg);
+  }
+
+  .section--none {
+    padding-block: 0;
+  }
+
+  /* The margin annotation: figure number, section word, then a hairline running
+     out to the edge of the measure. Reads as a datasheet rule, costs one element. */
+  .section__figure {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: var(--spacing-stack);
+    font-family: var(--font-mono);
+    font-stretch: normal;
+    font-size: var(--text-micro);
+    font-weight: 500;
+    letter-spacing: var(--tracking-wide);
+    color: var(--color-slate);
+  }
+
+  .section__slash {
+    color: var(--color-rule);
+  }
+
+  /* The uppercasing lives here, not in the dictionary. */
+  .section__label {
+    text-transform: uppercase;
+  }
+
+  .section__rule {
+    flex: 1;
+    height: 0;
+    margin-left: 0.25rem;
+    border-top: var(--border-hairline) solid var(--color-rule);
+  }
+
+  :global(.on-ink) .section__figure {
+    color: var(--color-on-ink-muted);
+  }
+
+  :global(.on-ink) .section__slash,
+  :global(.on-ink) .section__rule {
+    color: var(--color-ink-rule);
+    border-top-color: var(--color-ink-rule);
+  }
+</style>

@@ -1,0 +1,22 @@
+---
+/**
+ * AUDIT 2.6 — the skip *target* existed in the previous layout, the skip
+ * *link* never did. Both now read the same constant, so they cannot separate.
+ *
+ * This must be the first focusable element in the document. `BaseLayout`
+ * renders it as the first child of `<body>`.
+ */
+
+import { MAIN_CONTENT_ID } from '@/config/navigation';
+
+interface Props {
+  /** Localized label. Always `t.a11y.skipToContent` — never a literal. */
+  label: string;
+  /** Landmark to jump to. Defaults to the shared `<main>` id. */
+  targetId?: string | undefined;
+}
+
+const { label, targetId = MAIN_CONTENT_ID } = Astro.props;
+---
+
+<a class="skip-link" href={`#${targetId}`}>{label}</a>

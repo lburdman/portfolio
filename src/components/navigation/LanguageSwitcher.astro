@@ -1,0 +1,80 @@
+---
+/**
+ * Switches to **the same page** in the other locale, not to the homepage.
+ *
+ * `localizePath` is fed the current pathname directly: it strips the base and
+ * any existing locale prefix before re-prefixing, so it is idempotent and
+ * base-safe. That is the whole reason nothing here concatenates strings — the
+ * audit found a switcher that dropped the route and a `getLocaleFromURL` that
+ * reported `en` for every Spanish page under `base: '/portfolio'` (5.3).
+ */
+
+import { HOME_PATH } from '@/config/navigation';
+import { localizePath, otherLocale, type Locale, type UIStrings } from '@/i18n';
+
+interface Props {
+  locale: Locale;
+  t: UIStrings;
+  base: string;
+  /**
+   * Whether the current document has a URL of its own.
+   *
+   * `false` means there is no equivalent page in the other locale to switch
+   * to, so the switcher targets that locale's home instead. The 404 is the
+   * case: GitHub Pages serves one `404.html` for every unmatched path, so
+   * translating `/404/` into `/es/404/` produces a URL that does not exist —
+   * and Pages answers it with the same English 404, leaving the reader exactly
+   * where they were while the control appeared to do something.
+   */
+  stableURL?: boolean | undefined;
+  class?: string | undefined;
+}
+
+const { locale, t, base, stableURL = true, class: className } = Astro.props;
+
+const target = otherLocale(locale);
+const href = localizePath(stableURL ? Astro.url.pathname : HOME_PATH, target, base);
+---
+
+<nav class:list={['lang', className]} aria-label={t.a11y.languageSwitcher}>
+  <span class="lang__current">
+    <span class="sr-only">{t.a11y.currentLanguage}</span>
+    <span aria-hidden="true">{t.lang.short}</span>
+  </span>
+  <span class="lang__divider" aria-hidden="true">/</span>
+  <a class="lang__link" href={href} hreflang={target} lang={target} rel="alternate" aria-label={t.lang.switchTo}>
+    {t.lang.switchToShort}
+  </a>
+</nav>
+
+<style>
+  .lang {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5ch;
+    font-family: var(--font-mono);
+    font-stretch: normal;
+    font-size: var(--text-micro);
+    font-weight: 500;
+    letter-spacing: var(--tracking-eyebrow);
+  }
+
+  .lang__current {
+    color: var(--color-ink);
+  }
+
+  .lang__divider {
+    color: var(--color-rule);
+  }
+
+  .lang__link {
+    color: var(--color-slate);
+    padding: 0.25rem;
+    border-radius: var(--radius-sm);
+    transition: color var(--duration-fast) var(--ease-standard);
+  }
+
+  .lang__link:hover {
+    color: var(--color-accent);
+  }
+</style>

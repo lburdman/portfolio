@@ -2,6 +2,8 @@
 dist/
 # generated types
 .astro/
+# test coverage reports
+coverage/
 
 # dependencies
 node_modules/
@@ -12,10 +14,13 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 
-
 # environment variables
 .env
 .env.production
+
+# agent/tooling scratch state
+.atl/
+*.tmp.*
 
 # macOS-specific files
 .DS_Store

@@ -1,0 +1,11 @@
+{
+  "slug": "support-classifier",
+  "status": "published",
+  "featured": true,
+  "domains": ["ai"],
+  "stack": ["AI", "NLP", "Python", "Pydantic", "Anthropic", "Classification"],
+  "links": {
+    "github": "https://github.com/lburdman/support-ticket-classifier"
+  },
+  "order": 4
+}

@@ -1,0 +1,54 @@
+---
+/**
+ * The measure. Every page column is one of four widths, declared here and
+ * nowhere else, so the 12-column discipline cannot drift between sections.
+ *
+ * Widths come from the `--container-*` tokens; the gutter is added on top of
+ * the token so the *content* lands on the declared measure rather than the
+ * box.
+ */
+
+interface Props {
+  /** Which measure this column uses. `full` opts out entirely (bleed bands). */
+  width?: 'prose' | 'content' | 'wide' | 'full' | undefined;
+  /** Element to render. Defaults to a plain `div`. */
+  as?: 'div' | 'section' | 'header' | 'footer' | 'nav' | 'article' | undefined;
+  class?: string | undefined;
+}
+
+const { width = 'content', as: Tag = 'div', class: className }: Props = Astro.props;
+---
+
+<Tag class:list={['container', `container--${width}`, className]}>
+  <slot />
+</Tag>
+
+<style>
+  .container {
+    width: 100%;
+    margin-inline: auto;
+    padding-inline: var(--spacing-gutter);
+  }
+
+  @media (min-width: 48rem) {
+    .container {
+      padding-inline: var(--spacing-gutter-lg);
+    }
+  }
+
+  .container--prose {
+    max-width: calc(var(--container-prose) + 2 * var(--spacing-gutter-lg));
+  }
+
+  .container--content {
+    max-width: calc(var(--container-content) + 2 * var(--spacing-gutter-lg));
+  }
+
+  .container--wide {
+    max-width: calc(var(--container-wide) + 2 * var(--spacing-gutter-lg));
+  }
+
+  .container--full {
+    max-width: none;
+  }
+</style>

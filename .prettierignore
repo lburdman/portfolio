@@ -1,0 +1,14 @@
+# Generated output — Prettier must never rewrite or check these.
+# Without this file `prettier --write .` reformats build artefacts, and after a
+# coverage run `format:check` reports failures in ~46 generated files
+# (AUDIT.md 5.5).
+dist/
+coverage/
+.astro/
+node_modules/
+
+# Lockfile: owned by npm, reformatting it produces spurious diffs.
+package-lock.json
+
+# Local scratch files (never committed — see .gitignore).
+*.tmp.*

@@ -1,0 +1,250 @@
+---
+/**
+ * The header. Restrained by design: wordmark, three numbered routes, language.
+ *
+ * The numbering is the same device the sections use — the brief's navigation
+ * model (§32) is an ordered list, and the homepage genuinely is an ordered
+ * descent. Structure comes from `PRIMARY_NAV`, wording from `t.nav`, URLs from
+ * `localizePath`; each has exactly one owner and none of them is this file.
+ *
+ * The bottom hairline appears only once the page has scrolled. That is done
+ * with a zero-height sentinel and an `IntersectionObserver` — never a scroll
+ * handler, which would run on every frame of every scroll for one boolean.
+ */
+
+import LanguageSwitcher from '@/components/navigation/LanguageSwitcher.astro';
+import MobileMenu from '@/components/navigation/MobileMenu.astro';
+import { HOME_PATH, PRIMARY_NAV, type NavItem } from '@/config/navigation';
+import { SITE } from '@/config/site';
+import { localizePath, type Locale, type UIStrings } from '@/i18n';
+
+interface Props {
+  locale: Locale;
+  t: UIStrings;
+  base: string;
+  /** Forwarded to the language switcher — see its `stableURL` note. */
+  stableURL?: boolean | undefined;
+}
+
+const { locale, t, base, stableURL } = Astro.props;
+
+const currentPath = Astro.url.pathname;
+const homeHref = localizePath(HOME_PATH, locale, base);
+
+const items = PRIMARY_NAV.map((item: NavItem, index) => {
+  const path = localizePath(item.path, locale, base);
+  return {
+    id: item.id,
+    href: item.hash ? `${path}#${item.hash}` : path,
+    label: t.nav[item.labelKey],
+    ordinal: String(index + 1).padStart(2, '0'),
+    /** A hash destination is a section, never a page — it is never `current`. */
+    isCurrent: !item.hash && currentPath === path,
+  };
+});
+
+/** Initials shown when the full wordmark does not fit. Not a translatable string. */
+const monogram = SITE.author
+  .split(' ')
+  .map((part) => part.charAt(0))
+  .join('');
+---
+
+<div class="nav-sentinel" data-nav-sentinel aria-hidden="true"></div>
+
+<header class="nav" data-nav>
+  <div class="nav__inner">
+    <a class="nav__mark" href={homeHref} aria-label={t.a11y.homeLink}>
+      <span class="nav__monogram" aria-hidden="true">{monogram}</span>
+      <span class="nav__name">{SITE.author}</span>
+    </a>
+
+    <nav class="nav__primary" aria-label={t.a11y.primaryNavigation}>
+      <ul class="nav__list">
+        {
+          items.map((item) => (
+            <li>
+              <a class="nav__link" href={item.href} aria-current={item.isCurrent ? 'page' : undefined}>
+                <span class="nav__ordinal" aria-hidden="true">
+                  {item.ordinal}
+                </span>
+                <span class="nav__label">{item.label}</span>
+              </a>
+            </li>
+          ))
+        }
+      </ul>
+    </nav>
+
+    <div class="nav__aside">
+      <LanguageSwitcher locale={locale} t={t} base={base} stableURL={stableURL} />
+      <MobileMenu locale={locale} t={t} base={base} />
+    </div>
+  </div>
+</header>
+
+<style>
+  /* Zero net layout cost: 1px tall, pulled back by a negative margin. It only
+     has to be observable, not visible. */
+  .nav-sentinel {
+    height: 1px;
+    margin-bottom: -1px;
+  }
+
+  .nav {
+    --nav-height: 4rem;
+
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    background-color: var(--color-paper);
+    border-bottom: var(--border-hairline) solid transparent;
+    transition: border-bottom-color var(--duration-base) var(--ease-standard);
+  }
+
+  .nav[data-scrolled] {
+    border-bottom-color: var(--color-rule);
+  }
+
+  .nav__inner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--spacing-gutter);
+    height: var(--nav-height);
+    width: 100%;
+    max-width: calc(var(--container-wide) + 2 * var(--spacing-gutter-lg));
+    margin-inline: auto;
+    padding-inline: var(--spacing-gutter);
+  }
+
+  @media (min-width: 48rem) {
+    .nav__inner {
+      padding-inline: var(--spacing-gutter-lg);
+    }
+  }
+
+  /* --- wordmark ------------------------------------------------------------ */
+  .nav__mark {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.75rem;
+    min-width: 0;
+    border-radius: var(--radius-sm);
+  }
+
+  .nav__monogram {
+    font-family: var(--font-mono);
+    font-stretch: normal;
+    font-size: var(--text-micro);
+    font-weight: 500;
+    letter-spacing: var(--tracking-wide);
+    color: var(--color-slate);
+    padding: 0.25rem 0.375rem;
+    border: var(--border-hairline) solid var(--color-rule);
+    border-radius: var(--radius-sm);
+  }
+
+  .nav__name {
+    font-family: var(--font-display);
+    font-stretch: var(--display-width-expanded);
+    font-size: var(--text-sm);
+    font-weight: 600;
+    letter-spacing: var(--tracking-label);
+    white-space: nowrap;
+  }
+
+  /* Below 26rem the full name and the controls compete; the monogram carries
+     the identity on its own. Nothing is lost — the link keeps its a11y name. */
+  @media (max-width: 26rem) {
+    .nav__name {
+      display: none;
+    }
+  }
+
+  /* --- primary nav --------------------------------------------------------- */
+  .nav__primary {
+    display: none;
+  }
+
+  @media (min-width: 48rem) {
+    .nav__primary {
+      display: block;
+    }
+  }
+
+  .nav__list {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-gutter);
+    list-style: none;
+  }
+
+  .nav__link {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 0.5rem;
+    padding: 0.25rem 0;
+    border-bottom: var(--border-rule) solid transparent;
+    color: var(--color-slate);
+    transition:
+      color var(--duration-fast) var(--ease-standard),
+      border-bottom-color var(--duration-fast) var(--ease-standard);
+  }
+
+  .nav__link:hover {
+    color: var(--color-ink);
+  }
+
+  .nav__link[aria-current='page'] {
+    color: var(--color-ink);
+    border-bottom-color: var(--color-accent);
+  }
+
+  .nav__ordinal {
+    font-family: var(--font-mono);
+    font-stretch: normal;
+    font-size: var(--text-micro);
+    font-weight: 500;
+    letter-spacing: var(--tracking-eyebrow);
+    color: var(--color-rule);
+  }
+
+  .nav__link:hover .nav__ordinal,
+  .nav__link[aria-current='page'] .nav__ordinal {
+    color: var(--color-accent);
+  }
+
+  .nav__label {
+    font-family: var(--font-mono);
+    font-stretch: normal;
+    font-size: var(--text-caption);
+    font-weight: 500;
+    letter-spacing: var(--tracking-label);
+    text-transform: uppercase;
+  }
+
+  /* --- right-hand controls -------------------------------------------------- */
+  .nav__aside {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-gutter);
+  }
+</style>
+
+<script>
+  const sentinel = document.querySelector('[data-nav-sentinel]');
+  const header = document.querySelector<HTMLElement>('[data-nav]');
+
+  if (sentinel && header && 'IntersectionObserver' in window) {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          header.toggleAttribute('data-scrolled', !entry.isIntersecting);
+        }
+      },
+      { threshold: 0 },
+    );
+    observer.observe(sentinel);
+  }
+</script>

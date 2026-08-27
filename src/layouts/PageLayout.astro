@@ -1,0 +1,61 @@
+---
+/**
+ * The chrome every page shares: header, `<main>` (from `BaseLayout`), footer.
+ *
+ * This is the one place `useTranslations` is called for the navigation tree.
+ * Everything below receives `t`, `locale` and `base` as props and never looks
+ * a string up for itself (docs/ARCHITECTURE.md §3) — the discipline the audit
+ * praised and 1.3 broke when `Hero` was handed `base` without `locale`, so the
+ * Spanish homepage's CTAs pointed at English pages.
+ */
+
+import Footer from '@/components/navigation/Footer.astro';
+import Navbar from '@/components/navigation/Navbar.astro';
+import LayerSpine from '@/components/visuals/spine/LayerSpine.astro';
+import { SITE } from '@/config/site';
+import { useTranslations, type Locale } from '@/i18n';
+import BaseLayout from './BaseLayout.astro';
+
+interface Props {
+  locale: Locale;
+  title: string;
+  description: string;
+  ogImage?: string | undefined;
+  ogImageAlt?: string | undefined;
+  /**
+   * Forwarded to `BaseLayout`. `false` suppresses canonical, `hreflang` and
+   * `og:url` and emits `robots: noindex, follow` — see the prop's note there.
+   */
+  indexable?: boolean | undefined;
+  /**
+   * Renders the layer spine down the left margin. The homepage opts in; no
+   * other page does, because only the homepage is the ordered descent the
+   * spine describes (docs/MOTION_SYSTEM.md §2).
+   */
+  spine?: boolean | undefined;
+}
+
+const { locale, title, description, ogImage, ogImageAlt, indexable, spine = false } = Astro.props;
+
+const t = useTranslations(locale);
+const base = SITE.basePath;
+---
+
+<BaseLayout
+  locale={locale}
+  title={title}
+  description={description}
+  ogImage={ogImage}
+  ogImageAlt={ogImageAlt}
+  indexable={indexable}
+>
+  {
+    /* Forwarded, not dropped: a page needs somewhere to put document-level
+      metadata, and without this the only place left is the body. */
+  }
+  <slot name="head" slot="head" />
+  <Navbar slot="header" locale={locale} t={t} base={base} stableURL={indexable} />
+  {spine && <LayerSpine />}
+  <slot />
+  <Footer slot="footer" locale={locale} t={t} base={base} />
+</BaseLayout>

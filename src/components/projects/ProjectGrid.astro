@@ -1,0 +1,108 @@
+---
+/**
+ * The project listing layout.
+ *
+ * A ruled ledger rather than a box grid: each entry opens with its own channel
+ * masthead and the columns are separated by generous whitespace, not by
+ * borders. The one asymmetry — `lead`, which gives the first project the full
+ * measure and a larger title — is earned by hierarchy: the opening project is
+ * the strongest piece of evidence on the page and the layout should say so.
+ * Everything after it pairs up. Below 48rem the whole thing is one column.
+ *
+ * The empty state lives here rather than in each caller, so the homepage and
+ * the projects index cannot disagree about it — and so `t.projects.empty`
+ * replaces the `No featured projects available.` literal the audit found (2.8).
+ *
+ * This component never filters. It renders exactly the array it is handed;
+ * which projects are public is decided once, by `isVisible()` in
+ * `src/lib/projects/visibility.ts` (audit 2.1).
+ */
+
+import type { Locale, UIStrings } from '@/i18n';
+import type { Project } from '@/lib/projects';
+import ProjectCard from './ProjectCard.astro';
+
+interface Props {
+  /** Already resolved and already filtered. Rendered in the given order. */
+  projects: readonly Project[];
+  t: UIStrings;
+  locale: Locale;
+  base: string;
+  /** Heading level for the card titles — one below the section's own heading. */
+  headingLevel?: 2 | 3 | 4 | undefined;
+  /** Give the first project the full measure. */
+  lead?: boolean | undefined;
+  /** Show the two-digit figure number in each card's margin. */
+  numbered?: boolean | undefined;
+}
+
+const { projects, t, locale, base, headingLevel = 3, lead = false, numbered = true } = Astro.props;
+---
+
+{
+  projects.length === 0 ? (
+    <p class="grid__empty">{t.projects.empty}</p>
+  ) : (
+    <ul class="grid">
+      {projects.map((project, position) => {
+        const isLead = lead && position === 0;
+        return (
+          <li class:list={['grid__item', isLead && 'grid__item--lead']}>
+            <ProjectCard
+              project={project}
+              t={t}
+              locale={locale}
+              base={base}
+              headingLevel={headingLevel}
+              index={numbered ? position + 1 : undefined}
+              emphasis={isLead ? 'lead' : 'default'}
+            />
+          </li>
+        );
+      })}
+    </ul>
+  )
+}
+
+<style>
+  .grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    /* Row gap is a whole block: this section is the site's calm after the one
+       big motion moment, and the whitespace is the calm. */
+    gap: var(--spacing-block) var(--spacing-gutter-lg);
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  .grid__item {
+    display: flex;
+    min-width: 0;
+  }
+
+  .grid__item > :global(*) {
+    width: 100%;
+  }
+
+  @media (min-width: 48rem) {
+    .grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      column-gap: var(--spacing-block);
+    }
+
+    .grid__item--lead {
+      grid-column: 1 / -1;
+    }
+  }
+
+  .grid__empty {
+    padding-block: var(--spacing-stack);
+    border-top: var(--border-hairline) solid var(--color-rule);
+    font-family: var(--font-mono);
+    font-stretch: normal;
+    font-size: var(--text-caption);
+    letter-spacing: var(--tracking-label);
+    color: var(--color-slate);
+  }
+</style>

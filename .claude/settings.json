@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "permissions": {
+    "allow": [
+      "Bash(npm run:*)",
+      "Bash(npm ci)",
+      "Bash(npm install)",
+      "Bash(npm ls:*)",
+      "Bash(npm audit)",
+      "Bash(npx astro:*)",
+      "Bash(node scripts/:*)",
+      "Bash(git status:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(git show:*)",
+      "Bash(git add:*)",
+      "Bash(rg:*)",
+      "Bash(fd:*)",
+      "Bash(bat:*)",
+      "Bash(eza:*)",
+      "Read",
+      "Glob",
+      "Grep"
+    ],
+    "deny": ["Bash(git push --force:*)", "Bash(rm -rf /:*)"]
+  }
+}

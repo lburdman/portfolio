@@ -1,0 +1,214 @@
+---
+/**
+ * SECTION 01 — "I build across layers" (brief §5).
+ *
+ * The conceptual bridge: why five technical domains belong in one portfolio.
+ * It is typography-led and deliberately quiet — no glitch, no terminal, no
+ * WebGL. The one bold thing on the site is the layer spine running down the
+ * margin beside this; everything here stays out of its way.
+ *
+ * Driven entirely by `DOMAINS` and `t.layers.items[id]`. Nothing about the
+ * five layers is written in this file, so reordering `DOMAINS` reorders the
+ * section — which is the documented way to change the site's descent.
+ *
+ * ── The reveal, and why it is built the way it is ───────────────────────────
+ *
+ * Audit 2.3: `.animate-in { animation: …; opacity: 0 }` made invisibility the
+ * *resting* state, so content that never animated never appeared. The fix here
+ * is structural rather than a patch:
+ *
+ *   - The markup has no hidden state. With no CSS and no JavaScript, every
+ *     layer is visible.
+ *   - `data-reveal="pending"` — the only hidden state — is written **by the
+ *     same script that owns the observer which removes it**. It cannot exist
+ *     unless the mechanism to clear it is already running.
+ *   - Under `prefers-reduced-motion` the script never marks anything at all,
+ *     and it re-checks on change, so toggling the OS setting takes effect
+ *     without a reload.
+ */
+
+import Section from '@/components/ui/Section.astro';
+import { DOMAINS, domainOrdinal } from '@/config/domains';
+import type { Locale, UIStrings } from '@/i18n';
+
+interface Props {
+  locale: Locale;
+  t: UIStrings;
+  base: string;
+}
+
+const { t } = Astro.props;
+
+const layers = DOMAINS.map((domain) => ({
+  id: domain.id,
+  ordinal: domainOrdinal(domain),
+  layer: t.layers.items[domain.id].layer,
+  description: t.layers.items[domain.id].description,
+}));
+
+const HEADING_ID = 'layers-heading';
+---
+
+<Section section="layers" label={t.sections.layers} labelledBy={HEADING_ID} class="layers">
+  <div class="layers__intro">
+    <h2 id={HEADING_ID} class="layers__heading">{t.layers.heading}</h2>
+    <p class="layers__narrative">{t.layers.narrative}</p>
+  </div>
+
+  <ol class="layers__list" data-layers-list>
+    {
+      layers.map((layer) => (
+        <li class="layers__item" data-layers-item>
+          <p class="layers__ordinal" aria-hidden="true">
+            {layer.ordinal}
+          </p>
+          <h3 class="layers__name">{layer.layer}</h3>
+          <p class="layers__description">{layer.description}</p>
+        </li>
+      ))
+    }
+  </ol>
+</Section>
+
+<style>
+  .layers__intro {
+    display: grid;
+    gap: var(--spacing-gutter);
+    margin-bottom: var(--spacing-block);
+  }
+
+  @media (min-width: 60rem) {
+    .layers__intro {
+      grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
+      gap: var(--spacing-block);
+      align-items: end;
+    }
+  }
+
+  .layers__heading {
+    font-size: var(--text-display-2);
+    letter-spacing: var(--tracking-display);
+    line-height: var(--leading-display);
+    max-width: 16ch;
+  }
+
+  .layers__narrative {
+    font-size: var(--text-lg);
+    line-height: var(--leading-prose);
+    color: var(--color-slate);
+    text-wrap: pretty;
+  }
+
+  .layers__list {
+    list-style: none;
+    border-top: var(--border-hairline) solid var(--color-rule);
+  }
+
+  .layers__item {
+    display: grid;
+    gap: 0.5rem 2rem;
+    padding-block: var(--spacing-gutter);
+    border-bottom: var(--border-hairline) solid var(--color-rule);
+  }
+
+  @media (min-width: 48rem) {
+    .layers__item {
+      grid-template-columns: 3rem minmax(0, 4fr) minmax(0, 7fr);
+      align-items: baseline;
+      padding-block: var(--spacing-stack);
+    }
+  }
+
+  .layers__ordinal {
+    font-family: var(--font-mono);
+    font-stretch: normal;
+    font-size: var(--text-micro);
+    font-weight: 500;
+    letter-spacing: var(--tracking-eyebrow);
+    color: var(--color-rule);
+  }
+
+  .layers__name {
+    font-family: var(--font-display);
+    font-stretch: var(--display-width-wide);
+    font-size: var(--text-display-4);
+    font-weight: 600;
+    letter-spacing: var(--tracking-label);
+    text-transform: uppercase;
+    text-wrap: nowrap;
+  }
+
+  .layers__description {
+    font-size: var(--text-base);
+    line-height: var(--leading-body);
+    color: var(--color-slate);
+    max-width: 52ch;
+    text-wrap: pretty;
+  }
+
+  /* --- entrance ------------------------------------------------------------
+     Both states are animations whose hidden frame lives inside the keyframe.
+     There is no standalone `opacity: 0` in this file — see the header note.
+     ---------------------------------------------------------------------- */
+  .layers__item[data-reveal='pending'] {
+    animation: layers-hold 1ms linear both;
+  }
+
+  .layers__item[data-reveal='in'] {
+    animation: var(--animate-fade-up);
+  }
+
+  @keyframes layers-hold {
+    from,
+    to {
+      opacity: 0;
+      transform: translateY(1rem);
+    }
+  }
+</style>
+
+<script>
+  const REDUCED_MOTION = '(prefers-reduced-motion: reduce)';
+
+  const items = Array.from(document.querySelectorAll<HTMLElement>('[data-layers-item]'));
+
+  if (items.length > 0 && 'IntersectionObserver' in window) {
+    const reduced = window.matchMedia(REDUCED_MOTION);
+    let observer: IntersectionObserver | null = null;
+
+    function teardown() {
+      observer?.disconnect();
+      observer = null;
+      // Removing the attribute restores the markup's own state, which is visible.
+      for (const item of items) item.removeAttribute('data-reveal');
+    }
+
+    function setup() {
+      // Reduced motion never marks anything hidden, so there is nothing an
+      // absent observer could strand (docs/MOTION_SYSTEM.md §6).
+      if (reduced.matches) return;
+
+      for (const item of items) item.setAttribute('data-reveal', 'pending');
+
+      observer = new IntersectionObserver(
+        (entries, self) => {
+          for (const entry of entries) {
+            if (!entry.isIntersecting) continue;
+            entry.target.setAttribute('data-reveal', 'in');
+            self.unobserve(entry.target);
+          }
+        },
+        { rootMargin: '0px 0px -12% 0px', threshold: 0.15 },
+      );
+
+      for (const item of items) observer.observe(item);
+    }
+
+    reduced.addEventListener('change', () => {
+      teardown();
+      setup();
+    });
+
+    setup();
+  }
+</script>

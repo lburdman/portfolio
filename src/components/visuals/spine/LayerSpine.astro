@@ -1,0 +1,232 @@
+---
+/**
+ * THE LAYER SPINE — the site's one signature element (docs/MOTION_SYSTEM.md §2).
+ *
+ * A single hairline runs down the left margin for the page's full height, and
+ * its geometry changes as it descends through the five layers:
+ *
+ *     models        ·  ·  ·      discrete nodes
+ *     computation   ~~~~~~~      probability / phase
+ *     digital logic ⌐_⌐_⌐_       clock edges
+ *     hardware      ├──┬──┤      routed traces
+ *     signals       ∿∿∿∿∿∿∿      continuous wave
+ *
+ * It is the site's thesis rendered as one line, and it costs almost nothing:
+ * ONE inline SVG plus CSS. No canvas, no library, no per-frame JavaScript.
+ * The only thing that moves is a scroll-linked progress indicator, and that is
+ * a CSS scroll-driven animation — not a scroll event handler.
+ *
+ * ── Two implementation decisions worth knowing ──────────────────────────────
+ *
+ * **Why every shape oscillates horizontally.** The SVG stretches vertically to
+ * whatever height the page turns out to be (`preserveAspectRatio="none"`), so
+ * anything whose *proportions* matter would distort. Expressing amplitude on
+ * the x-axis makes the geometry stretch-invariant: vertical stretch only
+ * lengthens a period, it never deforms a shape. `vector-effect` keeps the
+ * stroke and the dash pattern hairline at any scale, for the same reason.
+ *
+ * **Why it is hidden below 1180px.** Below that width there is no left margin
+ * to put it in; forcing it there would crowd the text it is meant to annotate.
+ * That is a deliberate call, not an oversight (brief §33).
+ *
+ * The path data is generated at build time in this frontmatter. It ships as
+ * static SVG — nothing below runs in a browser.
+ */
+
+/** Spine centre and layer height, in viewBox units. */
+const CX = 12;
+const SEG = 200;
+const HEIGHT = SEG * 5;
+
+const n = (value: number): string => Number(value.toFixed(2)).toString();
+
+/** A sine that oscillates left-to-right as it descends. */
+function sine(y0: number, amp: number, period: number, step = 4): string {
+  const points: string[] = [];
+  for (let y = y0; y <= y0 + SEG; y += step) {
+    const x = CX + amp * Math.sin(((y - y0) / period) * Math.PI * 2);
+    points.push(`${n(x)} ${n(y)}`);
+  }
+  return `M ${points.join(' L ')}`;
+}
+
+/** A clock: vertical runs at two rails, joined by instantaneous edges. */
+function clock(y0: number, amp: number, period: number): string {
+  const half = period / 2;
+  const d: string[] = [`M ${CX} ${n(y0)}`];
+  let y = y0;
+  let x = CX + amp;
+  d.push(`L ${n(x)} ${n(y)}`);
+
+  while (y < y0 + SEG) {
+    const next = Math.min(y + half, y0 + SEG);
+    d.push(`L ${n(x)} ${n(next)}`);
+    y = next;
+    if (y >= y0 + SEG) break;
+    x = x === CX + amp ? CX - amp : CX + amp;
+    d.push(`L ${n(x)} ${n(y)}`);
+  }
+
+  d.push(`L ${CX} ${n(y0 + SEG)}`);
+  return d.join(' ');
+}
+
+/** Short horizontal ticks — nodes on the models layer, vias on the routing layer. */
+function ticks(points: readonly (readonly [number, number])[], half: number): string {
+  return points.map(([x, y]) => `M ${n(x - half)} ${n(y)} L ${n(x + half)} ${n(y)}`).join(' ');
+}
+
+/* --- 00 · models — discrete nodes on a dotted connector -------------------- */
+const NODE_YS = [26, 58, 90, 122, 154, 186] as const;
+const nodesConnector = `M ${CX} 0 L ${CX} ${SEG}`;
+const nodes = ticks(
+  NODE_YS.map((y) => [CX, y] as const),
+  6,
+);
+
+/* --- 01 · computation — interference, four full cycles --------------------- */
+const computation = sine(SEG, 6, 50);
+
+/* --- 02 · digital logic — clock edges -------------------------------------- */
+const logic = clock(SEG * 2, 5, 50);
+
+/* --- 03 · hardware — routed traces. Vertices are vertical or exactly 45°. -- */
+const ROUTE = [
+  [12, 600],
+  [12, 612],
+  [18, 618],
+  [18, 646],
+  [7, 657],
+  [7, 684],
+  [16, 693],
+  [16, 720],
+  [10, 726],
+  [10, 758],
+  [15, 763],
+  [15, 783],
+  [12, 789],
+  [12, 800],
+] as const satisfies readonly (readonly [number, number])[];
+
+const hardware = `M ${ROUTE.map(([x, y]) => `${n(x)} ${n(y)}`).join(' L ')}`;
+const vias = ticks(
+  [
+    [18, 632],
+    [7, 670],
+    [16, 706],
+    [10, 742],
+  ] as const,
+  3,
+);
+
+/* --- 04 · signals — a denser continuous wave, eight full cycles ------------ */
+const signals = sine(SEG * 4, 4, 25, 3);
+
+/* --- layer boundaries ------------------------------------------------------ */
+const boundaries = ticks(
+  [1, 2, 3, 4].map((i) => [CX, SEG * i] as const),
+  9,
+);
+---
+
+<div class="spine" data-layer-spine aria-hidden="true">
+  <svg class="spine__svg" viewBox={`0 0 24 ${HEIGHT}`} preserveAspectRatio="none" focusable="false">
+    <path class="spine__connector" d={nodesConnector}></path>
+    <path class="spine__stroke" d={nodes}></path>
+    <path class="spine__stroke" d={computation}></path>
+    <path class="spine__stroke" d={logic}></path>
+    <path class="spine__stroke" d={hardware}></path>
+    <path class="spine__stroke" d={vias}></path>
+    <path class="spine__stroke" d={signals}></path>
+    <path class="spine__boundary" d={boundaries}></path>
+  </svg>
+  <span class="spine__marker"></span>
+</div>
+
+<style>
+  .spine {
+    position: absolute;
+    inset-block: 0;
+    /* Sits in the gutter between the viewport edge and the content measure. */
+    left: clamp(1.5rem, calc((100vw - var(--container-content)) / 2 - 3.5rem), 7rem);
+    width: 24px;
+    display: none;
+    pointer-events: none;
+    color: var(--color-rule);
+    z-index: 0;
+  }
+
+  @media (min-width: 1180px) {
+    .spine {
+      display: block;
+    }
+  }
+
+  .spine__svg {
+    width: 24px;
+    height: 100%;
+  }
+
+  .spine__stroke,
+  .spine__connector,
+  .spine__boundary {
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    /* Keeps hairlines hairline, and dash patterns uniform, at any stretch. */
+    vector-effect: non-scaling-stroke;
+  }
+
+  /* The models layer is discrete: the connector between nodes is implied. */
+  .spine__connector {
+    stroke-dasharray: 1 9;
+    opacity: 0.5;
+  }
+
+  .spine__boundary {
+    opacity: 0.45;
+  }
+
+  /* --- the one moving part -------------------------------------------------
+     A scroll-driven CSS animation. No scroll listener exists anywhere in this
+     component; where `animation-timeline` is unsupported the marker simply
+     never renders and the spine is static, which is a complete state rather
+     than a broken one.
+     ---------------------------------------------------------------------- */
+  .spine__marker {
+    display: none;
+  }
+
+  @supports (animation-timeline: scroll()) {
+    .spine__marker {
+      display: block;
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: 0;
+      height: var(--border-rule);
+      background-color: var(--color-accent);
+      animation: spine-progress linear both;
+      animation-timeline: scroll(root block);
+    }
+  }
+
+  @keyframes spine-progress {
+    from {
+      top: 0%;
+    }
+    to {
+      top: 100%;
+    }
+  }
+
+  /* Reduced motion: the spine stays exactly as it is, minus the indicator.
+     Declared last so it wins over the @supports block above. */
+  @media (prefers-reduced-motion: reduce) {
+    .spine__marker {
+      display: none;
+    }
+  }
+</style>

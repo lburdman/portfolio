@@ -1,0 +1,66 @@
+---
+/**
+ * The homepage, for every locale.
+ *
+ * `/` and `/es/` are rendered from this one file. That is the whole point of
+ * the `[...locale]` catch-all (docs/ARCHITECTURE.md §2): the audit measured the
+ * previous physical `src/pages/es/` tree at 86% duplicated lines *with drift
+ * already shipped*, and a single file per route makes that class of bug
+ * structurally impossible rather than merely fixed (AUDIT.md 5.1).
+ *
+ * The locale arrives as a **prop**, never by parsing `Astro.url`. `getStaticPaths`
+ * already knows which locale it is emitting, so re-deriving it from the URL
+ * would be a second routing authority — exactly what AUDIT.md 5.2 found wrong
+ * with declaring Astro's `i18n` block and consuming it nowhere. The locale list
+ * comes from `LOCALES`, so a third locale is a content change, not a code change.
+ *
+ * Section order is brief §5 / §40: Hero → Layers → Technical Worlds → Selected
+ * Projects. Each component owns its own `<section>`, figure number and heading,
+ * so this file composes and does not decorate.
+ *
+ * `spine` is passed here and nowhere else: the layer spine describes the
+ * homepage's ordered descent and has nothing to annotate on any other page
+ * (docs/MOTION_SYSTEM.md §2).
+ */
+
+import Hero from '@/components/home/Hero.astro';
+import LayersSequence from '@/components/home/LayersSequence.astro';
+import SelectedProjects from '@/components/home/SelectedProjects.astro';
+import TechnicalWorlds from '@/components/home/TechnicalWorlds.astro';
+import { SITE } from '@/config/site';
+import { DEFAULT_LOCALE, LOCALES, useTranslations, type Locale } from '@/i18n';
+import PageLayout from '@/layouts/PageLayout.astro';
+
+/**
+ * English is the unprefixed default, so its `locale` param is `undefined` and
+ * the route collapses to `/`. Spanish carries the `es` segment.
+ */
+export function getStaticPaths() {
+  return LOCALES.map((locale) => ({
+    params: { locale: locale === DEFAULT_LOCALE ? undefined : locale },
+    props: { locale },
+  }));
+}
+
+interface Props {
+  locale: Locale;
+}
+
+const { locale } = Astro.props;
+
+const t = useTranslations(locale);
+const base = SITE.basePath;
+---
+
+<PageLayout
+  locale={locale}
+  title={t.seo.home.title}
+  description={t.seo.home.description}
+  ogImageAlt={t.seo.ogImageAlt}
+  spine
+>
+  <Hero locale={locale} t={t} base={base} />
+  <LayersSequence locale={locale} t={t} base={base} />
+  <TechnicalWorlds locale={locale} t={t} base={base} />
+  <SelectedProjects locale={locale} t={t} base={base} />
+</PageLayout>

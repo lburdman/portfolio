@@ -1,23 +1,113 @@
 ---
-import BaseLayout from '@/components/BaseLayout.astro';
-import { useTranslations } from '@/i18n/index';
+/**
+ * The 404 page — deliberately **outside** the `[...locale]` catch-all.
+ *
+ * GitHub Pages serves exactly one `404.html` for every unmatched path under the
+ * site. There is no server-side branch, no rewrite and no request-time locale
+ * information, so a per-locale 404 route would produce two files of which only
+ * one could ever be served. One file is the honest shape of the constraint.
+ *
+ * The locale is `DEFAULT_LOCALE`. English is the site's unprefixed default and
+ * the target of the `x-default` hreflang alternate — that is, already the
+ * declared fallback for any request the site cannot serve by language. Guessing
+ * from the URL was considered and rejected: a `/es/…` prefix on a path that
+ * does not exist is not evidence of a Spanish reader, and the guess would have
+ * to be made in a static file that is byte-identical for every request anyway.
+ *
+ * A visitor who lands here reaches Spanish in one click — the language switcher
+ * in the header is present on this page like any other.
+ */
 
-const locale = 'en';
+import ActionLink from '@/components/ui/ActionLink.astro';
+import Container from '@/components/ui/Container.astro';
+import { HOME_PATH } from '@/config/navigation';
+import { SITE } from '@/config/site';
+import { DEFAULT_LOCALE, localizePath, useTranslations } from '@/i18n';
+import PageLayout from '@/layouts/PageLayout.astro';
+
+const locale = DEFAULT_LOCALE;
 const t = useTranslations(locale);
-const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+const base = SITE.basePath;
+
+const homeHref = localizePath(HOME_PATH, locale, base);
+
+const HEADING_ID = 'not-found-heading';
+
+/**
+ * The status code as a figure number, in the same locale-independent, numeric,
+ * `aria-hidden` register the datasheet annotations use elsewhere. A screen
+ * reader gets the localized heading instead of three digits.
+ */
+const STATUS = '404';
 ---
 
-<BaseLayout
-  title="404 — Page Not Found | Lucas Burdman"
-  description="The page you're looking for doesn't exist."
+<PageLayout
   locale={locale}
+  title={t.seo.notFound.title}
+  description={t.seo.notFound.description}
+  ogImageAlt={t.seo.ogImageAlt}
+  indexable={false}
 >
-  <div class="section-container flex flex-col items-center justify-center min-h-[60vh] text-center py-24">
-    <p class="text-8xl font-bold text-surface-border mb-6" aria-hidden="true">404</p>
-    <h1 class="text-2xl font-semibold text-text-primary mb-3">{t.notFound.heading}</h1>
-    <p class="text-text-secondary mb-8">{t.notFound.message}</p>
-    <a href={base || '/'} class="btn-ghost" id="not-found-home">
-      {t.notFound.backHome}
-    </a>
+  <div class="notfound" aria-labelledby={HEADING_ID}>
+    <Container width="content">
+      <p class="notfound__figure" aria-hidden="true">
+        <span class="notfound__status">{STATUS}</span>
+        <span class="notfound__rule"></span>
+      </p>
+
+      <h1 id={HEADING_ID} class="notfound__heading">{t.notFound.heading}</h1>
+      <p class="notfound__message">{t.notFound.message}</p>
+
+      <p class="notfound__action">
+        <ActionLink href={homeHref} variant="secondary">
+          {t.notFound.backHome}
+        </ActionLink>
+      </p>
+    </Container>
   </div>
-</BaseLayout>
+</PageLayout>
+
+<style>
+  .notfound {
+    padding-block: var(--spacing-section-lg);
+  }
+
+  .notfound__figure {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: var(--spacing-stack);
+  }
+
+  .notfound__status {
+    font-family: var(--font-mono);
+    font-stretch: normal;
+    font-size: var(--text-micro);
+    font-weight: 500;
+    letter-spacing: var(--tracking-wide);
+    color: var(--color-slate);
+  }
+
+  .notfound__rule {
+    flex: 1;
+    height: 0;
+    border-top: var(--border-hairline) solid var(--color-rule);
+  }
+
+  .notfound__heading {
+    max-width: var(--container-prose);
+  }
+
+  .notfound__message {
+    max-width: var(--container-prose);
+    margin-top: var(--spacing-gutter);
+    font-size: var(--text-lg);
+    line-height: var(--leading-prose);
+    color: var(--color-slate);
+    text-wrap: pretty;
+  }
+
+  .notfound__action {
+    margin-top: var(--spacing-stack);
+  }
+</style>

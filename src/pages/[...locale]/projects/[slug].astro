@@ -1,0 +1,566 @@
+---
+/**
+ * `/projects/<slug>/` and `/es/projects/<slug>/`, from one file.
+ *
+ * ## One visibility predicate (AUDIT.md 2.1)
+ *
+ * `getStaticPaths` builds the cross product of *visible projects* × *locales*
+ * by calling `getVisibleProjects()` — the identical function the listing page
+ * calls, which filters with `isVisible()` and nothing else. The set of built
+ * detail pages is therefore the set of listed projects, by construction rather
+ * than by two filters that happen to agree today. The previous pair did not
+ * agree: the listing required `status === 'published'` while this route only
+ * excluded `draft`, so the first `wip` project would have shipped a live,
+ * sitemap-eligible page that appeared in no listing.
+ *
+ * Resolving the project inside `getStaticPaths` and passing it through as a
+ * prop also removes the "not found" branch entirely. There is no path to this
+ * page that does not carry a project.
+ *
+ * ## The information model (brief §9)
+ *
+ * Title, statement, contribution, stack, links, media, related work — and the
+ * template adapts by **omission**. `year`, `role`, `cover`, `related` and every
+ * one of the four `links` types each render nothing at all when absent. No placeholder, no empty
+ * frame, no "coming soon": the previous template's missing-cover branch drew a
+ * bordered box with an icon and the literal `Project image coming soon`, which
+ * is a hardcoded string advertising an absence.
+ *
+ * ## View transitions (brief §8, docs/MOTION_SYSTEM.md §5)
+ *
+ * Native cross-document transitions only — `@view-transition { navigation: auto }`
+ * is already declared in `global.css` and there is no `<ClientRouter />`, because
+ * §8 forbids turning the site into an SPA to buy one animation.
+ *
+ * The contract with `ProjectCard.astro` is the **name**, not the mechanism:
+ * `project-title-<slug>` and `project-media-<slug>`. Pairing compares the
+ * computed value of `view-transition-name` across the two documents, so the
+ * card and this page must agree on those strings and need not agree on how
+ * each applies them.
+ *
+ * Both sides apply them the same way — a `data-vt` attribute read by a static
+ * rule — because the site's CSP makes every dynamic alternative fail silently.
+ * The stylesheet note above `.detail__title` records what was measured. It is
+ * emphatically *not* an inline custom property: the CSP drops style attributes,
+ * which is why the first version of this page rendered a transition that could
+ * never run.
+ *
+ * Uniqueness holds per page: this page's `<h1>` is the only element carrying
+ * `project-title-<slug>` for *this* slug, and any related cards below carry
+ * their own, necessarily different, slugs.
+ */
+
+import { Image } from 'astro:assets';
+import { render } from 'astro:content';
+import ProjectGrid from '@/components/projects/ProjectGrid.astro';
+import Container from '@/components/ui/Container.astro';
+import type { ProjectLinks } from '@/content/schema';
+import { SITE } from '@/config/site';
+import { DEFAULT_LOCALE, LOCALES, localizePath, useTranslations, type Locale } from '@/i18n';
+import {
+  getProjectBodyEntry,
+  getRelatedProjects,
+  getVisibleProjects,
+  isWorkInProgress,
+  type Project,
+} from '@/lib/projects';
+import PageLayout from '@/layouts/PageLayout.astro';
+
+export async function getStaticPaths() {
+  const perLocale = await Promise.all(
+    LOCALES.map(async (locale) => {
+      const projects = await getVisibleProjects(locale);
+      return projects.map((project) => ({
+        params: {
+          locale: locale === DEFAULT_LOCALE ? undefined : locale,
+          slug: project.meta.slug,
+        },
+        props: { locale, project },
+      }));
+    }),
+  );
+
+  return perLocale.flat();
+}
+
+interface Props {
+  locale: Locale;
+  project: Project;
+}
+
+/**
+ * The `: Props` annotation is explicit rather than inferred, and it is
+ * load-bearing here in a way it is not on the sibling routes.
+ *
+ * `@astrojs/check` normally links `Astro.props` to a page's `Props` interface
+ * on its own. It stops doing so once the frontmatter contains a `satisfies`
+ * expression — `LINK_ORDER` below — at which point `Props` is reported as
+ * declared-but-never-used and `astro check` fails. Annotating the destructure
+ * restores the link by using the type outright.
+ *
+ * This is the same form `ui/Container.astro` already uses. It is a type
+ * annotation, not a cast: it constrains `Astro.props` rather than reinterpreting
+ * it, so a mismatch with what `getStaticPaths` supplies is still an error.
+ */
+const { locale, project }: Props = Astro.props;
+const { meta, title, summary } = project;
+
+const t = useTranslations(locale);
+const base = SITE.basePath;
+
+const listingHref = localizePath('/projects', locale, base);
+
+/**
+ * The body is read for the locale the project actually **resolved** to, not
+ * the one requested. A project with no `es.md` renders its English title and
+ * summary via `resolveProject`; reading the body for the requested locale
+ * instead would pair an English heading with a missing document.
+ */
+const entry = await getProjectBodyEntry(meta.slug, project.locale);
+const Content = entry ? (await render(entry)).Content : undefined;
+
+const related = await getRelatedProjects(meta.slug, locale);
+
+/**
+ * Same resolution path as `ProjectCard`: covers are stored as a path string
+ * because `src/content/schema.ts` imports no Astro virtual module, so
+ * `import.meta.glob` is what turns one into real `ImageMetadata` — which is
+ * what `<Image />` needs in order to emit width/height and a srcset.
+ */
+const covers = import.meta.glob<{ default: ImageMetadata }>(
+  '/src/content/projects/*/media/*.{webp,avif,png,jpg,jpeg}',
+  { eager: true },
+);
+const cover = meta.cover ? covers[`/src/content/projects/${meta.slug}/${meta.cover}`]?.default : undefined;
+
+/**
+ * The accent itself is not carried here. `data-domain` goes on the element and
+ * one rule per domain in the stylesheet below resolves it — see the CSP note
+ * on those rules for why an inline custom property cannot be used.
+ */
+const domains = meta.domains.map((id) => ({ id, name: t.worlds.items[id].name }));
+
+/** Optional credits. Absent means absent. */
+const credits: string[] = [];
+if (meta.role) credits.push(meta.role);
+if (meta.year !== undefined) credits.push(String(meta.year));
+
+/** The schema's own link keys. Not re-declared here — derived. */
+type ProjectLinkId = keyof ProjectLinks;
+
+/**
+ * Every link type the schema accepts, in render order.
+ *
+ * `LINK_TEXT` is typed `Record<ProjectLinkId, …>`, and `ProjectLinkId` is
+ * `keyof ProjectLinks` — the schema's own shape. That is the point: adding a
+ * fifth link type to `projectLinksSchema` makes this object a **compile
+ * error** until it is named in both dictionaries, rather than a link that the
+ * schema happily accepts and the page silently never renders. `paper` and
+ * `article` were exactly that gap until their keys landed.
+ *
+ * The ordering array cannot express completeness in the type system without a
+ * dummy assertion, so it is guarded from the rendering side instead — see the
+ * `projectLinksSchema.shape` case in `tests/pages.test.ts`.
+ */
+const LINK_ORDER = ['github', 'demo', 'paper', 'article'] as const satisfies readonly ProjectLinkId[];
+
+const LINK_TEXT: Record<ProjectLinkId, { text: string; label: (projectTitle: string) => string }> = {
+  github: { text: t.projects.github, label: t.a11y.projectGithubLabel },
+  demo: { text: t.projects.demo, label: t.a11y.projectDemoLabel },
+  paper: { text: t.projects.paper, label: t.a11y.projectPaperLabel },
+  article: { text: t.projects.article, label: t.a11y.projectArticleLabel },
+};
+
+const links = meta.links;
+const external = LINK_ORDER.flatMap((id) => {
+  const href = links?.[id];
+  if (href === undefined) return [];
+  const { text, label } = LINK_TEXT[id];
+  return [{ href, text, label: label(title) }];
+});
+
+const HEADING_ID = 'project-heading';
+const RELATED_ID = 'project-related';
+
+/**
+ * View-transition idents, carried as plain data attributes — the identical
+ * mechanism `ProjectCard.astro` ships, which is what makes the pairing exist.
+ *
+ * `SLUG_PATTERN` forbids anything outside `[a-z0-9-]` and the literal prefix
+ * keeps the result a valid `<custom-ident>` even for a slug starting with a
+ * digit, so these are safe to read straight into `view-transition-name`.
+ *
+ * Attributes rather than an inline `style`, for the CSP reason spelled out
+ * above `.detail__title` in the stylesheet below.
+ */
+const titleTransition = `project-title-${meta.slug}`;
+const mediaTransition = `project-media-${meta.slug}`;
+---
+
+<PageLayout
+  locale={locale}
+  title={t.seo.projects.title(title)}
+  description={t.seo.projects.description(summary)}
+  ogImageAlt={t.seo.ogImageAlt}
+>
+  <article class="detail" aria-labelledby={HEADING_ID}>
+    <Container width="content">
+      <a class="detail__back link" href={listingHref}>{t.projects.backToList}</a>
+
+      <header class="detail__header">
+        <div class="detail__channels" aria-hidden="true">
+          {domains.map((domain) => <span class="detail__channel" data-domain={domain.id} />)}
+          <span class="detail__channel-rule"></span>
+        </div>
+
+        <h1 id={HEADING_ID} class="detail__title" data-vt={titleTransition}>{title}</h1>
+
+        <p class="detail__summary">{summary}</p>
+
+        {
+          isWorkInProgress(project) && (
+            <p class="detail__status">
+              <span class="detail__status-dot" aria-hidden="true" />
+              {t.projects.workInProgress}
+            </p>
+          )
+        }
+
+        {credits.length > 0 && <p class="detail__credits">{credits.join(' · ')}</p>}
+
+        <ul class="detail__tags detail__tags--domains" aria-label={t.projects.domains}>
+          {
+            domains.map((domain) => (
+              <li class="detail__domain" data-domain={domain.id}>
+                <span class="detail__domain-mark" aria-hidden="true" />
+                {domain.name}
+              </li>
+            ))
+          }
+        </ul>
+
+        <ul class="detail__tags detail__tags--stack" aria-label={t.projects.stack}>
+          {meta.stack.map((item) => <li class="detail__stack-item">{item}</li>)}
+        </ul>
+
+        {
+          external.length > 0 && (
+            <ul class="detail__links" aria-label={t.projects.links}>
+              {external.map((link) => (
+                <li>
+                  <a class="detail__external" href={link.href} aria-label={link.label}>
+                    {link.text}
+                    <span class="detail__external-mark" aria-hidden="true">
+                      &#8599;
+                    </span>
+                  </a>
+                </li>
+              ))}
+            </ul>
+          )
+        }
+      </header>
+
+      {
+        cover && (
+          <div class="detail__media" data-vt={mediaTransition}>
+            <Image
+              src={cover}
+              alt={title}
+              widths={[640, 960, 1280]}
+              sizes="(min-width: 68rem) 68rem, 100vw"
+              loading="eager"
+              decoding="async"
+            />
+          </div>
+        )
+      }
+
+      <div class="prose detail__body">
+        {Content && <Content />}
+      </div>
+
+      {
+        related.length > 0 && (
+          <section class="detail__related" aria-labelledby={RELATED_ID}>
+            <h2 id={RELATED_ID} class="detail__related-heading">
+              {t.projects.relatedWork}
+            </h2>
+            <ProjectGrid projects={related} t={t} locale={locale} base={base} headingLevel={3} numbered={false} />
+          </section>
+        )
+      }
+    </Container>
+  </article>
+</PageLayout>
+
+<style>
+  .detail {
+    padding-block: var(--spacing-section);
+  }
+
+  .detail__back {
+    display: inline-block;
+    margin-bottom: var(--spacing-stack);
+    font-family: var(--font-mono);
+    font-stretch: normal;
+    font-size: var(--text-caption);
+    font-weight: 500;
+    letter-spacing: var(--tracking-label);
+    text-transform: uppercase;
+  }
+
+  .detail__header {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    max-width: var(--container-prose);
+  }
+
+  /* --- Domain accents ------------------------------------------------------
+     `data-domain` on the element, one rule per domain here — never an inline
+     custom property. That is a CSP requirement, not a preference, and it is the
+     same convention `TechnicalWorlds.astro` documents: `security.csp` ships no
+     `'unsafe-inline'` and Astro emits no `style-src-attr`, so `style-src`
+     governs style *attributes* too, and without `'unsafe-hashes'` every inline
+     `style=""` is dropped. Painting the accents that way rendered correctly in
+     `astro dev` and produced uncoloured channel bars in production.
+
+     These five lines mirror `Domain['accentVar']`, typed
+     `--color-domain-${DomainId}`. CSS cannot derive the name, so a sixth domain
+     needs a sixth line here — `tests/pages.test.ts` fails if one is missing.
+
+     Paper ground, so the values are consumed through the 68% ink mix below,
+     never as `color` — see the boxed warning in tokens.css.
+     ----------------------------------------------------------------------- */
+
+  .detail [data-domain='ai'] {
+    --domain-accent: var(--color-domain-ai);
+  }
+  .detail [data-domain='quantum'] {
+    --domain-accent: var(--color-domain-quantum);
+  }
+  .detail [data-domain='fpga'] {
+    --domain-accent: var(--color-domain-fpga);
+  }
+  .detail [data-domain='electronics'] {
+    --domain-accent: var(--color-domain-electronics);
+  }
+  .detail [data-domain='audio'] {
+    --domain-accent: var(--color-domain-audio);
+  }
+
+  /* The same channel legend the card carries, so the two documents read as one
+     object seen at two magnifications. */
+  .detail__channels {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    width: 100%;
+  }
+
+  .detail__channel {
+    width: 3.5rem;
+    height: var(--border-rule);
+    /* NON-TEXT ONLY — the 68% mix measures 3.41-4.90:1 on paper, which clears
+       the 3:1 WCAG 1.4.11 requires of a graphic mark but NOT the 4.5:1 text
+       needs. Never move this ratio onto a `color` property. */
+    background-color: color-mix(in oklab, var(--domain-accent) 68%, var(--color-ink));
+  }
+
+  .detail__channel-rule {
+    flex: 1;
+    height: 0;
+    border-top: var(--border-rule) solid var(--color-ink);
+  }
+
+  /* --- The view-transition name --------------------------------------------
+     The value comes from `data-vt`, read by this completely static rule. Three
+     things were each measured against a real build before landing here, and
+     all three fail:
+
+       · an inline `style` attribute is dropped — `security.csp` ships no
+         `'unsafe-inline'` and Astro emits no `style-src-attr`, so `style-src`
+         governs attributes too and its hashes authorise a `<style>` *element*
+         only. This page shipped that first, and the transition never ran.
+       · `define:vars` compiles to that same attribute, so it fails identically.
+       · a generated `<style is:inline>` whose hash is registered through
+         `Astro.csp.insertStyleHash({ kind: 'element' })` *does* land — measured
+         here, `style-src-elem` carried the element's sha256 and the tag was
+         authorised. It is still not what this page uses: an ID-specificity rule
+         put the name beyond the reach of the reduced-motion guard in
+         `global.css`, which forced a second, local copy of that guard. One
+         owner for reduced motion is worth more than the mechanism.
+
+     `var(--vt-title, …)` wraps `attr()` deliberately: `global.css` nulls
+     `--vt-title` with `!important` under reduced motion, and keeping the
+     property first in the chain means that guard still wins untouched.
+
+     Advanced `attr()` is Chromium-only for now. Where it is unsupported the
+     declaration is invalid at computed-value time, `view-transition-name`
+     resolves to `none`, and the browser performs an ordinary navigation — the
+     same graceful degradation as a browser with no view transitions at all.
+     ----------------------------------------------------------------------- */
+  .detail__title {
+    view-transition-name: var(--vt-title, attr(data-vt type(<custom-ident>), none));
+  }
+
+  .detail__summary {
+    font-size: var(--text-lg);
+    line-height: var(--leading-prose);
+    color: var(--color-slate);
+    text-wrap: pretty;
+  }
+
+  /* Status is carried by a label, not by the dot: the dot is redundant and
+     hidden, so nothing here depends on colour perception. */
+  .detail__status {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    align-self: flex-start;
+    padding: 0.125rem 0.5rem;
+    border: var(--border-hairline) solid var(--color-rule);
+    border-radius: var(--radius-sm);
+    font-family: var(--font-mono);
+    font-stretch: normal;
+    font-size: var(--text-micro);
+    font-weight: 500;
+    letter-spacing: var(--tracking-eyebrow);
+    text-transform: uppercase;
+    color: var(--color-ink);
+  }
+
+  .detail__status-dot {
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: var(--radius-full);
+    background-color: var(--color-accent);
+  }
+
+  .detail__credits {
+    font-family: var(--font-mono);
+    font-stretch: normal;
+    font-size: var(--text-caption);
+    letter-spacing: var(--tracking-label);
+    color: var(--color-slate);
+  }
+
+  .detail__tags {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.375rem 0.875rem;
+    list-style: none;
+    font-family: var(--font-mono);
+    font-stretch: normal;
+    font-size: var(--text-micro);
+    font-weight: 500;
+    line-height: 1.4;
+    letter-spacing: var(--tracking-eyebrow);
+    text-transform: uppercase;
+  }
+
+  .detail__tags--domains {
+    color: var(--color-ink);
+  }
+
+  .detail__domain {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  /* NON-TEXT ONLY, same 68% mix and the same reason as `.detail__channel`. */
+  .detail__domain-mark {
+    width: var(--border-heavy);
+    height: 0.75em;
+    background-color: color-mix(in oklab, var(--domain-accent) 68%, var(--color-ink));
+  }
+
+  .detail__tags--stack {
+    gap: 0.375rem 0.75rem;
+    color: var(--color-slate);
+  }
+
+  .detail__stack-item {
+    padding: 0.125rem 0.5rem;
+    border: var(--border-hairline) solid var(--color-rule);
+    border-radius: var(--radius-sm);
+  }
+
+  .detail__links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem 1rem;
+    list-style: none;
+    font-family: var(--font-mono);
+    font-stretch: normal;
+    font-size: var(--text-caption);
+    font-weight: 500;
+    letter-spacing: var(--tracking-label);
+    text-transform: uppercase;
+  }
+
+  .detail__external {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 0.5em;
+    color: var(--color-slate);
+    text-decoration: underline;
+    text-decoration-thickness: from-font;
+    text-underline-offset: 0.3em;
+    transition: color var(--duration-fast) var(--ease-standard);
+  }
+
+  .detail__external:hover,
+  .detail__external:focus-visible {
+    color: var(--color-accent);
+  }
+
+  .detail__external-mark {
+    font-size: 0.9em;
+  }
+
+  .detail__media {
+    margin-top: var(--spacing-stack);
+    overflow: hidden;
+    border: var(--border-hairline) solid var(--color-rule);
+    border-radius: var(--radius-sm);
+    background-color: var(--color-paper-raised);
+    view-transition-name: var(--vt-media, attr(data-vt type(<custom-ident>), none));
+  }
+
+  .detail__media :global(img) {
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    object-fit: cover;
+  }
+
+  .detail__body {
+    margin-top: var(--spacing-block);
+  }
+
+  .detail__related {
+    margin-top: var(--spacing-block);
+    padding-top: var(--spacing-stack);
+    border-top: var(--border-hairline) solid var(--color-rule);
+  }
+
+  .detail__related-heading {
+    margin-bottom: var(--spacing-stack);
+    font-size: var(--text-display-4);
+  }
+
+  /* Reduced motion. `global.css` nulls `--vt-title` / `--vt-media` with
+     `!important`, which wins the `var()` chain above and is the primary guard.
+     This mirrors the belt-and-braces rule `ProjectCard` carries, for a parser
+     that drops the nested `@view-transition` form: an unnamed element is simply
+     not paired, and the browser performs an ordinary navigation. */
+  @media (prefers-reduced-motion: reduce) {
+    .detail__title,
+    .detail__media {
+      view-transition-name: none;
+    }
+  }
+</style>

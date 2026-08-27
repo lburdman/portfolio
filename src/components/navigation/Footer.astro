@@ -1,0 +1,200 @@
+---
+/**
+ * Identity, the same three routes, and the profile links.
+ *
+ * Two audit findings live here:
+ *
+ * - **5.5** — `github.com/lburdman` was duplicated across files. Every profile
+ *   URL now comes from `SITE.social`; this file contains no URL of its own.
+ * - **1.5** — the résumé CTA 404'd in production because the PDF was never
+ *   shipped. The link renders only when `SITE.resumePath` is non-null, so a
+ *   dead link is not expressible.
+ */
+
+import { HOME_PATH, PRIMARY_NAV, type NavItem } from '@/config/navigation';
+import { SITE } from '@/config/site';
+import { localizePath, type Locale, type UIStrings } from '@/i18n';
+
+interface Props {
+  locale: Locale;
+  t: UIStrings;
+  base: string;
+}
+
+const { locale, t, base } = Astro.props;
+
+const homeHref = localizePath(HOME_PATH, locale, base);
+
+const navItems = PRIMARY_NAV.map((item: NavItem) => {
+  const path = localizePath(item.path, locale, base);
+  return {
+    id: item.id,
+    href: item.hash ? `${path}#${item.hash}` : path,
+    label: t.nav[item.labelKey],
+  };
+});
+
+/** Localized label per social id. Keyed so a new id is a type error, not a blank. */
+const socialLabels: Record<(typeof SITE.social)[number]['id'], string> = {
+  github: t.contact.githubLabel,
+  linkedin: t.contact.linkedinLabel,
+  email: t.contact.emailLabel,
+};
+
+const resumeHref = SITE.resumePath === null ? null : `${base}${SITE.resumePath}`;
+
+const year = new Date().getFullYear();
+---
+
+<footer class="footer">
+  <div class="footer__inner">
+    <div class="footer__grid">
+      <div class="footer__identity">
+        <a class="footer__mark" href={homeHref} aria-label={t.a11y.homeLink}>{SITE.author}</a>
+        <p class="footer__role">{t.hero.role}</p>
+        <p class="footer__tagline">{t.footer.tagline}</p>
+      </div>
+
+      <nav class="footer__nav" aria-label={t.a11y.footerNavigation}>
+        <ul class="footer__list">
+          <li><a class="footer__link" href={homeHref}>{t.nav.home}</a></li>
+          {
+            navItems.map((item) => (
+              <li>
+                <a class="footer__link" href={item.href}>
+                  {item.label}
+                </a>
+              </li>
+            ))
+          }
+          {
+            resumeHref && (
+              <li>
+                <a class="footer__link" href={resumeHref}>
+                  {t.contact.resumeLabel}
+                </a>
+              </li>
+            )
+          }
+        </ul>
+      </nav>
+
+      <ul class="footer__list footer__social">
+        {
+          SITE.social.map((link) => (
+            <li>
+              <a class="footer__link footer__link--social" href={link.href}>
+                <span class="footer__social-name">{socialLabels[link.id]}</span>
+                <span class="footer__social-handle">{link.display}</span>
+              </a>
+            </li>
+          ))
+        }
+      </ul>
+    </div>
+
+    <p class="footer__colophon">
+      <span>&#169; {year} {SITE.author}. {t.footer.rights}</span>
+      <span>{t.footer.builtWith}</span>
+    </p>
+  </div>
+</footer>
+
+<style>
+  .footer {
+    border-top: var(--border-hairline) solid var(--color-rule);
+    padding-block: var(--spacing-block) var(--spacing-stack);
+  }
+
+  .footer__inner {
+    width: 100%;
+    max-width: calc(var(--container-wide) + 2 * var(--spacing-gutter-lg));
+    margin-inline: auto;
+    padding-inline: var(--spacing-gutter);
+  }
+
+  @media (min-width: 48rem) {
+    .footer__inner {
+      padding-inline: var(--spacing-gutter-lg);
+    }
+  }
+
+  .footer__grid {
+    display: grid;
+    gap: var(--spacing-stack);
+  }
+
+  @media (min-width: 48rem) {
+    .footer__grid {
+      grid-template-columns: 2fr 1fr 1fr;
+      gap: var(--spacing-block);
+    }
+  }
+
+  .footer__mark {
+    display: inline-block;
+    font-family: var(--font-display);
+    font-stretch: var(--display-width-expanded);
+    font-size: var(--text-xl);
+    font-weight: 600;
+    letter-spacing: var(--tracking-heading);
+    border-radius: var(--radius-sm);
+  }
+
+  .footer__role,
+  .footer__tagline {
+    margin-top: 0.5rem;
+    font-family: var(--font-mono);
+    font-stretch: normal;
+    font-size: var(--text-caption);
+    letter-spacing: var(--tracking-label);
+    color: var(--color-slate);
+  }
+
+  .footer__list {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .footer__link {
+    display: inline-flex;
+    flex-direction: column;
+    gap: 0.125rem;
+    font-family: var(--font-mono);
+    font-stretch: normal;
+    font-size: var(--text-caption);
+    font-weight: 500;
+    letter-spacing: var(--tracking-label);
+    text-transform: uppercase;
+    color: var(--color-ink);
+    border-radius: var(--radius-sm);
+    transition: color var(--duration-fast) var(--ease-standard);
+  }
+
+  .footer__link:hover {
+    color: var(--color-accent);
+  }
+
+  .footer__social-handle {
+    font-size: var(--text-micro);
+    text-transform: none;
+    letter-spacing: var(--tracking-normal);
+    color: var(--color-slate);
+  }
+
+  .footer__colophon {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem var(--spacing-gutter);
+    margin-top: var(--spacing-block);
+    padding-top: var(--spacing-gutter);
+    border-top: var(--border-hairline) solid var(--color-rule);
+    font-family: var(--font-mono);
+    font-stretch: normal;
+    font-size: var(--text-micro);
+    letter-spacing: var(--tracking-label);
+    color: var(--color-slate);
+  }
+</style>
