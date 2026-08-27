@@ -22,7 +22,8 @@
     "test:coverage": "vitest run --coverage",
     "project:new": "node scripts/project-new.mjs",
     "project:validate": "node scripts/project-validate.mjs",
-    "verify": "astro sync && npm run format:check && npm run lint && npm run type-check && npm run test && npm run build"
+    "project:validate:offline": "node scripts/project-validate.mjs --offline",
+    "verify": "astro sync && npm run format:check && npm run lint && npm run type-check && npm run build && npm run test"
   },
   "dependencies": {
     "@astrojs/react": "^6.0.4",

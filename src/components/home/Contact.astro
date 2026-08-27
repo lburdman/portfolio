@@ -1,0 +1,294 @@
+---
+/**
+ * The quiet ending (brief §12, REDESIGN_DECISIONS P0 #7).
+ *
+ * ## Why this file exists
+ *
+ * `#contact` was linked from four places — the desktop nav, the mobile menu,
+ * the footer and the Hero's own "Get in touch" — and existed nowhere. Both
+ * locales shipped the primary call-to-action pointing at nothing, through 288
+ * tests and five green gates. `tests/anchors.test.ts` is the guard that makes
+ * that class of defect loud; this component is the target it resolves to.
+ *
+ * The element `id` is `CONTACT_SECTION_ID`, the same constant the four links
+ * read. Neither side can be edited without the other following.
+ *
+ * ## Restraint is the design
+ *
+ * Page rhythm is Hero (calm) → Layers (build) → Technical Worlds (the one big
+ * motion moment) → Projects (calm evidence) → Contact. This section closes the
+ * descent, so it has no entrance choreography, no canvas, no island and no
+ * script — the same decision `SelectedProjects` documents, and for the same
+ * reason. Anything that competed with the Worlds band here would blunt it.
+ *
+ * The links are a datasheet rail rather than a row of buttons: mono label,
+ * value, hairline between. The brief asks for email, GitHub, LinkedIn and CV
+ * as *clear links*, not as a call-to-action wall, and the site already spends
+ * its one filled-ink button in the Hero.
+ *
+ * ## Where every string and URL comes from
+ *
+ * Copy is `t.contact.*`, already authored in both dictionaries and — until
+ * now — rendered nowhere. Profiles and the address are `SITE.social`; nothing
+ * here writes a URL or an email literal, so the "one value, one owner" rule of
+ * `src/config/site.ts` holds.
+ *
+ * Email leads the rail because `t.contact.note` says it does ("Email is the
+ * fastest way to reach me. GitHub and LinkedIn are below."). The order is
+ * derived from the `id`, not hardcoded, so the copy and the markup cannot
+ * disagree after someone reorders `SITE.social`.
+ *
+ * The résumé link renders **only** when `SITE.resumePath` is non-null. It is
+ * `null` today: the audit found two prominent CTAs pointing at a PDF that was
+ * never shipped, and a dead link is worse than an absent one on a page whose
+ * subject is evidence.
+ *
+ * ## The two rules this file is most at risk of breaking
+ *
+ * 1. No inline `style=""`. `security.csp` emits hash-based `style-src` with no
+ *    `style-src-attr` and no `'unsafe-hashes'`, so a style attribute is dropped
+ *    in production while working perfectly in `astro dev`
+ *    (docs/ARCHITECTURE.md §10). Per-row variation is a `data-contact-link`
+ *    attribute matched by a static rule in the `<style>` block below.
+ * 2. No resting `opacity: 0`. There is no entrance animation here at all, so
+ *    "absent animation degrades to visible" is true by construction.
+ *
+ * ## Figure number and margin label — read this before changing them
+ *
+ * `section={SECTION}` is the only thing this component states about its own
+ * identity. `ui/Section.astro` derives the element `id` from it, the figure
+ * number from `SECTION_IDS.indexOf('contact')` and the margin word from
+ * `t.sections.contact`, so the anchor, the numbering and the annotation have
+ * one owner between them and cannot drift apart.
+ *
+ * This replaced a local `index` override computing `SECTION_IDS.length`, used
+ * while `'contact'` was still outside that array. The override was correct
+ * exactly until the id was appended, at which point the array grew to five and
+ * the homepage started reading `00, 01, 02, 03, 05`. It is the same trap
+ * `SelectedProjects` records about its old hardcoded `'03'`: a number that
+ * merely *equals* the right answer is the dangerous kind, because nothing
+ * fails at the moment it stops equalling it.
+ *
+ * The margin word is `t.sections[SECTION]`, as in every other section — not
+ * `t.contact.heading`. The two read the same today ("Contact" / "Contacto"),
+ * but the annotation belongs to the `sections` group; taking it from this
+ * section's own content group would leave them free to diverge.
+ *
+ * ## Heading level
+ *
+ * The page owns the `<h1>`. This opens at `<h2>`, and the `<h2>` carries
+ * `t.contact.invitation` rather than the word "Contact" — the same shape as
+ * the layers section, whose margin reads `01 / LAYERS` while its heading is a
+ * sentence. The margin annotation is `aria-hidden` inside `Section`; the
+ * section is named for assistive technology by `aria-labelledby`.
+ */
+
+import ActionLink from '@/components/ui/ActionLink.astro';
+import Section from '@/components/ui/Section.astro';
+import { CONTACT_SECTION_ID, type SectionId } from '@/config/navigation';
+import { SITE } from '@/config/site';
+import type { Locale, UIStrings } from '@/i18n';
+
+interface Props {
+  t: UIStrings;
+  /**
+   * Carried for symmetry with the other homepage sections. Nothing here is a
+   * localized *route* — the rail is external profiles and a `mailto:`, and the
+   * résumé is a static asset — so no href needs `localizePath`.
+   */
+  locale: Locale;
+  base: string;
+}
+
+const { t, base } = Astro.props;
+
+/**
+ * Typed, not stringly — and the join between two constants that must agree.
+ *
+ * `CONTACT_SECTION_ID` is what the nav, the mobile menu, the footer and the
+ * Hero link to; `SectionId` is the union over `SECTION_IDS`. Annotating one
+ * with the other means that if the anchor ever leaves the numbered sequence
+ * this stops compiling, rather than rendering an unnumbered section that four
+ * links still point at.
+ */
+const SECTION: SectionId = CONTACT_SECTION_ID;
+
+const HEADING_ID = `${SECTION}-heading`;
+
+/** Localized label per social id, so no profile name is written twice. */
+const socialLabels = {
+  email: t.contact.emailLabel,
+  github: t.contact.githubLabel,
+  linkedin: t.contact.linkedinLabel,
+} as const;
+
+/**
+ * Email first, then the profiles in `SITE.social` order — the order
+ * `t.contact.note` describes. Derived from the `id` rather than restated as a
+ * literal list, so the two cannot drift apart.
+ */
+const rail = [
+  ...SITE.social.filter((link) => link.id === 'email'),
+  ...SITE.social.filter((link) => link.id !== 'email'),
+];
+
+/**
+ * A file under `public/`, not a route: `localizePath` would append the trailing
+ * slash every *page* URL carries and break it. Same construction as the Hero's
+ * résumé CTA, which is the only other caller. `null` today, so neither renders.
+ */
+const resumeHref = SITE.resumePath === null ? null : `${base}${SITE.resumePath}`;
+---
+
+<Section section={SECTION} label={t.sections[SECTION]} labelledBy={HEADING_ID} class="contact">
+  <div class="contact__opening">
+    <h2 id={HEADING_ID} class="contact__invitation">{t.contact.invitation}</h2>
+    <p class="contact__note">{t.contact.note}</p>
+  </div>
+
+  <ul class="contact__rail">
+    {
+      rail.map((link) => (
+        <li class="contact__row">
+          <a class="contact__link" href={link.href} data-contact-link={link.id}>
+            <span class="contact__label">{socialLabels[link.id]}</span>
+            <span class="contact__value">{link.display}</span>
+            <span class="contact__arrow" aria-hidden="true">
+              &#8594;
+            </span>
+          </a>
+        </li>
+      ))
+    }
+  </ul>
+
+  {
+    resumeHref && (
+      <p class="contact__resume">
+        <ActionLink href={resumeHref} variant="secondary">
+          {t.contact.resumeLabel}
+        </ActionLink>
+      </p>
+    )
+  }
+</Section>
+
+<style>
+  /* The <section>, the measure, the vertical rhythm and the margin annotation
+     belong to `ui/Section.astro`. Only what is specific to this section lives
+     here — and none of it is an inline attribute (see the header comment). */
+
+  .contact__opening {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    max-width: var(--container-prose);
+    margin-bottom: var(--spacing-block);
+  }
+
+  /* Base `h2` already supplies the display face, the expanded width axis and
+     `--text-display-3`. This only holds the measure. */
+  .contact__invitation {
+    max-width: 18ch;
+  }
+
+  .contact__note {
+    color: var(--color-slate);
+    text-wrap: pretty;
+  }
+
+  /* --- The rail ------------------------------------------------------------
+     A datasheet table of contacts: hairline above the first row, one below
+     each. No fills, no buttons, no shadow. */
+  .contact__rail {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    border-top: var(--border-hairline) solid var(--color-rule);
+  }
+
+  .contact__row {
+    border-bottom: var(--border-hairline) solid var(--color-rule);
+  }
+
+  .contact__link {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: baseline;
+    gap: 0.375rem 1.5rem;
+    padding-block: 1.125rem;
+    color: var(--color-ink);
+    text-decoration: none;
+    transition: color var(--duration-fast) var(--ease-standard);
+  }
+
+  /* From the first breakpoint the label becomes its own margin column, which is
+     what makes the block read as a datasheet rather than as a list. */
+  @media (min-width: 40rem) {
+    .contact__link {
+      grid-template-columns: 9rem 1fr auto;
+    }
+  }
+
+  .contact__label {
+    grid-column: 1;
+    font-family: var(--font-mono);
+    font-stretch: normal;
+    font-size: var(--text-micro);
+    font-weight: 500;
+    letter-spacing: var(--tracking-wide);
+    text-transform: uppercase;
+    color: var(--color-slate);
+    transition: color var(--duration-fast) var(--ease-standard);
+  }
+
+  .contact__value {
+    font-size: var(--text-lg);
+    /* Long profile URLs must never widen the page on a narrow viewport. */
+    overflow-wrap: anywhere;
+  }
+
+  @media (min-width: 40rem) {
+    .contact__value {
+      grid-column: 2;
+    }
+  }
+
+  /* The one emphasis in the section, and it agrees with `t.contact.note`:
+     email is the fastest way through. A data attribute matched by a static
+     rule — never an inline style (docs/ARCHITECTURE.md §10). */
+  .contact__link[data-contact-link='email'] .contact__value {
+    font-size: var(--text-xl);
+    font-weight: 600;
+  }
+
+  .contact__arrow {
+    grid-column: -1;
+    grid-row: 1;
+    color: var(--color-rule);
+    transition:
+      transform var(--duration-fast) var(--ease-standard),
+      color var(--duration-fast) var(--ease-standard);
+  }
+
+  .contact__link:hover,
+  .contact__link:focus-visible {
+    color: var(--color-accent);
+  }
+
+  .contact__link:hover .contact__label,
+  .contact__link:focus-visible .contact__label,
+  .contact__link:hover .contact__arrow,
+  .contact__link:focus-visible .contact__arrow {
+    color: var(--color-accent);
+  }
+
+  .contact__link:hover .contact__arrow,
+  .contact__link:focus-visible .contact__arrow {
+    transform: translateX(0.25em);
+  }
+
+  .contact__resume {
+    margin-top: var(--spacing-stack);
+  }
+</style>

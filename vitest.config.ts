@@ -44,6 +44,15 @@ export default getViteConfig({
   test: {
     environment: 'node',
     include: ['tests/**/*.test.ts'],
+
+    // Builds `dist/` exactly once, before any suite, with the Vite/Vitest env
+    // pollution stripped back out. `tests/links.test.ts` and
+    // `tests/anchors.test.ts` both read that output and neither may build it
+    // itself — two on-demand builders race into one directory, and a build
+    // spawned from inside a worker inherits `BASE_URL=/` and silently drops
+    // the deployment base from every internal link. Both failures were
+    // observed here; see the header of `tests/global-setup.ts`.
+    globalSetup: ['./tests/global-setup.ts'],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html'],

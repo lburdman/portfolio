@@ -12,6 +12,18 @@
  * pointed at an English page. Every href below goes through `localizePath`
  * with the locale it was handed.
  *
+ * ── The credibility strip ───────────────────────────────────────────────────
+ *
+ * Three lines of provenance between the positioning sentence and the CTA row
+ * (REDESIGN_DECISIONS P5 #20). Before it, no string in either dictionary
+ * carried a degree, a certification or a MicroMasters — the site asked to be
+ * believed on the strength of its own copy.
+ *
+ * The cap of three is enforced by the type, not by this file: `credentials` is
+ * a `CredentialTrio`, a fixed 3-tuple, so a fourth badge is a compile error in
+ * both dictionaries. That is the same reasoning as `Record<DomainId, T>`, and
+ * it is what keeps a strip from becoming a wall.
+ *
  * The technical-area row is a real `<nav>` of real links. Nothing about it is
  * hover-only — brief §14 requires that anything a pointer reveals be reachable
  * by tap and by keyboard, so there is nothing to reveal in the first place.
@@ -60,7 +72,7 @@ const areas = DOMAINS.map((domain) => ({
 const HEADING_ID = 'hero-heading';
 ---
 
-<Section section="hero" label={t.sections.hero} labelledBy={HEADING_ID} spacing="lg" class="hero">
+<Section section="hero" label={t.sections.hero} labelledBy={HEADING_ID} spacing="none" class="hero">
   <canvas slot="bleed" class="section__bleed hero__field" data-signal-field aria-hidden="true"></canvas>
 
   <div class="hero__lockup">
@@ -69,6 +81,10 @@ const HEADING_ID = 'hero-heading';
   </div>
 
   <p class="hero__positioning">{t.hero.positioning}</p>
+
+  <ul class="hero__credentials">
+    {t.hero.credentials.map((credential) => <li class="hero__credential">{credential}</li>)}
+  </ul>
 
   <div class="hero__actions">
     <ActionLink href={projectsHref} variant="primary" arrow>{t.hero.ctaProjects}</ActionLink>
@@ -110,12 +126,27 @@ const HEADING_ID = 'hero-heading';
 <style>
   .hero {
     /* Tall enough to be a threshold, never so tall that the next section is a
-       surprise. `svh` avoids the mobile URL-bar jump. */
-    min-height: min(92svh, 60rem);
+       surprise. `svh` avoids the mobile URL-bar jump.
+
+       RETUNED — REDESIGN_DECISIONS P4 #17 measured 92% of the first viewport
+       empty, with 144px dead bands at the top and bottom. At 1440x900 the old
+       `min(92svh, 60rem)` plus `spacing="lg"` produced an 859px section around
+       571px of content: 288px of it was section padding alone, and the next
+       section began exactly one pixel below the fold, so nothing signalled
+       that the page continued. This is 738px around the same content, and the
+       Layers section now breaks the fold by ~95px. */
+    min-height: min(82svh, 50rem);
     display: flex;
     flex-direction: column;
     justify-content: center;
     overflow: hidden;
+  }
+
+  /* The hero owns its own rhythm, which is why `spacing="none"` is passed to
+     `Section` rather than `lg`. Two classes so this reliably outranks
+     `.section--none` regardless of stylesheet order. */
+  .hero.section {
+    padding-block: 4.5rem;
   }
 
   /* The canvas inherits this `color`; `signal-field.ts` reads it back rather
@@ -162,6 +193,53 @@ const HEADING_ID = 'hero-heading';
     text-wrap: pretty;
   }
 
+  /* --- credibility strip ---------------------------------------------------
+     Provenance, not decoration. It borrows the type treatment of the
+     technical-area row below the CTAs — mono, micro, uppercase, slate — so it
+     introduces no new visual language and cannot outweigh the name it sits
+     under. The list is a fixed 3-tuple in the dictionary, so the layout below
+     is allowed to assume exactly three items.
+
+     Below 64rem the three sit in a column with no rules: three uppercase mono
+     lines wrap unpredictably in a row, and a wrapped flex row puts a leading
+     hairline at the start of the second line, which reads as a mistake. At
+     64rem and up they fit on one line, so the separators can be real.
+     ---------------------------------------------------------------------- */
+  .hero__credentials {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4375rem;
+    margin-top: var(--spacing-stack);
+    padding-top: 1rem;
+    border-top: var(--border-hairline) solid var(--color-rule);
+    list-style: none;
+  }
+
+  .hero__credential {
+    font-family: var(--font-mono);
+    font-stretch: normal;
+    font-size: var(--text-micro);
+    font-weight: 500;
+    letter-spacing: var(--tracking-eyebrow);
+    text-transform: uppercase;
+    color: var(--color-slate);
+  }
+
+  @media (min-width: 64rem) {
+    .hero__credentials {
+      flex-direction: row;
+      flex-wrap: nowrap;
+      align-items: baseline;
+      gap: 0;
+    }
+
+    .hero__credential + .hero__credential {
+      margin-inline-start: 1rem;
+      padding-inline-start: 1rem;
+      border-inline-start: var(--border-hairline) solid var(--color-rule);
+    }
+  }
+
   .hero__actions {
     display: flex;
     flex-wrap: wrap;
@@ -172,7 +250,11 @@ const HEADING_ID = 'hero-heading';
 
   /* --- technical areas ------------------------------------------------------ */
   .hero__areas {
-    margin-top: var(--spacing-block);
+    /* 48px rather than `--spacing-block` (64px): the credibility strip added a
+       fourth horizontal rule to this stack, and at 64px the four bands read as
+       four unrelated blocks instead of one lockup. Re-measured after the strip
+       landed rather than inherited from the layout that predated it. */
+    margin-top: 3rem;
     padding-top: var(--spacing-gutter);
     border-top: var(--border-hairline) solid var(--color-rule);
   }
@@ -222,13 +304,45 @@ const HEADING_ID = 'hero-heading';
 </style>
 
 <script>
+  /**
+   * NOTE ON WHERE THIS SHIPS. Astro inlines a `<script>` chunk only while it is
+   * under Vite's `build.assetsInlineLimit` (4096 bytes, default). The pass-2
+   * signal field bundles to 4912 bytes, so this block is now emitted as
+   * `<script type="module" src=…>` rather than inline.
+   *
+   * Nothing in the performance contract moves: a module script is deferred
+   * whether it is inline or external, so blocking critical-path bytes stay at
+   * 0 KB and the hero's semantic content still never waits on it. What changes
+   * is one same-origin request, covered by the CSP's existing `script-src
+   * 'self'` (verified in the built `<meta>`), against 1.06 KB gz less HTML —
+   * and both locales now share one cached chunk instead of inlining the same
+   * code into two documents, so across `/` and `/es/` the total is +192 bytes
+   * gz rather than double.
+   *
+   * Getting back under the limit would have meant dropping the pointer
+   * excitation, the wavepacket's vertical locality, the graticule's tick axis
+   * AND the `ResizeObserver` / `IntersectionObserver` feature guards — four
+   * things the review asked for or the motion contract requires — to save
+   * about a kilobyte. If inlining is ever wanted back, the lever is
+   * `vite.build.assetsInlineLimit` in `astro.config.mjs`, not this file.
+   */
   import { createSignalField } from '../visuals/hero/signal-field';
 
   const canvas = document.querySelector<HTMLCanvasElement>('[data-signal-field]');
 
   if (canvas) {
+    const section = canvas.closest<HTMLElement>('section');
+
     const field = createSignalField(canvas, {
-      pointerTarget: canvas.closest<HTMLElement>('section') ?? canvas,
+      pointerTarget: section ?? canvas,
+      /**
+       * The field runs at full contrast in the margins and whispers behind the
+       * words. `.section__inner` is the measure `ui/Section.astro` renders, so
+       * the quiet region is derived from the real content box rather than from
+       * a hardcoded rectangle that would drift the moment the copy changed —
+       * which it just did, when the credibility strip was added.
+       */
+      quietTarget: section?.querySelector<HTMLElement>('.section__inner') ?? null,
     });
 
     field.start();

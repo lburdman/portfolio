@@ -3,9 +3,18 @@
   "status": "published",
   "featured": true,
   "domains": ["ai"],
-  "stack": ["Machine Learning", "Time Series", "Python", "Scikit-learn", "Forecasting", "XGBoost"],
+  "stack": [
+    "Machine Learning",
+    "Time Series",
+    "Python",
+    "Scikit-learn",
+    "XGBoost",
+    "Conformal Prediction",
+    "Streamlit"
+  ],
   "links": {
-    "github": "https://github.com/lburdman/energy-demand-forecasting"
+    "github": "https://github.com/lburdman/energy-demand-forecast"
   },
-  "order": 2
+  "cover": "media/prediction-interval.webp",
+  "order": 10
 }

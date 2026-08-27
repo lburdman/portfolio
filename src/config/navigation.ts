@@ -44,8 +44,16 @@ export const HOME_PATH = '/';
  */
 export const MAIN_CONTENT_ID = 'main-content';
 
-/** Anchor for the contact block, which lives at the foot of the home page. */
-export const CONTACT_SECTION_ID = 'contact';
+/**
+ * Anchor for the contact block, which lives at the foot of the home page.
+ *
+ * `satisfies SectionId` is the whole point of the annotation: this constant is
+ * what four links (`PRIMARY_NAV`, the mobile menu, the footer and the Hero CTA)
+ * point at, and it is also the section's own `id`. Now that `'contact'` is a
+ * member of `SECTION_IDS`, renaming one without the other is a type error
+ * rather than four dead anchors — which is exactly how P0 #7 shipped.
+ */
+export const CONTACT_SECTION_ID = 'contact' satisfies SectionId;
 
 /**
  * The homepage sections, in the order they appear.
@@ -57,9 +65,17 @@ export const CONTACT_SECTION_ID = 'contact';
  * These ids are also the `id` attributes the sections carry, so an in-page
  * anchor, a section's own `id` and its margin label all resolve from one list.
  * `UIStrings['sections']` is a `Record` over this union, which is what stops a
- * section rendering the label belonging to a different section.
+ * section rendering the label belonging to a different section — and what
+ * makes adding an id here a compile error until both dictionaries have words
+ * for it.
+ *
+ * `'contact'` is last because the page order is Hero → Layers → Technical
+ * Worlds → Projects → Contact, so Contact is figure `04`. It joined the list
+ * only once `sections.contact` existed in `en.ts` and `es.ts`; until then the
+ * Contact section rendered through `Section`'s explicit-`id`/`index` escape
+ * hatch, which it no longer needs.
  */
-export const SECTION_IDS = ['hero', 'layers', 'worlds', 'projects'] as const;
+export const SECTION_IDS = ['hero', 'layers', 'worlds', 'projects', 'contact'] as const;
 
 export type SectionId = (typeof SECTION_IDS)[number];
 

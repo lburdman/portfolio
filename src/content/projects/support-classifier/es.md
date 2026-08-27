@@ -1,26 +1,31 @@
 ---
 title: 'Clasificador de Tickets de Soporte'
-summary: 'Un clasificador de tickets de soporte asistido por IA con outputs estructurados validados, fallbacks determinísticos y una UI local ligera — enfocado en diseño de backend mantenible y manejo práctico de respuestas del modelo.'
+summary: 'Un clasificador de tickets de soporte asistido por IA con respuestas estructuradas validadas por esquema, un comportamiento de respaldo determinista que nunca lanza errores y una interfaz local mínima — enfocado en diseño de backend mantenible.'
 ---
 
-## Descripción General
+## Resumen
 
-Un sistema de clasificación de tickets de soporte que usa un modelo de lenguaje para categorizar tickets entrantes, con validación de outputs estructurados, comportamiento de fallback determinístico y una interfaz local mínima para inspección.
+Un servicio en FastAPI que clasifica mensajes de soporte con un modelo de lenguaje, valida el resultado contra un esquema tipado y recurre a una respuesta fija y segura cada vez que la salida del modelo no es confiable.
 
-## Problema
+## El problema
 
-Desplegar clasificadores basados en LLMs en producción expone un desafío práctico: los outputs del modelo no son estructurados de forma confiable. Un modelo que devuelve "Creo que podría ser un problema de facturación" no es parseable por sistemas finales. Este proyecto aborda la brecha entre la flexibilidad de los LLMs y el comportamiento estructurado requerido para uso en producción.
+Poner en producción clasificadores basados en LLMs deja al descubierto un problema práctico: la salida del modelo no es estructurada de forma confiable. Un modelo que responde "creo que podría ser un problema de facturación" no se puede interpretar desde un sistema posterior. El proyecto aborda esa distancia entre la flexibilidad de un LLM y el comportamiento estructurado que necesita quien lo consume.
 
 ## Arquitectura
 
-- **Backend del clasificador**: Llama a una API de LLM con un prompt estructurado y extrae un objeto de clasificación validado con Pydantic de la respuesta.
-- **Parsing multi-formato**: Maneja JSON en bloques de código, JSON inline y outputs envueltos en prosa — una variabilidad común de respuestas en la práctica.
-- **Lógica de fallback**: Cuando el parsing falla, cae en un clasificador basado en reglas determinístico en lugar de propagar un error.
-- **Capa de auditoría**: Registra las decisiones de clasificación con puntajes de confianza y estado de parsing para observabilidad.
-- **UI local**: Una interfaz mínima para enviar tickets e inspeccionar resultados de clasificación.
+- **Servicio de clasificación**: llama a la API de Anthropic con temperatura 0 y un prompt de sistema definido en un único módulo, y valida la respuesta contra un modelo Pydantic cuyos campos de categoría y prioridad son enumeraciones `Literal`.
+- **Extracción multiformato**: primero se busca un bloque delimitado ` ```json `; si no aparece, un recorrido que cuenta llaves localiza los límites exactos del objeto dentro del texto que lo rodea.
+- **Respaldo determinista**: el servicio nunca lanza una excepción. Cualquier error del proveedor o salida inválida devuelve un `ClassifyResponse` fijo con `is_fallback` y `needs_human_review` activados, de modo que quien llama siempre recibe un objeto válido y puede mostrar un aviso.
+- **Aislamiento del proveedor**: todos los imports de Anthropic viven en `classifier.py`; cambiar de proveedor implica tocar solo ese archivo.
+- **Interfaz local**: una única página Jinja2 para enviar un mensaje e inspeccionar la clasificación.
 
-## Decisiones de Diseño Clave
+## Decisiones de diseño
 
-- **Enfoque schema-first**: Los esquemas de output se definen con Pydantic y se aplican antes de que se ejecute cualquier lógica posterior.
-- **Modos de fallo explícitos**: El sistema distingue entre fallos de configuración, de red y de parsing — cada uno manejado de forma diferente.
-- **Estructura testeable**: La lógica de parsing y fallback es completamente testeable con unit tests sin acceso a la API en vivo.
+- **El esquema primero**: los esquemas de salida se definen con Pydantic y se aplican antes de que se ejecute cualquier lógica posterior.
+- **Modos de falla explícitos**: los errores de autenticación y configuración, los de red transitorios, el JSON inválido y las respuestas que no cumplen el esquema se capturan por separado y se registran de forma distinta, así una respuesta de respaldo en producción se puede rastrear hasta su causa.
+- **Estructura verificable**: tres módulos de pruebas cubren los casos límite del esquema, el servicio y el endpoint. Todas las llamadas a Anthropic están simuladas, por lo que la suite corre sin necesidad de una clave de API.
+- **Deliberadamente chico**: sin base de datos, sin autenticación y sin Docker — la tarea no los pedía y habrían tapado la lógica de clasificación.
+
+## Conclusiones
+
+Lo más difícil de un sistema apoyado en un LLM no es el modelo, sino todo lo que lo rodea. La extracción de la respuesta, el comportamiento de respaldo, la distinción entre clases de falla y la estabilidad del contrato de salida son lo que separa una demo de algo en lo que otro sistema puede confiar.

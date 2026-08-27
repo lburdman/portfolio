@@ -56,6 +56,38 @@ export default defineConfig({
       ],
     },
   },
+  /**
+   * Markdown.
+   *
+   * `syntaxHighlight: 'prism'` is a CSP decision, not a taste one.
+   *
+   * Astro's default highlighter is Shiki, which resolves every token to a
+   * literal colour and emits it as a `style=""` attribute. Under the hash-based
+   * policy above there is no `'unsafe-hashes'`, and a hash authorises a
+   * `<style>` *element*, never a style *attribute* — so the browser drops every
+   * one of them. Astro knows this and says so at build time:
+   *
+   *   [WARN] Shiki syntax highlighting uses inline styles that are not
+   *          compatible with CSP
+   *
+   * There are zero code fences in the content today, which is the only reason
+   * that warning is currently harmless. The moment someone adds one it becomes
+   * the same silent failure as the inline-style bug in docs/ARCHITECTURE.md §10:
+   * `astro dev` serves no CSP, so the block is perfectly coloured in
+   * development and renders as flat unstyled text in production, with no error
+   * anywhere.
+   *
+   * Prism emits class names only (`.token.keyword`, `.token.string`, …) and no
+   * inline styles at all, so highlighting survives the policy. `@astrojs/prism`
+   * ships with Astro; this adds no dependency.
+   *
+   * Prism ships colours in a stylesheet rather than in the markup, so the token
+   * classes need a Prism theme in the site's CSS to be visible. Without one the
+   * classes are present and correct but inherit the surrounding text colour.
+   */
+  markdown: {
+    syntaxHighlight: 'prism',
+  },
   integrations: [
     react(),
     sitemap({

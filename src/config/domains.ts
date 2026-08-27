@@ -39,11 +39,11 @@ export interface Domain {
    * domain. Each is a distinct, deliberately cheap SVG/DOM treatment — see
    * docs/MOTION_SYSTEM.md for why none of them is WebGL.
    */
-  readonly stage: 'network' | 'interference' | 'routing' | 'signalpath' | 'waveform';
+  readonly stage: 'forecast' | 'interference' | 'routing' | 'signalpath' | 'waveform';
 }
 
 export const DOMAINS = [
-  { id: 'ai', layerIndex: 0, accentVar: '--color-domain-ai', stage: 'network' },
+  { id: 'ai', layerIndex: 0, accentVar: '--color-domain-ai', stage: 'forecast' },
   { id: 'quantum', layerIndex: 1, accentVar: '--color-domain-quantum', stage: 'interference' },
   { id: 'fpga', layerIndex: 2, accentVar: '--color-domain-fpga', stage: 'routing' },
   { id: 'electronics', layerIndex: 3, accentVar: '--color-domain-electronics', stage: 'signalpath' },

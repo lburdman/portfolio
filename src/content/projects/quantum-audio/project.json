@@ -3,9 +3,10 @@
   "status": "published",
   "featured": true,
   "domains": ["quantum", "ai", "audio"],
-  "stack": ["Quantum ML", "PyTorch", "PennyLane", "Speech Processing", "Deep Learning", "CREMA-D"],
+  "stack": ["Quantum ML", "PyTorch", "PennyLane", "Qiskit", "Speech Processing", "Deep Learning", "CREMA-D"],
   "links": {
-    "github": "https://github.com/lburdman/qnn-speech-recognition"
+    "github": "https://github.com/lburdman/qnn-transfer-learning"
   },
-  "order": 3
+  "cover": "media/confusion-matrix.webp",
+  "order": 20
 }

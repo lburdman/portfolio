@@ -30,14 +30,23 @@
    (400, 500) and the two subsets the site needs (latin, latin-ext for Spanish)
    are imported.
 
+   The 400-italic faces exist for exactly one role: code comments in the Prism
+   theme below. That theme must not separate tokens by hue alone, and a
+   synthesised oblique is the one axis a monospace face degrades badly on. An
+   @font-face costs only its declaration until a glyph actually matches it, so
+   a page with no code block downloads neither file — the two woff2 are fetched
+   only when a comment renders.
+
    Every @font-face here ships `font-display: swap` from the packages.
    -------------------------------------------------------------------------- */
 
 @import '@fontsource-variable/archivo/wdth.css';
 @import '@fontsource/ibm-plex-mono/latin-400.css';
 @import '@fontsource/ibm-plex-mono/latin-500.css';
+@import '@fontsource/ibm-plex-mono/latin-400-italic.css';
 @import '@fontsource/ibm-plex-mono/latin-ext-400.css';
 @import '@fontsource/ibm-plex-mono/latin-ext-500.css';
+@import '@fontsource/ibm-plex-mono/latin-ext-400-italic.css';
 
 /* =============================================================================
    BASE
@@ -430,6 +439,145 @@
     border: 0;
   }
 
+  /* --- Prism theme ----------------------------------------------------------
+     `markdown.syntaxHighlight` is `'prism'` and not Shiki, for the CSP reason
+     set out in astro.config.mjs: Shiki resolves each token to a literal colour
+     and emits it as a `style=""` attribute, which the hash-based policy drops
+     silently in production (docs/ARCHITECTURE.md §10). Prism emits class names
+     only — and therefore ships no colours at all. Without the rules below the
+     `.token.*` classes are present, correct, and completely invisible.
+
+     This is written from the tokens rather than imported. Every stock Prism
+     theme (Okaidia, Tomorrow, Dracula, …) carries its own palette, and
+     dropping one in would put a second, foreign set of colours into a
+     repository whose entire premise is that tokens.css is the only file
+     holding a colour value.
+
+     THE PALETTE. Four colours, two of them accents — a datasheet, not an IDE.
+     Ratios are real WCAG 2.1 relative-luminance measurements against
+     `--color-paper-raised`, the `.prose pre` ground, not estimates:
+
+       --color-slate                        5.79:1   connective tissue
+       --color-ink                         15.48:1   identifiers
+       --color-accent                       6.57:1   the language's own words
+       domain-electronics 56% -> ink        6.61:1   literal author data
+
+     The literal colour is the measured 56% text ceiling from tokens.css. A raw
+     `--color-domain-electronics` here would be 2.98:1 — the accessibility bug
+     that file's loud block exists to prevent. Do not raise the percentage.
+
+     HUE IS NEVER THE ONLY SIGNAL. `--color-accent` and the literal mix are
+     6.57:1 and 6.61:1: in greyscale, or to a reader who cannot separate blue
+     from red-brown, they are the same value. So weight carries the distinction
+     independently — keywords 500, literals 400 — and comments take italic,
+     because slate and the literal mix are likewise near-identical in
+     luminance. Every pair that shares a colour is separated by weight; every
+     pair that shares a weight is separated by luminance. If you add a role,
+     hold that property.
+
+     Ordering is load-bearing where a token carries two of these classes.
+     Python's decorator is `token decorator annotation punctuation`, so
+     `.annotation` must come after `.punctuation` to win on equal specificity.
+     ----------------------------------------------------------------------- */
+
+  /* Declared on `.prose` itself, not on `pre[class*='language-']`: a custom
+     property that fails to resolve would make `color` invalid at
+     computed-value time, and the token would silently inherit instead. This
+     way the definition cannot be missed by an element the tokens descend from.
+     6.61:1 on paper-raised · 6.14:1 on paper — AA */
+  .prose {
+    --code-literal: color-mix(in oklab, var(--color-domain-electronics) 56%, var(--color-ink));
+  }
+
+  /* Connective tissue — recedes. 5.79:1 */
+  .prose .token:is(.comment, .prolog, .doctype, .cdata) {
+    color: var(--color-slate);
+    font-style: italic;
+  }
+
+  .prose .token:is(.punctuation, .interpolation-punctuation, .template-punctuation) {
+    color: var(--color-slate);
+  }
+
+  .prose .token:is(.operator, .entity, .url, .regex-delimiter, .regex-flags) {
+    color: var(--color-slate);
+    font-weight: 500;
+  }
+
+  /* Python `@decorator` — must follow .punctuation, whose alias it carries. */
+  .prose .token.annotation {
+    color: var(--color-slate);
+    font-weight: 500;
+  }
+
+  /* Identifiers — the default voice. 15.48:1
+     `.atrule` is here rather than with the keywords because the only language
+     in play that emits it is YAML, where it is the alias for a mapping key.
+     That keeps a YAML key and a JSON key reading identically. */
+  .prose
+    .token:is(
+      .property,
+      .literal-property,
+      .string-property,
+      .attr-name,
+      .atrule,
+      .key,
+      .variable,
+      .parameter,
+      .tag,
+      .symbol,
+      .property-access
+    ) {
+    color: var(--color-ink);
+  }
+
+  .prose .token:is(.function, .function-name, .class-name, .builtin, .selector, .maybe-class-name) {
+    color: var(--color-ink);
+    font-weight: 500;
+  }
+
+  /* The language's own words. 6.57:1 — weight 500 separates these from the
+     literals below, which are indistinguishable from them in greyscale. */
+  .prose .token:is(.keyword, .boolean, .constant, .null, .important, .directive, .rule) {
+    color: var(--color-accent);
+    font-weight: 500;
+  }
+
+  /* A bash shebang is emitted as `token shebang important`, so without this it
+     would inherit the keyword colour above and a `#!` line would read as
+     language rather than as the comment it looks like. Must stay after the
+     keyword rule: equal specificity, so source order decides. */
+  .prose .token:is(.shebang, .hashbang) {
+    color: var(--color-slate);
+    font-weight: 400;
+    font-style: italic;
+  }
+
+  /* Literal author data. 6.61:1 — weight 400, deliberately. */
+  .prose
+    .token:is(
+      .string,
+      .triple-quoted-string,
+      .template-string,
+      .char,
+      .attr-value,
+      .regex,
+      .regex-source,
+      .number,
+      .scalar,
+      .datetime,
+      .inserted
+    ) {
+    color: var(--code-literal);
+    font-weight: 400;
+  }
+
+  .prose .token.deleted {
+    color: var(--color-slate);
+    font-weight: 500;
+    text-decoration: line-through;
+  }
+
   .prose blockquote {
     padding-left: var(--spacing-gutter);
     border-left: var(--border-rule) solid var(--color-accent);
@@ -528,6 +676,55 @@
 
 @view-transition {
   navigation: auto;
+}
+
+/* --- Timing: the morph must outlast the cross-fade -----------------------
+   MEASURED, not guessed. `getAnimations()` captured during a live navigation
+   showed `::view-transition-group(project-title-<slug>)` animating correctly
+   on both sides — the morph was never missing. It ran for 250ms UNDERNEATH a
+   250ms root cross-fade carrying the UA default `mix-blend-mode: plus-lighter`
+   on `::view-transition-old(root)` / `-new(root)`. That blend is ADDITIVE, so
+   the dark Technical Worlds band summed with the light detail page instead of
+   dissolving into it: the ghosting, and the reason the whole thing read as a
+   flash rather than as a title travelling.
+
+   The fix is timing. It does not remove the additive blend — it stops the
+   blend from being the event. Measured with `getAnimations()` on a real
+   navigation: before, every pseudo ran 250ms, so the wash and the morph were
+   the same gesture and the wash won. After, the ground swap is 150ms and the
+   morph is 480ms, so by the time the eye has settled the page is already clean
+   and the only thing still moving is the title. Frames confirm it: at 160ms
+   the old timing is still compositing two whole pages, the new one is done.
+
+   If the remaining 150ms of additive brightening ever needs to go too, the
+   lever is `mix-blend-mode: normal` on the two root snapshots — but that trades
+   a bright overshoot on dark->light for a visible dip on like-to-like
+   navigations, which is exactly what the UA chose `plus-lighter` to avoid.
+   Measure both grounds before reaching for it.
+
+   `(*)` is required, not lazy: view-transition names are per-slug
+   (`project-title-<slug>`) and generated from content, so they cannot be
+   enumerated in a static stylesheet. Chrome propagates a group's duration to
+   its own `-old`/`-new` snapshots, so matching the group is sufficient.
+
+   Tokens resolve here — verified by rendering with distinctive fallbacks and
+   confirming the fallback never appeared. The `::view-transition` pseudo tree
+   inherits custom properties from the document root.
+
+   This block sits OUTSIDE `prefers-reduced-motion` on purpose. The block at
+   the foot of this file collapses these same pseudo-elements with
+   `!important`, so it keeps winning. Never add `!important` here.
+   ----------------------------------------------------------------------- */
+
+::view-transition-group(*) {
+  animation-duration: var(--duration-slow);
+  animation-timing-function: var(--ease-entrance);
+}
+
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: var(--duration-fast);
+  animation-timing-function: linear;
 }
 
 /* =============================================================================

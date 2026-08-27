@@ -31,11 +31,28 @@ const CELLS = Array.from({ length: COLUMNS * ROWS }, (_, index) => {
 });
 
 /**
+ * Cells on a route, and therefore **clock ticks per traversal**.
+ *
+ * The propagating pulse used to be a fixed-rate infinite dash, which reads as
+ * *flow* — fluid moving through a pipe — and an FPGA fabric does not do that
+ * (REDESIGN_DECISIONS P2, FPGA). It is synchronous logic: a value is latched
+ * into one cell on a clock edge and appears in the next cell on the following
+ * edge. So the pulse advances in `ROUTE_STEPS` discrete jumps, one per tick,
+ * and the clock indicator blinks on the same period.
+ *
+ * The step count lives in CSS as `steps(6)` — a keyframe timing function cannot
+ * read a module constant, and handing it one would mean an inline custom
+ * property, which the site's CSP drops. `tests/worlds.test.ts` asserts every
+ * route really has this many cells, so the two cannot drift apart silently.
+ */
+export const ROUTE_STEPS = 6;
+
+/**
  * Four candidate placements of the same net, expressed as cell coordinates.
  * Deliberately hand-authored rather than generated: a real routing solution is
  * a decision, not noise, and these four read as four decisions.
  */
-const ROUTE_CELLS: readonly (readonly (readonly [number, number])[])[] = [
+export const ROUTE_CELLS: readonly (readonly (readonly [number, number])[])[] = [
   [
     [0, 1],
     [2, 1],

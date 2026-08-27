@@ -3,9 +3,9 @@
   "status": "published",
   "featured": true,
   "domains": ["ai"],
-  "stack": ["AI", "NLP", "Python", "Pydantic", "Anthropic", "Classification"],
+  "stack": ["AI", "NLP", "Python", "FastAPI", "Pydantic", "Anthropic", "Classification"],
   "links": {
-    "github": "https://github.com/lburdman/support-ticket-classifier"
+    "github": "https://github.com/lburdman/leaderPruebaTecnica"
   },
-  "order": 4
+  "order": 40
 }

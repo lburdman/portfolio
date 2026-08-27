@@ -1,29 +1,35 @@
 ---
 title: 'Augmenta'
-summary: 'Una capa de privacidad para flujos de trabajo con LLMs con detección de PII, anonimización y integración orientada a servicios — centrada en herramientas de privacidad, diseño de APIs e IA aplicada.'
+summary: 'Una capa de privacidad de prueba de concepto para flujos con LLMs: detección de PII con Presidio, tokenización acotada a cada petición sobre una bóveda cifrada y rehidratación en el camino de vuelta — servicios en Go alrededor de un servicio de detección en Python.'
 ---
 
-## Descripción General
+## Resumen
 
-Augmenta es una capa de privacidad de prueba de concepto diseñada para flujos de trabajo con LLMs. Aborda una brecha real en los sistemas de IA en producción: la necesidad de manejar información de identificación personal (PII) de forma segura antes de que llegue a un modelo de lenguaje.
+Augmenta es una capa de privacidad de prueba de concepto para flujos de trabajo con LLMs; el propio repositorio se describe como un scaffold, y ese es el alcance honesto. Aborda una brecha real de los sistemas de IA en producción: qué hacer con la información de identificación personal (PII) antes de que llegue a un modelo de lenguaje.
 
-## Problema
+## El problema
 
-Enviar entradas de usuarios crudas a APIs de LLMs expone datos sensibles a servicios de terceros. La mayoría de los equipos manejan esto de forma ad hoc, o no lo hacen en absoluto. Augmenta explora un enfoque estructurado: detectar PII, anonimizarla de forma determinística, reenviar solo el texto limpio al modelo y luego rehidratar la respuesta antes de devolverla al cliente.
+Enviar la entrada cruda de un usuario a la API de un LLM expone datos sensibles a un servicio de terceros. La mayoría de los equipos resuelve esto de manera improvisada, o directamente no lo resuelve. Augmenta explora un enfoque estructurado: detectar la PII, reemplazar cada fragmento detectado por un token, enviar al modelo únicamente el texto tokenizado y rehidratar la respuesta antes de devolverla al cliente.
 
 ## Arquitectura
 
-El sistema está organizado como un conjunto de servicios enfocados:
+Cuatro servicios sobre Docker Compose, enrutados por inquilino y origen desde `configs/flows.yaml`:
 
-- **API de Ingesta**: Recibe la entrada cruda, ejecuta la detección de PII y orquesta el pipeline de anonimización.
-- **Anonimizador**: Reemplaza las entidades detectadas con pseudónimos estables, manteniendo la integridad referencial en conversaciones multi-turno.
-- **Gateway LLM**: Reenvía los prompts anonimizados al modelo objetivo. La PII cruda nunca llega a esta capa.
-- **Rehidratador**: Restaura los pseudónimos a los valores originales en la respuesta del modelo.
-- **Registro de auditoría**: Rastrea cada paso de transformación para observabilidad y cumplimiento.
+- **Servicio de ingesta (Go)**: recibe el webhook, resuelve el flujo del par inquilino/origen y coordina la detección, la escritura en la bóveda, la llamada al modelo y la rehidratación.
+- **Servicio de privacidad (Python / FastAPI)**: el único componente que ve el texto crudo. Microsoft Presidio detecta las entidades y cada fragmento detectado se reemplaza por un token posicional como `[[AUG:EMAIL_ADDRESS:1]]`.
+- **Bóveda (Go, DynamoDB)**: guarda la correspondencia entre token y valor original bajo cifrado de sobre — una clave de datos AES-GCM generada por inquilino y petición, envuelta a su vez por una clave maestra — con un tiempo de vida definido en el flujo.
+- **Gateway de LLM (Go)**: recibe solo texto tokenizado. En la versión publicada es un proveedor de eco que calcula el hash del prompt y expone un endpoint `/last`, para que las pruebas puedan verificar que ninguna PII cruzó ese límite.
 
-## Decisiones de Diseño
+Una interfaz de demostración en React envía una frase y muestra la tokenización, la llamada al gateway y la rehidratación de punta a punta. Un búfer circular en memoria conserva los 200 eventos más recientes de `anonymize`, `vault_put`, `llm_call` y `rehydrate`: solo recuentos y latencias, nunca el texto de origen ni la salida del modelo.
 
-- **Outputs estructurados**: Todas las respuestas de la API se validan con esquemas Pydantic para evitar que datos malformados se propaguen.
-- **Pseudónimos determinísticos**: La misma entidad se mapea al mismo pseudónimo dentro de una sesión, permitiendo una rehidratación coherente en multi-turno.
-- **Fronteras orientadas a servicios**: Cada preocupación está aislada detrás de una interfaz bien definida, haciendo los componentes testeables y reemplazables independientemente.
-- **Sin persistencia de datos por defecto**: La PII se mantiene solo en memoria durante la duración de una solicitud a menos que se configure explícitamente de otra manera.
+## Decisiones de diseño
+
+- **Tokens acotados a la petición**: las entidades se numeran por tipo dentro de una misma petición (`[[AUG:PERSON:1]]`, `[[AUG:PERSON:2]]`) y la correspondencia se guarda bajo ese identificador. La rehidratación es coherente para esa petición, pero los tokens no son estables entre peticiones y no existe una seudonimización que atraviese sesiones.
+- **Falla cerrada**: cada flujo declara `failClosed`. Si falla la detección, la escritura en la bóveda o la rehidratación, la petición devuelve un error con paso y código de motivo tipados, en lugar de degradarse en una llamada parcialmente anonimizada.
+- **Cifrado en reposo y con vencimiento**: los valores originales no quedan solo en memoria; se escriben cifrados en la bóveda, con un vencimiento de una hora en la configuración publicada. Un token vencido hace fallar la rehidratación en vez de devolverle un token al cliente sin avisar.
+- **Nunca registrar el contenido**: el servicio de privacidad registra el recuento de entidades y la latencia; el gateway registra un SHA-256 del prompt. Ninguno de los dos escribe el texto.
+- **Contratos tipados en cada salto**: modelos Pydantic en el servicio de privacidad, structs de Go y pasos de error tipados en la ruta de ingesta, de modo que una carga malformada falla en el límite y no más adelante.
+
+## Conclusiones
+
+Los problemas difíciles estaban en los límites entre servicios, no en la detección. De la detección se encarga Presidio; todo lo que la rodea es el trabajo de diseño. Qué ocurre cuando la escritura en la bóveda funciona pero la rehidratación se encuentra con un token vencido. Cuánto puede registrar una traza de auditoría antes de convertirse en la filtración que venía a evitar. Dónde queda realmente el límite de confianza cuando hay un tercer servicio en el camino, y qué le está permitido registrar a un servicio que vio texto crudo.

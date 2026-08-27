@@ -1,6 +1,6 @@
 import type { StageProps } from '../StageFrame';
+import { ForecastStage } from './ForecastStage';
 import { InterferenceStage } from './InterferenceStage';
-import { NetworkStage } from './NetworkStage';
 import { RoutingStage } from './RoutingStage';
 import { SignalPathStage } from './SignalPathStage';
 import { WaveformStage } from './WaveformStage';
@@ -14,8 +14,8 @@ import { WaveformStage } from './WaveformStage';
  */
 export function DomainStage({ domain, active }: StageProps) {
   switch (domain.stage) {
-    case 'network':
-      return <NetworkStage domain={domain} active={active} />;
+    case 'forecast':
+      return <ForecastStage domain={domain} active={active} />;
     case 'interference':
       return <InterferenceStage domain={domain} active={active} />;
     case 'routing':

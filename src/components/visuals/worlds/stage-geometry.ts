@@ -28,11 +28,6 @@ export interface Point {
   readonly y: number;
 }
 
-export interface Edge {
-  readonly a: number;
-  readonly b: number;
-}
-
 /**
  * Linear congruential generator (Numerical Recipes constants).
  *
@@ -48,99 +43,96 @@ export function createRandom(seed: number): () => number {
   };
 }
 
+/* ===========================================================================
+   FORECAST GEOMETRY — the AI / ML stage
+
+   The stage this replaced drew projected points joined to their nearest
+   neighbours. The objection that retired it was not the cliché: *adjacency is
+   a property of any point set, so nothing had been learned and nothing was
+   being shown.* What is drawn now is a forecast and its calibrated prediction
+   interval — the one relationship an ML picture can state without a caption
+   and without lying: **uncertainty grows with horizon.**
+   ======================================================================== */
+
 /**
- * Mitchell's best-candidate sampling: for each new point, propose a few and
- * keep the one furthest from everything already placed.
+ * The realised series the AI stage draws, as a deterministic function of
+ * normalised time.
  *
- * A uniform random scatter clumps, which reads as noise; a regular lattice
- * reads as a table. Best-candidate lands where an embedding projection
- * actually lands — evenly spread but not aligned.
+ * Three sinusoids over a slow carrier. Not noise, and not a single sine: a
+ * forecastable series has to carry structure a model could plausibly have
+ * learned, or a band drawn over it means nothing. Amplitude stays inside
+ * roughly `±0.8` so the caller maps it with one constant.
  */
-export function scatterPoints(
-  count: number,
-  seed: number,
-  bounds: { readonly x: number; readonly y: number; readonly width: number; readonly height: number },
-  candidates = 12,
-): Point[] {
-  const random = createRandom(seed);
-  const points: Point[] = [];
-  const total = Math.max(0, Math.trunc(count));
-
-  for (let i = 0; i < total; i += 1) {
-    let best: Point = { x: bounds.x, y: bounds.y };
-    let bestDistance = -1;
-
-    for (let c = 0; c < candidates; c += 1) {
-      const candidate: Point = {
-        x: bounds.x + random() * bounds.width,
-        y: bounds.y + random() * bounds.height,
-      };
-      let nearest = Number.POSITIVE_INFINITY;
-      for (const placed of points) {
-        const distance = (placed.x - candidate.x) ** 2 + (placed.y - candidate.y) ** 2;
-        if (distance < nearest) nearest = distance;
-      }
-      if (nearest > bestDistance) {
-        bestDistance = nearest;
-        best = candidate;
-      }
-    }
-
-    points.push(best);
-  }
-
-  return points;
+export function forecastSignal(t: number): number {
+  const x = Number.isFinite(t) ? t : 0;
+  const tau = Math.PI * 2;
+  return (
+    0.3 * Math.sin(tau * 2.15 * x + 1.05) +
+    0.16 * Math.sin(tau * 4.6 * x + 2.7) +
+    0.07 * Math.sin(tau * 8.3 * x + 0.4) -
+    0.22 * Math.cos(tau * 0.85 * x)
+  );
 }
 
 /**
- * Connects every point to its `k` nearest neighbours, de-duplicated so an edge
- * is drawn once rather than twice. This is what makes the AI stage read as a
- * *relation* graph rather than as loose dots.
+ * Half-width of a prediction interval at a given forecast horizon:
+ * `base + span · horizon^exponent`.
+ *
+ * With `exponent < 1` the interval is already non-zero at the origin and
+ * widens *concavely*. That is what a calibrated interval actually looks like —
+ * residuals are not zero one step ahead, and their spread grows sublinearly
+ * rather than fanning out as a straight cone.
+ *
+ * It says nothing about how the interval was obtained, and that is deliberate.
+ * `energy-demand-forecast` calibrates by **split conformal prediction**, not by
+ * fitting one model per quantile (quantile regression is Future Work in that
+ * repository, and the case study was corrected for claiming otherwise). A
+ * single band that widens with horizon is true of either method; a *family* of
+ * per-quantile curves would assert the one that is false.
  */
-export function nearestNeighbourEdges(points: readonly Point[], k: number): Edge[] {
-  const edges: Edge[] = [];
-  const seen = new Set<string>();
+export function bandHalfWidth(horizon: number, base: number, span: number, exponent: number): number {
+  const h = Number.isFinite(horizon) ? Math.min(1, Math.max(0, horizon)) : 0;
+  const power = Number.isFinite(exponent) && exponent > 0 ? exponent : 1;
+  return base + span * Math.pow(h, power);
+}
 
-  points.forEach((point, index) => {
-    const ranked = points
-      .map((other, otherIndex) => ({
-        index: otherIndex,
-        distance: (other.x - point.x) ** 2 + (other.y - point.y) ** 2,
-      }))
-      .filter((entry) => entry.index !== index)
-      .sort((left, right) => left.distance - right.distance)
-      .slice(0, Math.max(0, Math.trunc(k)));
-
-    for (const entry of ranked) {
-      const a = Math.min(index, entry.index);
-      const b = Math.max(index, entry.index);
-      const key = `${a}:${b}`;
-      if (seen.has(key)) continue;
-      seen.add(key);
-      edges.push({ a, b });
-    }
-  });
-
-  return edges;
+/** A sampled series as an SVG polyline. */
+export function polylinePath(points: readonly Point[]): string {
+  return points
+    .map((point, index) => `${index === 0 ? 'M' : 'L'}${point.x.toFixed(2)} ${point.y.toFixed(2)}`)
+    .join(' ');
 }
 
 /**
- * Index of the point closest to `(x, y)`.
- *
- * Answers 0 for an empty list so callers can index without a guard under
- * `noUncheckedIndexedAccess`; they render nothing in that case anyway.
+ * A closed ribbon between an upper and a lower edge — the filled area of a
+ * prediction interval. Out along the top, back along the bottom, closed.
  */
-export function nearestPointIndex(points: readonly Point[], x: number, y: number): number {
-  let bestIndex = 0;
-  let bestDistance = Number.POSITIVE_INFINITY;
-  points.forEach((point, index) => {
-    const distance = (point.x - x) ** 2 + (point.y - y) ** 2;
-    if (distance < bestDistance) {
-      bestDistance = distance;
-      bestIndex = index;
-    }
-  });
-  return bestIndex;
+export function ribbonPath(upper: readonly Point[], lower: readonly Point[]): string {
+  if (upper.length === 0 || lower.length === 0) return '';
+  const back = lower
+    .slice()
+    .reverse()
+    .map((point) => `L${point.x.toFixed(2)} ${point.y.toFixed(2)}`);
+  return `${polylinePath(upper)} ${back.join(' ')} Z`;
+}
+
+/**
+ * Linear interpolation into a fixed sample table, `t` in `0 → 1`.
+ *
+ * Lets a short table of residuals stand in for a continuous noise process. The
+ * table is generated once from {@link createRandom}, so the realised series is
+ * byte-identical on the server and after hydration.
+ */
+export function interpolateAt(values: readonly number[], t: number): number {
+  if (values.length === 0) return 0;
+  const first = values[0] ?? 0;
+  if (values.length === 1) return first;
+  const clamped = Number.isFinite(t) ? Math.min(1, Math.max(0, t)) : 0;
+  const position = clamped * (values.length - 1);
+  const index = Math.min(values.length - 2, Math.floor(position));
+  const a = values[index] ?? 0;
+  const b = values[index + 1] ?? 0;
+  return a + (b - a) * (position - index);
 }
 
 /**

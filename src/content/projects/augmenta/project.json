@@ -3,9 +3,9 @@
   "status": "published",
   "featured": true,
   "domains": ["ai"],
-  "stack": ["Privacy", "LLM", "Python", "FastAPI", "Docker", "Applied AI"],
+  "stack": ["Privacy", "LLM", "Go", "Python", "FastAPI", "Presidio", "DynamoDB", "Docker", "Applied AI"],
   "links": {
     "github": "https://github.com/lburdman/augmenta"
   },
-  "order": 1
+  "order": 30
 }

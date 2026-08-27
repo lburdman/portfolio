@@ -5,8 +5,13 @@ import { DomainStage } from './stages/DomainStage';
 import {
   activeIndexFromProgress,
   clampIndex,
+  FINALE_DWELL,
   nextIndexForKey,
+  pinnedScrollLength,
   scrollTargetForIndex,
+  SCROLL_PER_STEP,
+  TRAVEL_SHARE,
+  travelProgress,
   TRAVERSE_LENGTH,
   TRAVERSE_SEQUENCE,
 } from './traverse';
@@ -33,9 +38,11 @@ import { REDUCED_MOTION_QUERY, TRAVERSE_QUERY, useMediaQuery } from './useMediaQ
  *    whatever carries that attribute and stops its loop while it is on screen,
  *    which is what enforces "at most one expensive visual at a time"
  *    (MOTION_SYSTEM §4). It is server-rendered, and that is the point: this
- *    island hydrates on `client:visible`, so an attribute added at hydration
- *    time could be missed entirely by a hero that queried for it at first
- *    paint. It sits here rather than on the `<section>` only because
+ *    island hydrates on `client:media`, so on a phone, a short window or with
+ *    reduced motion it never hydrates at all. An attribute added at hydration
+ *    time would simply not exist for those visitors, and the hero's canvas
+ *    would keep running behind this band with nothing reporting the problem.
+ *    It sits here rather than on the `<section>` only because
  *    `ui/Section.astro` does not spread undeclared props — see the note in
  *    `home/TechnicalWorlds.astro`. This island never reads it back and never
  *    knows whether anyone is listening.
@@ -61,6 +68,11 @@ import { REDUCED_MOTION_QUERY, TRAVERSE_QUERY, useMediaQuery } from './useMediaQ
  * reader with JavaScript disabled gets, and it is also the reduced-motion and
  * the mobile composition. The traverse is an attribute set on the root by an
  * effect after mount. It moves DOM that already exists; it never creates it.
+ *
+ * Since the wrapper moved to `client:media`, three of those four cases never
+ * receive this file at all — the stack is not a fallback they degrade to, it
+ * is the whole of what they were sent. Nothing below may become load-bearing
+ * for content.
  *
  * ── NO SCROLL-JACKING ──────────────────────────────────────────────────────
  * There is no wheel handler, no touch handler and no momentum. ScrollTrigger
@@ -144,7 +156,17 @@ export default function TechnicalWorlds({ t }: TechnicalWorldsProps) {
     let cancelled = false;
     let handle: StageHandle | null = null;
 
+    /* How far the track travels. The `.tw-track::after` spacer makes this
+       exactly `(TRAVERSE_LENGTH - 1)` panel pitches rather than the ~3.5%-per-
+       step short measure it used to be — see the long note beside that rule in
+       `home/TechnicalWorlds.astro` for what that mis-registration produced. */
     const distance = () => Math.max(0, track.scrollWidth - viewport.clientWidth);
+
+    /* How much scrolling that travel costs, which is now a separate question
+       (see the budget block in `traverse.ts`). `window.innerHeight` rather
+       than the band's own height: the band IS the viewport height while
+       pinned, so reading it back would be circular. */
+    const scrollLength = () => pinnedScrollLength(window.innerHeight);
 
     void (async () => {
       const [{ gsap }, { ScrollTrigger }] = await Promise.all([import('gsap'), import('gsap/ScrollTrigger')]);
@@ -161,13 +183,27 @@ export default function TechnicalWorlds({ t }: TechnicalWorldsProps) {
 
       gsap.registerPlugin(ScrollTrigger);
 
-      const tween = gsap.to(track, {
-        x: () => -distance(),
-        ease: 'none',
+      /* A timeline rather than a single tween, because the pinned range now has
+         two parts and only the first of them moves.
+
+           [ travel: the track slides (TRAVERSE_LENGTH - 1) panels ][ hold ]
+
+         The hold is an empty tween on a throwaway object — GSAP's own idiom for
+         reserving time — and with `scrub: true` reserving timeline time is
+         reserving *scroll distance*. So the last world stays parked at the
+         viewport's left edge for `FINALE_DWELL` screens of scrolling before the
+         pin lets go, instead of arriving on the frame the pin released.
+
+         The two durations are in the same units as the budget in `traverse.ts`
+         (viewport heights), so the timeline's shape and the scroll length it is
+         mapped onto are derived from one pair of numbers. */
+      const timeline = gsap.timeline({
         scrollTrigger: {
           trigger: band,
           start: 'top top',
-          end: () => `+=${distance()}`,
+          // Not `distance()`. How far the track moves and how much scrolling
+          // that should cost are different questions; this answers the second.
+          end: () => `+=${scrollLength()}`,
           pin: band,
           pinSpacing: true,
           anticipatePin: 1,
@@ -181,18 +217,29 @@ export default function TechnicalWorlds({ t }: TechnicalWorldsProps) {
           },
           onUpdate: (self) => {
             rangeRef.current = { start: self.start, end: self.end };
-            setActiveIndex(activeIndexFromProgress(self.progress, TRAVERSE_LENGTH));
+            // Through `travelProgress` first: during the hold, scroll progress
+            // keeps advancing and the track does not, so raw progress would
+            // report a sixth stop that does not exist.
+            setActiveIndex(activeIndexFromProgress(travelProgress(self.progress), TRAVERSE_LENGTH));
           },
         },
       });
 
-      const trigger = tween.scrollTrigger;
+      timeline
+        .to(track, {
+          x: () => -distance(),
+          ease: 'none',
+          duration: (TRAVERSE_LENGTH - 1) * SCROLL_PER_STEP,
+        })
+        .to({}, { duration: FINALE_DWELL });
+
+      const trigger = timeline.scrollTrigger;
       if (trigger) rangeRef.current = { start: trigger.start, end: trigger.end };
 
       handle = {
         kill: () => {
           trigger?.kill(true);
-          tween.kill();
+          timeline.kill();
         },
       };
       setEngaged(true);
@@ -259,7 +306,10 @@ export default function TechnicalWorlds({ t }: TechnicalWorldsProps) {
      the two can never disagree about where the traverse is. */
   const goTo = useCallback((index: number) => {
     const { start, end } = rangeRef.current;
-    const target = scrollTargetForIndex(index, TRAVERSE_LENGTH, start, end);
+    // `TRAVEL_SHARE` because the stops all live in the travelling part of the
+    // range. Without it, End would land in the middle of the finale's hold and
+    // Home would still be correct, which is the worst kind of half-right.
+    const target = scrollTargetForIndex(index, TRAVERSE_LENGTH, start, end, TRAVEL_SHARE);
     window.scrollTo({ top: target, behavior: 'smooth' });
     setActiveIndex(clampIndex(index, TRAVERSE_LENGTH));
   }, []);

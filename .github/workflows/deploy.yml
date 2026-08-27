@@ -58,11 +58,45 @@ jobs:
       - name: Type check
         run: npm run type-check
 
+      # Build before the tests, mirroring `npm run verify`.
+      #
+      # Two suites read `dist/`. They do NOT depend on this step: `dist/` is
+      # built for them by `tests/global-setup.ts`, once, with the Vite/Vitest
+      # environment stripped back out — without that a build spawned from
+      # inside a worker inherits `BASE_URL=/` and emits a site with no
+      # deployment base at all. This step's value is that a broken build fails
+      # here, under its own name, instead of surfacing as a confusing failure
+      # inside the test gate.
+      #
+      # Yes, this means the site is built more than once per run. Correctness
+      # beats twenty seconds.
+      - name: Build site
+        run: npm run build
+        env:
+          NODE_ENV: production
+
       # `test:coverage`, not `test`: the thresholds in vitest.config.ts only
       # gate anything if the gate runs them. A decorative threshold is worse
       # than none — it reads as protection that is not there.
       - name: Test (with coverage thresholds)
         run: npm run test:coverage
+
+      # Content validation, including NETWORK liveness of every external
+      # project link.
+      #
+      # This runs because the site shipped with three of its four "View on
+      # GitHub" links pointing at repositories that do not exist. The schema
+      # validated that a URL was well-formed and never asked whether anything
+      # was there. Every gate was green while a recruiter clicking three of
+      # four projects got a 404.
+      #
+      # It is deliberately the live check rather than `--offline`: a link
+      # checker that never touches the network cannot catch the bug it exists
+      # to catch. If GitHub rate-limits a run, switch this one step to
+      # `npm run project:validate:offline` and fix it properly — do not delete
+      # the step.
+      - name: Validate project content and links
+        run: npm run project:validate
 
   # ─── Build (gated on CI) ──────────────────────────────────────────────────
   build:

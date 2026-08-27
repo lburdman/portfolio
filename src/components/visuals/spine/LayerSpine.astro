@@ -12,31 +12,149 @@
  *     signals       ∿∿∿∿∿∿∿      continuous wave
  *
  * It is the site's thesis rendered as one line, and it costs almost nothing:
- * ONE inline SVG plus CSS. No canvas, no library, no per-frame JavaScript.
- * The only thing that moves is a scroll-linked progress indicator, and that is
- * a CSS scroll-driven animation — not a scroll event handler.
+ * inline SVG plus CSS. No canvas, no library, no JavaScript at all — the only
+ * thing that moves is a scroll-linked progress indicator, and that is a CSS
+ * scroll-driven animation rather than a scroll event handler.
  *
- * ── Two implementation decisions worth knowing ──────────────────────────────
+ * ═══════════════════════════════════════════════════════════════════════════
+ * WHAT PASS 2 CHANGED, AND WHY
+ * ═══════════════════════════════════════════════════════════════════════════
  *
- * **Why every shape oscillates horizontally.** The SVG stretches vertically to
- * whatever height the page turns out to be (`preserveAspectRatio="none"`), so
- * anything whose *proportions* matter would distort. Expressing amplitude on
- * the x-axis makes the geometry stretch-invariant: vertical stretch only
- * lengthens a period, it never deforms a shape. `vector-effect` keeps the
- * stroke and the dash pattern hairline at any scale, for the same reason.
+ * ── 1. The notation now annotates something ────────────────────────────────
  *
- * **Why it is hidden below 1180px.** Below that width there is no left margin
- * to put it in; forcing it there would crowd the text it is meant to annotate.
- * That is a deliberate call, not an oversight (brief §33).
+ * The previous spine was ONE SVG of `SEG * 5` units stretched over the whole
+ * of `<main>`, so each layer occupied a fifth of the DOCUMENT HEIGHT. Since
+ * the pinned Technical Worlds traverse alone is ~40% of the document, the
+ * "computation" band sat beside Selected Projects and "signals" beside the
+ * footer. The glyphs were correct and pointed at nothing — measured as 0px of
+ * change over 1.2s, because a reader scrolling a whole section never saw the
+ * geometry turn over.
+ *
+ * Each band is now bound to the SECTION it annotates. Which mapping is honest
+ * took some deciding, because the five geometries are the five ENGINEERING
+ * LAYERS (`DOMAINS` order) and the five sections are a different list
+ * (`SECTION_IDS`: hero, layers, worlds, projects, contact). Pairing them by
+ * index would put "signals" beside Contact — the same category error as
+ * before, merely re-based.
+ *
+ * So the mapping is by what each section actually does:
+ *
+ *   #hero      an implied line. The thesis is STATED here, not traced; the
+ *              dotted connector says the descent has not started.
+ *   #layers    the full five-geometry sequence, stretched over the ONE section
+ *              that names the five layers, in `DOMAINS` order. This is where
+ *              the notation earns its place: the glyph beside "digital logic"
+ *              is now clock edges, and it is clock edges because that row is
+ *              on screen — not because the reader happens to be 40% down the
+ *              document.
+ *   #worlds    occluded. See the note below; this is a decision, not an
+ *              oversight.
+ *   #projects  a plain rule. Projects are the evidence, not a layer. Ticks
+ *              here would annotate nothing, which is the defect being fixed.
+ *   #contact   a plain rule, terminated. The line ends rather than stopping.
+ *
+ * Registration inside `#layers` is to the SECTION, not to individual rows: the
+ * section's own heading and narrative occupy its first stretch, so the five
+ * fifths run a little ahead of the five rows. Fixing that would mean putting a
+ * band inside each row, which is a change to `LayersSequence.astro`. What was
+ * measured as broken — a geometry sitting beside an unrelated section — is
+ * fixed; sub-section registration is a further refinement, and it is named
+ * here rather than quietly implied.
+ *
+ * ── Why the Technical Worlds band has no visible spine ─────────────────────
+ *
+ * Measured, then decided. That band is the one place the ground inverts, and
+ * it is full-bleed: the `<section>` paints `--color-ink` from x=0 to the
+ * viewport edge, its content measure is `--container-wide` (1408px), and the
+ * traverse slides panels with `overflow: visible`, so text reaches x=48 at
+ * 1440px and x=32 at 1180px. The spine sits at x=104–144 at 1440px. Rendering
+ * it above the ink puts a hairline straight through the panel headings and
+ * body copy — screenshotted, and it is as bad as it sounds. Moving it to the
+ * page edge would make the site's signature element teleport sideways once per
+ * scroll, and no width below ~1500px leaves room for it there anyway.
+ *
+ * So the line goes behind the ink and comes out below it, which is also what
+ * the concept says: MOTION_SYSTEM §3 calls that band "looking into the
+ * instrument", and a notebook margin does not exist inside an instrument. The
+ * band already reports position with its own progress ticks and per-world
+ * accent, so nothing is lost that the reader needed. The band element is still
+ * rendered, carrying the plain rule, so the line is continuous the moment that
+ * section ever gains a gutter.
+ *
+ * ── 2. How the binding is done: CSS grid, still zero JavaScript ────────────
+ *
+ * `<main>` becomes a single-column grid, each section is assigned an explicit
+ * row, and each spine band is assigned the SAME row. A grid row is exactly as
+ * tall as the section in it, so a band cannot drift out of alignment no matter
+ * how the content grows — no measurement, no `ResizeObserver`, no CSS
+ * variables written from script.
+ *
+ * `.spine` itself is `display: contents`, so it contributes no box and its
+ * children become grid items of `<main>` directly.
+ *
+ * Two details make the selectors look stranger than they are:
+ *
+ *   · `:has(> #worlds)` — ScrollTrigger pins `<section id="worlds">` by
+ *     wrapping it in a `.pin-spacer` div at runtime, so after the traverse is
+ *     built that section is no longer a child of `<main>`. Matching the
+ *     wrapper as well as the section keeps the row assignment correct in both
+ *     states. `nth-of-type` would have silently shifted every row after it.
+ *   · `main:has(> [data-layer-spine])` — the grid applies only to a page that
+ *     actually renders a spine (the homepage), and the specificity of the
+ *     `:has()` clears `BaseLayout`'s own `main` rule regardless of the order
+ *     the two stylesheets end up in.
+ *
+ * ── 3. Amplitude and value ─────────────────────────────────────────────────
+ *
+ * It was 24px wide and drawn entirely at `--color-rule`, which measured 99% of
+ * its pixels at L >= 207 — a 1px non-scaling stroke on a stretched path lands
+ * on half-pixels and antialiases away to almost nothing. It is now 40px wide
+ * at 1320px and up, and the geometry is drawn at `--color-slate` (5.38:1 on
+ * paper) with a 1.5px stroke. `--color-rule` (3.07:1) is kept for the
+ * connector and the boundaries, which are the subordinate marks.
+ *
+ * ── 4. Why the progress marker was not moving ──────────────────────────────
+ *
+ * `animation: spine-progress linear both` sets `animation-duration` to `0s`
+ * through the shorthand, and a scroll-driven animation with a zero duration
+ * finishes at progress 0 and never advances. Measured: 0px of travel between
+ * scroll top and scroll bottom. The longhands below set
+ * `animation-duration: auto`, which is what binds an animation to the whole
+ * length of its timeline.
+ *
+ * ── 5. Why it is still hidden below 1180px ─────────────────────────────────
+ *
+ * Re-examined rather than inherited. Below that width there is no left margin
+ * to put it in: at 1180px the content measure already begins at x=14 and its
+ * text at x=46, and the spine occupies 12–38. Forcing it onto a phone would
+ * mean drawing it over the text it is meant to annotate — and the mobile
+ * composition already carries the per-world coloured left rule that does this
+ * job at that size (REDESIGN_DECISIONS, "confirmed good — do not regress").
+ * What DID change is that the width is now responsive: 26px in the cramped
+ * 1180–1320 range, 40px above it. Amplitude is expressed on the x-axis, so a
+ * narrower box compresses the geometry instead of clipping it.
+ *
+ * ── Two implementation decisions carried over ──────────────────────────────
+ *
+ * **Why every shape oscillates horizontally.** Each band's SVG stretches
+ * vertically to whatever height its section turns out to be
+ * (`preserveAspectRatio="none"`), so anything whose *proportions* matter would
+ * distort. Expressing amplitude on the x-axis makes the geometry
+ * stretch-invariant: vertical stretch only lengthens a period, it never
+ * deforms a shape. `vector-effect` keeps the stroke and the dash pattern
+ * hairline at any scale, for the same reason.
  *
  * The path data is generated at build time in this frontmatter. It ships as
  * static SVG — nothing below runs in a browser.
  */
 
+import { SECTION_IDS } from '@/config/navigation';
+
 /** Spine centre and layer height, in viewBox units. */
-const CX = 12;
+const CX = 20;
+const W = 40;
 const SEG = 200;
-const HEIGHT = SEG * 5;
+const SEQUENCE_HEIGHT = SEG * 5;
 
 const n = (value: number): string => Number(value.toFixed(2)).toString();
 
@@ -78,115 +196,273 @@ function ticks(points: readonly (readonly [number, number])[], half: number): st
 
 /* --- 00 · models — discrete nodes on a dotted connector -------------------- */
 const NODE_YS = [26, 58, 90, 122, 154, 186] as const;
-const nodesConnector = `M ${CX} 0 L ${CX} ${SEG}`;
 const nodes = ticks(
   NODE_YS.map((y) => [CX, y] as const),
-  6,
+  10,
 );
 
 /* --- 01 · computation — interference, four full cycles --------------------- */
-const computation = sine(SEG, 6, 50);
+const computation = sine(SEG, 11, 50);
 
 /* --- 02 · digital logic — clock edges -------------------------------------- */
-const logic = clock(SEG * 2, 5, 50);
+const logic = clock(SEG * 2, 9, 50);
 
 /* --- 03 · hardware — routed traces. Vertices are vertical or exactly 45°. -- */
 const ROUTE = [
-  [12, 600],
-  [12, 612],
-  [18, 618],
-  [18, 646],
-  [7, 657],
-  [7, 684],
-  [16, 693],
-  [16, 720],
-  [10, 726],
-  [10, 758],
-  [15, 763],
-  [15, 783],
-  [12, 789],
-  [12, 800],
+  [20, 600],
+  [20, 612],
+  [31, 623],
+  [31, 646],
+  [10, 667],
+  [10, 684],
+  [27, 701],
+  [27, 720],
+  [15, 732],
+  [15, 758],
+  [25, 768],
+  [25, 783],
+  [20, 788],
+  [20, 800],
 ] as const satisfies readonly (readonly [number, number])[];
 
 const hardware = `M ${ROUTE.map(([x, y]) => `${n(x)} ${n(y)}`).join(' L ')}`;
 const vias = ticks(
   [
-    [18, 632],
-    [7, 670],
-    [16, 706],
-    [10, 742],
+    [31, 634],
+    [10, 675],
+    [27, 710],
+    [15, 745],
   ] as const,
-  3,
+  5,
 );
 
 /* --- 04 · signals — a denser continuous wave, eight full cycles ------------ */
-const signals = sine(SEG * 4, 4, 25, 3);
+const signals = sine(SEG * 4, 8, 25, 3);
 
-/* --- layer boundaries ------------------------------------------------------ */
+/* --- the spine's own structure -------------------------------------------- */
+
+/** The connector every band shares: one vertical run down the centre. */
+const connector = (height: number): string => `M ${CX} 0 L ${CX} ${n(height)}`;
+
+/** Boundaries between the five layers of a sequence band. */
 const boundaries = ticks(
   [1, 2, 3, 4].map((i) => [CX, SEG * i] as const),
-  9,
+  15,
 );
+
+/** Origin mark at the head of the spine, and its terminator at the foot. */
+const ORIGIN_HEIGHT = 120;
+const originTick = ticks([[CX, 6]] as const, 15);
+const terminatorTick = ticks([[CX, ORIGIN_HEIGHT - 6]] as const, 15);
+
+/**
+ * The section each band is bound to, in `SECTION_IDS` order. Destructured from
+ * the config rather than written out: `SECTION_IDS` is a fixed-length readonly
+ * tuple, so dropping a section makes this line a compile error instead of
+ * leaving a band bound to nothing. Renaming one is not caught here — the row
+ * selectors in the stylesheet below carry the same five ids, and CSS cannot
+ * read a TypeScript constant. `tests/anchors.test.ts` already fails if a
+ * section id loses its anchor, which is the same rename.
+ */
+const [HERO, LAYERS, WORLDS, PROJECTS, CONTACT] = SECTION_IDS;
 ---
 
 <div class="spine" data-layer-spine aria-hidden="true">
-  <svg class="spine__svg" viewBox={`0 0 24 ${HEIGHT}`} preserveAspectRatio="none" focusable="false">
-    <path class="spine__connector" d={nodesConnector}></path>
-    <path class="spine__stroke" d={nodes}></path>
-    <path class="spine__stroke" d={computation}></path>
-    <path class="spine__stroke" d={logic}></path>
-    <path class="spine__stroke" d={hardware}></path>
-    <path class="spine__stroke" d={vias}></path>
-    <path class="spine__stroke" d={signals}></path>
-    <path class="spine__boundary" d={boundaries}></path>
-  </svg>
-  <span class="spine__marker"></span>
+  {/* 00 — the thesis is stated, not yet traced. */}
+  <div class="spine__band" data-band={HERO}>
+    <svg class="spine__svg" viewBox={`0 0 ${W} ${ORIGIN_HEIGHT}`} preserveAspectRatio="none" focusable="false">
+      <path class="spine__connector" d={connector(ORIGIN_HEIGHT)}></path>
+      <path class="spine__boundary" d={originTick}></path>
+    </svg>
+  </div>
+
+  {/* 01 — the five layers, named. One geometry per fifth, in DOMAINS order. */}
+  <div class="spine__band" data-band={LAYERS}>
+    <svg class="spine__svg" viewBox={`0 0 ${W} ${SEQUENCE_HEIGHT}`} preserveAspectRatio="none" focusable="false">
+      <path class="spine__connector" d={connector(SEG)}></path>
+      <path class="spine__stroke" d={nodes}></path>
+      <path class="spine__stroke" d={computation}></path>
+      <path class="spine__stroke" d={logic}></path>
+      <path class="spine__stroke" d={hardware}></path>
+      <path class="spine__stroke" d={vias}></path>
+      <path class="spine__stroke" d={signals}></path>
+      <path class="spine__boundary" d={boundaries}></path>
+    </svg>
+  </div>
+
+  {
+    /* 02 — the run continues behind the ink ground. See the note in the header:
+      this band is deliberately occluded, and is kept so that the line is
+      continuous the moment that band ever stops being full-bleed. */
+  }
+  <div class="spine__band" data-band={WORLDS}>
+    <svg class="spine__svg" viewBox={`0 0 ${W} ${ORIGIN_HEIGHT}`} preserveAspectRatio="none" focusable="false">
+      <path class="spine__rule" d={connector(ORIGIN_HEIGHT)}></path>
+    </svg>
+  </div>
+
+  {/* 03 / 04 — evidence and close. Not layers, so no notation is claimed. */}
+  <div class="spine__band" data-band={PROJECTS}>
+    <svg class="spine__svg" viewBox={`0 0 ${W} ${ORIGIN_HEIGHT}`} preserveAspectRatio="none" focusable="false">
+      <path class="spine__rule" d={connector(ORIGIN_HEIGHT)}></path>
+    </svg>
+  </div>
+
+  <div class="spine__band" data-band={CONTACT}>
+    <svg class="spine__svg" viewBox={`0 0 ${W} ${ORIGIN_HEIGHT}`} preserveAspectRatio="none" focusable="false">
+      <path class="spine__rule" d={connector(ORIGIN_HEIGHT)}></path>
+      <path class="spine__boundary" d={terminatorTick}></path>
+    </svg>
+  </div>
+
+  <div class="spine__track"><span class="spine__marker"></span></div>
 </div>
 
 <style>
-  .spine {
-    position: absolute;
-    inset-block: 0;
-    /* Sits in the gutter between the viewport edge and the content measure. */
-    left: clamp(1.5rem, calc((100vw - var(--container-content)) / 2 - 3.5rem), 7rem);
-    width: 24px;
+  /* --- placement -----------------------------------------------------------
+     Hidden by default. Everything below, including the grid imposed on
+     `<main>`, is switched on together at the one breakpoint — so a viewport
+     that never shows the spine never has its layout touched either.
+     ---------------------------------------------------------------------- */
+  .spine,
+  .spine__track {
     display: none;
-    pointer-events: none;
-    color: var(--color-rule);
-    z-index: 0;
   }
 
   @media (min-width: 1180px) {
+    /* `<main>` becomes the single-column grid the bands share with the
+       sections. `:has(> [data-layer-spine])` scopes it to pages that render a
+       spine and outranks BaseLayout's own bare `main` rule. */
+    :global(main:has(> [data-layer-spine])) {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr);
+      /* Five EXPLICIT rows, one per `SECTION_IDS` entry. Declaring them rather
+         than letting them be implicit is what makes `grid-row: 1 / -1` on the
+         progress track mean "the whole run": `-1` resolves against the explicit
+         grid only, so with implicit rows the track collapsed to the height of
+         row 1 and the marker travelled 736px of 8676. Measured. */
+      grid-template-rows: repeat(5, auto);
+    }
+
+    /* Every laid-out child shares the one column; the sections and the bands
+       are then paired by explicit row below. `.pin-spacer` is matched through
+       `:has(> #id)` because ScrollTrigger wraps the pinned section at runtime. */
+    :global(main:has(> [data-layer-spine]) > *) {
+      grid-column: 1;
+      min-width: 0;
+    }
+
     .spine {
+      /* No box of its own: the bands are grid items of `<main>` directly. */
+      display: contents;
+      color: var(--color-rule);
+    }
+
+    /* `grid-column` has to be declared here rather than picked up from the
+       `main > *` rule above: `display: contents` promotes these to grid ITEMS
+       of `<main>`, but they remain DOM grandchildren, so no `main > *`
+       selector reaches them. Without it they auto-place into implicit columns
+       and squeeze the sections — measured, not theorised. */
+    .spine__band,
+    .spine__track {
+      position: relative;
+      z-index: 0;
+      grid-column: 1;
+      justify-self: start;
+      width: 26px;
+      margin-inline-start: clamp(0.75rem, calc((100vw - var(--container-content)) / 2 - 4.5rem), 7rem);
+      pointer-events: none;
+      color: var(--color-rule);
+    }
+
+    .spine__track {
       display: block;
+    }
+
+    @media (min-width: 1320px) {
+      .spine__band,
+      .spine__track {
+        width: 40px;
+      }
+    }
+
+    /* Absolute, so a band contributes nothing to the height of the row it
+       shares with its section — the section alone sizes the row. */
+    .spine__svg {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
     }
   }
 
-  .spine__svg {
-    width: 24px;
-    height: 100%;
+  /* --- band <-> section row pairing ---------------------------------------
+     The whole point of the rewrite. Row N holds section N and the band bound
+     to it, so the band is exactly as tall as what it annotates.
+     ---------------------------------------------------------------------- */
+  @media (min-width: 1180px) {
+    :global(main:has(> [data-layer-spine]) > :is(#hero, :has(> #hero))),
+    .spine__band[data-band='hero'] {
+      grid-row: 1;
+    }
+
+    :global(main:has(> [data-layer-spine]) > :is(#layers, :has(> #layers))),
+    .spine__band[data-band='layers'] {
+      grid-row: 2;
+    }
+
+    :global(main:has(> [data-layer-spine]) > :is(#worlds, :has(> #worlds))),
+    .spine__band[data-band='worlds'] {
+      grid-row: 3;
+    }
+
+    :global(main:has(> [data-layer-spine]) > :is(#projects, :has(> #projects))),
+    .spine__band[data-band='projects'] {
+      grid-row: 4;
+    }
+
+    :global(main:has(> [data-layer-spine]) > :is(#contact, :has(> #contact))),
+    .spine__band[data-band='contact'] {
+      grid-row: 5;
+    }
+
+    /* The progress track spans the whole run, so the marker is continuous
+       across the five bands — except where the ink band paints over it, which
+       is the one deliberate interruption (see the header note). */
+    .spine__track {
+      grid-row: 1 / -1;
+    }
   }
 
+  /* --- marks ---------------------------------------------------------------- */
   .spine__stroke,
   .spine__connector,
-  .spine__boundary {
+  .spine__boundary,
+  .spine__rule {
     fill: none;
     stroke: currentColor;
-    stroke-width: 1;
     stroke-linecap: round;
     stroke-linejoin: round;
     /* Keeps hairlines hairline, and dash patterns uniform, at any stretch. */
     vector-effect: non-scaling-stroke;
   }
 
-  /* The models layer is discrete: the connector between nodes is implied. */
-  .spine__connector {
-    stroke-dasharray: 1 9;
-    opacity: 0.5;
+  /* The geometry itself, at the value the review asked for: 5.38:1 on paper
+     rather than the ~1.5:1 a 1px --color-rule stroke was antialiasing down to. */
+  .spine__stroke {
+    stroke: var(--color-slate);
+    stroke-width: 1.5;
   }
 
+  /* The models layer is discrete: the connector between nodes is implied. */
+  .spine__connector {
+    stroke-width: 1;
+    stroke-dasharray: 1 9;
+  }
+
+  .spine__rule,
   .spine__boundary {
-    opacity: 0.45;
+    stroke-width: 1;
   }
 
   /* --- the one moving part -------------------------------------------------
@@ -194,6 +470,12 @@ const boundaries = ticks(
      component; where `animation-timeline` is unsupported the marker simply
      never renders and the spine is static, which is a complete state rather
      than a broken one.
+
+     Longhands, not the `animation` shorthand: the shorthand resets
+     `animation-duration` to `0s`, and a scroll-driven animation of zero
+     duration sits at progress 0 forever. `auto` is what binds it to the whole
+     length of the timeline. Measured before and after — 0px of travel became
+     the full run of `<main>`.
      ---------------------------------------------------------------------- */
   .spine__marker {
     display: none;
@@ -208,17 +490,20 @@ const boundaries = ticks(
       top: 0;
       height: var(--border-rule);
       background-color: var(--color-accent);
-      animation: spine-progress linear both;
+      animation-name: spine-progress;
+      animation-duration: auto;
+      animation-timing-function: linear;
+      animation-fill-mode: both;
       animation-timeline: scroll(root block);
     }
   }
 
   @keyframes spine-progress {
     from {
-      top: 0%;
+      top: 0;
     }
     to {
-      top: 100%;
+      top: calc(100% - var(--border-rule));
     }
   }
 

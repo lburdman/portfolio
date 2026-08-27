@@ -219,8 +219,23 @@ Omit a link you do not have. Do not write `""`, `null` or a placeholder.
   project's files.
 - The file must actually exist; `project:validate` checks.
 - Prefer `.webp` for photographs and screenshots, `.svg` for diagrams.
-- Cover images have no `alt` field: the alt text is derived from the localized
-  title, which is already translated.
+- Images have no `alt` field in `project.json`, and must never grow one. Alt is
+  user-facing copy like every other string on this site, so it lives in the
+  dictionaries under `projects.mediaAlt`, keyed `<slug>/<file stem>` — e.g.
+  `"energy-forecasting/prediction-interval"`. A string written once in English
+  is read aloud on the Spanish page with Spanish phonemes, so every figure
+  needs both locales.
+- Describe what the image **shows** — the series drawn, the axes, the shaded
+  region — never what it proves. And describe what it _actually_ shows: if a
+  confusion matrix came from a classical baseline, the alt text says
+  "logistic-regression baseline". A reader who cannot see the figure is owed
+  the same evidence as one who can, not a conclusion drawn on their behalf.
+- A missing key is not a crash. `ProjectCard.astro` and the project detail page
+  fall back to the localized project title, which is vague rather than wrong —
+  which is exactly why nothing would tell you. `tests/i18n.test.ts` sweeps the
+  real `media/` directories instead: it fails on any committed figure without
+  an entry in **both** locales, and on any entry left behind after its image
+  was deleted.
 
 ---
 
@@ -242,7 +257,45 @@ one. It verifies:
 - every link is `https://`;
 - `cover` points at a file that exists;
 - every `related` slug resolves, and nothing lists itself;
-- no stray files at the top level or inside a project directory.
+- no stray files at the top level or inside a project directory;
+- **every external link resolves over the network** — see below.
+
+### The link check, and why it is on by default
+
+`project:validate` requests every external URL in every `project.json` and
+fails on one that does not resolve. This is **on by default**. To skip only the
+network pass:
+
+```bash
+npm run project:validate:offline   # or: node scripts/project-validate.mjs --offline
+```
+
+`--offline` skips the network pass and nothing else: schema validation, slug
+and file checks, `cover` existence and `related` resolution all still run, and
+the summary line ends `links not checked (--offline)`, so a passing offline run
+can never be mistaken for a passing full one.
+
+The direction of the flag is deliberate. Three of the four "View on GitHub"
+links shipped pointing at repositories that do not exist —
+`energy-demand-forecasting`, `qnn-speech-recognition` and
+`support-ticket-classifier` — because the schema validated that a URL was
+_well-formed_ and never asked whether anything was there. Every gate was green
+while a recruiter clicking three of four projects got a 404. A check that is
+off by default is a check nobody runs, so the flag opts _out_ rather than in.
+
+Use `--offline` on a plane or behind a proxy. Do not use it to turn a red run
+green: if a link fails, fix the link.
+
+### It runs in CI
+
+`.github/workflows/deploy.yml` runs `npm run project:validate` — the full
+check, network pass included — as its own step, alongside format, lint,
+type-check, build and test. A dead project link now fails the pipeline instead
+of reaching production.
+
+If GitHub ever rate-limits a run, switch that one step to
+`npm run project:validate:offline` and fix the cause. Deleting the step
+restores exactly the blind spot it was added for.
 
 The wider gates, unchanged:
 
