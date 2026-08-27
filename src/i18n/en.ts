@@ -109,7 +109,7 @@ export const en: UIStrings = {
 
   about: {
     heading: 'About',
-    bio: "I'm an Electronic Engineer with a foundation in mathematics, physics and computational thinking, working across machine learning, AI-backed applications, data workflows and software systems. My work combines experimentation, technical rigor and a production-minded approach to implementation.",
+    bio: "I'm an Electronic Engineer with a foundation in mathematics, physics and computational thinking, working across AI systems, automation, data workflows and software products. My work combines experimentation, technical rigor and a production-minded approach to implementation.",
     portraitAlt: 'Lucas Burdman, Electronic Engineer and AI Engineer.',
     facts: ['Electronic Engineer', 'FIUBA', 'Buenos Aires'],
     currentlyHeading: 'Currently exploring',

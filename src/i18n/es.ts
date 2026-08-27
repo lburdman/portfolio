@@ -109,7 +109,7 @@ export const es: UIStrings = {
 
   about: {
     heading: 'Sobre mí',
-    bio: 'Soy Ingeniero Electrónico, con base en matemática, física y pensamiento computacional, y trabajo en machine learning, aplicaciones con IA, flujos de datos y sistemas de software. Mi trabajo combina experimentación, rigor técnico y una implementación pensada para producción.',
+    bio: 'Soy Ingeniero Electrónico, con base en matemática, física y pensamiento computacional, y trabajo en sistemas de IA, automatización, flujos de datos y productos de software. Mi trabajo combina experimentación, rigor técnico y una implementación pensada para producción.',
     portraitAlt: 'Lucas Burdman, Ingeniero Electrónico y AI Engineer.',
     facts: ['Ingeniero Electrónico', 'FIUBA', 'Buenos Aires'],
     currentlyHeading: 'Explorando ahora',
