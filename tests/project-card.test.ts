@@ -65,6 +65,52 @@ describe('CSP: no inline style attributes', () => {
   });
 });
 
+/**
+ * docs/REDESIGN_DECISIONS.md #18. `loading="lazy"` was hardcoded on every
+ * cover. No project ships one today, so the defect is latent — and a latent
+ * defect in the LCP element is worth a test precisely because there is nothing
+ * to see until the media lands, at which point the opening card's cover becomes
+ * the largest paint on both the projects index and the homepage's projects band
+ * and is discovered only after layout instead of by the preload scanner.
+ */
+describe('LCP: the opening card is not lazy-loaded', () => {
+  it('decides loading per card rather than hardcoding it', () => {
+    const code = withoutComments(source('components/projects/ProjectCard.astro'));
+    expect(code, 'a hardcoded lazy cover is the regression').not.toMatch(/loading="lazy"/);
+    expect(code).toMatch(/loading=\{priority \? 'eager' : 'lazy'\}/);
+  });
+
+  it('lifts the priority as well as removing the deferral', () => {
+    // `loading="eager"` alone only stops the deferral; images still start at a
+    // low fetch priority during initial layout.
+    const code = withoutComments(source('components/projects/ProjectCard.astro'));
+    expect(code).toMatch(/fetchpriority=\{priority \? 'high' : 'auto'\}/);
+  });
+
+  it('gives the priority to the first card with an image, not to editorial emphasis', () => {
+    // `emphasis="lead"` is opt-in per listing, so the priority must not be tied
+    // to it: a listing that declined to emphasise its opener must not thereby
+    // lose it.
+    //
+    // Nor is it `position === 0`, which is what this asserted while no project
+    // shipped media. A card with no cover renders as type and cannot be the
+    // Largest Contentful Paint, and the current ordering opens with exactly
+    // such a card — so hardcoding position 0 handed `fetchpriority="high"` to
+    // a heading and left the real LCP element, a 1500px plot one card later,
+    // behind `loading="lazy"`. `findIndex` returning −1 collapses to 0, so a
+    // listing with no media at all behaves exactly as before.
+    const grid = withoutComments(source('components/projects/ProjectGrid.astro'));
+    expect(grid).toContain('priority={position === priorityIndex}');
+    expect(grid).toMatch(/findIndex\(\(project\) => project\.meta\.cover !== undefined\)/);
+    expect(grid).not.toContain('priority={isLead}');
+  });
+
+  it('keeps the reserved box that holds CLS at zero either way', () => {
+    const code = source('components/projects/ProjectCard.astro');
+    expect(code).toMatch(/\.card__media :global\(img\)\s*\{[^}]*aspect-ratio:\s*16 \/ 10/);
+  });
+});
+
 describe('every domain has an accent rule', () => {
   /**
    * `--domain-accent` is resolved from `[data-domain]` in the stylesheet. CSS

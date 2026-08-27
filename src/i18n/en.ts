@@ -1,4 +1,19 @@
-import type { UIStrings } from './types';
+import type { CredentialTrio, UIStrings } from './types';
+
+/**
+ * The three credentials, defined once and referenced from both the Hero strip
+ * and `about.facts`, so the two places on the site that carry provenance
+ * cannot disagree about what it is.
+ *
+ * Ordered degree → MicroMasters → certification. `Claude Certified Architect`
+ * keeps its issued English name in the Spanish dictionary too: it is a proper
+ * noun, and a translated certification name is one nobody can look up.
+ */
+const CREDENTIALS = [
+  'Electronic Engineering · UBA',
+  'MITx MicroMasters · Statistics & Data Science',
+  'Claude Certified Architect · Foundations',
+] as const satisfies CredentialTrio;
 
 export const en: UIStrings = {
   nav: {
@@ -13,6 +28,7 @@ export const en: UIStrings = {
     layers: 'Layers',
     worlds: 'Technical worlds',
     projects: 'Selected projects',
+    contact: 'Contact',
   },
 
   hero: {
@@ -20,13 +36,14 @@ export const en: UIStrings = {
     role: 'Electronic Engineer · AI Engineer',
     positioning:
       'I build across layers — from signals and hardware, through digital logic and computation, to models and intelligent systems.',
+    credentials: CREDENTIALS,
     ctaProjects: 'See projects',
     ctaContact: 'Get in touch',
     ctaResume: 'Résumé',
   },
 
   layers: {
-    heading: 'I build across layers',
+    heading: 'Down to the physics',
     narrative:
       'Each layer sets the limits of the one above it. Knowing what happens two layers down changes the decisions you make at the top.',
     items: {
@@ -58,7 +75,7 @@ export const en: UIStrings = {
 
   worlds: {
     heading: 'Technical Worlds',
-    subtitle: 'One system seen from five layers, from the models on top to the physics underneath.',
+    subtitle: 'Five areas of work. What each one actually involves.',
     items: {
       ai: {
         name: 'AI & Machine Learning',
@@ -78,7 +95,7 @@ export const en: UIStrings = {
       electronics: {
         name: 'Electronics',
         summary:
-          'Circuit design and instrumentation — the sensor-to-processor chain, read the way engineering documentation reads.',
+          'Circuit design and instrumentation: the chain from sensor to processor. The foundation the other four layers rest on, and the subject of the Electronic Engineering degree behind them.',
       },
       audio: {
         name: 'Audio & Acoustics',
@@ -105,13 +122,26 @@ export const en: UIStrings = {
     article: 'Article',
     relatedWork: 'Related work',
     backToList: 'Back to projects',
+    mediaAlt: {
+      'energy-forecasting/prediction-interval':
+        'Line chart of German electricity load over 14 days in August 2019: actual load in black, XGBoost forecast dashed, and a shaded 95% conformal prediction interval around it. The forecast tracks the daily peaks and troughs closely; the interval widens where the model is least certain.',
+      'energy-forecasting/backtest-rmse-by-fold':
+        'Line chart, RMSE by fold across a rolling-origin backtest, comparing four models over five folds. The naive baseline stays near 8,500 throughout; Ridge sits between 4,400 and 5,500; RandomForest and XGBoost start near 3,400 and fall to roughly 1,200–1,400 by the third fold.',
+      // A logistic-regression baseline, not the hybrid quantum model: no
+      // confusion matrix for the QNN exists in any notebook, so this must not
+      // be worded in a way that reads as a quantum result.
+      'quantum-audio/confusion-matrix':
+        'Six-by-six confusion matrix for a logistic-regression baseline over the CREMA-D emotion classes HAP, SAD, ANG, DIS, FEA and NEU. The diagonal is the darkest band, anger is the strongest class, and disgust and fear are the most often confused with the rest.',
+      'quantum-audio/transpiled-circuit':
+        "Two-qubit circuit diagram captioned 'Transpiled for ibm_kingston': a long chain of Rz and square-root-of-X gates on qubits q0 and q1, separated by barriers, with two two-qubit entangling gates and a measurement of each qubit into a 2-bit classical register.",
+    },
   },
 
   about: {
     heading: 'About',
-    bio: "I'm an Electronic Engineer with a foundation in mathematics, physics and computational thinking, working across AI systems, automation, data workflows and software products. My work combines experimentation, technical rigor and a production-minded approach to implementation.",
+    bio: "I'm an Electronic Engineer from UBA, working on AI systems in production. My background is signals, circuits and digital design; most of my time now goes to machine learning and LLM systems, and to the evaluation work that decides whether they are good enough to ship. I'm a teaching assistant in Digital Systems and in Quantum Computation and Communications at FIUBA.",
     portraitAlt: 'Lucas Burdman, Electronic Engineer and AI Engineer.',
-    facts: ['Electronic Engineer', 'FIUBA', 'Buenos Aires'],
+    facts: CREDENTIALS,
     currentlyHeading: 'Currently exploring',
     interests: [
       'LLM systems in production',
@@ -146,7 +176,6 @@ export const en: UIStrings = {
   },
 
   contact: {
-    heading: 'Contact',
     invitation: "Let's build something interesting.",
     note: 'Email is the fastest way to reach me. GitHub and LinkedIn are below.',
     emailLabel: 'Email',

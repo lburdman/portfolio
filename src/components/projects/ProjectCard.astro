@@ -80,9 +80,19 @@ interface Props {
   index?: number | undefined;
   /** `lead` is the editorial opener of a listing: larger title, wider measure. */
   emphasis?: 'lead' | 'default' | undefined;
+  /**
+   * This card opens its listing, so its cover is a candidate for the page's
+   * Largest Contentful Paint and must not be lazy-loaded.
+   *
+   * Separate from `emphasis` on purpose. `emphasis="lead"` is an editorial
+   * decision about weight that a listing may decline to make; loading priority
+   * is a fact about document order that every listing has. Collapsing them
+   * would mean an un-emphasised first card silently lost its priority.
+   */
+  priority?: boolean | undefined;
 }
 
-const { project, t, locale, base, headingLevel = 3, index, emphasis = 'default' } = Astro.props;
+const { project, t, locale, base, headingLevel = 3, index, emphasis = 'default', priority = false } = Astro.props;
 const { meta, title, summary } = project;
 
 const HEADINGS = { 2: 'h2', 3: 'h3', 4: 'h4' } as const;
@@ -98,16 +108,108 @@ const href = localizePath(`/projects/${meta.slug}`, locale, base);
  * `width`/`height` and a `srcset`.
  *
  * The audit's MEDIUM performance finding was a raw `<img>` with no dimensions.
- * No project ships a cover today, so this branch is currently unexercised and
- * the glob resolves to an empty object; the typographic branch below is the one
- * that actually renders. Raster formats only — `astro:assets` does not
- * transform SVG, and a diagram cover would want different framing anyway.
+ * Raster formats only — `astro:assets` does not transform SVG, and a diagram
+ * cover would want different framing anyway.
  */
 const covers = import.meta.glob<{ default: ImageMetadata }>(
   '/src/content/projects/*/media/*.{webp,avif,png,jpg,jpeg}',
   { eager: true },
 );
 const cover = meta.cover ? covers[`/src/content/projects/${meta.slug}/${meta.cover}`]?.default : undefined;
+
+/**
+ * The candidate widths, filtered against what the source actually has.
+ *
+ * `<Image />` will happily generate a 1080px variant of a 431px source: sharp
+ * upscales, so the page pays for bytes that carry no detail and renders a soft
+ * image on the display that asked for them. Every real cover here is a plot
+ * exported at whatever size its notebook chose, so the set is intersected with
+ * the intrinsic width rather than assumed. A source narrower than the smallest
+ * candidate still gets a one-entry `srcset` at its own width — correct, and
+ * honest about the resolution that exists.
+ */
+const RESPONSIVE_WIDTHS = [480, 768, 1080, 1344];
+const fitted = cover ? RESPONSIVE_WIDTHS.filter((width) => width <= cover.width) : [];
+const coverWidths = fitted.length > 0 ? fitted : cover ? [cover.width] : [];
+
+/**
+ * `sizes`, which depends on whether this card is the lead.
+ *
+ * A lead card spans the whole grid (`grid__item--lead` is `grid-column: 1/-1`);
+ * every other card is one of two columns. Those are very different slots — 1344
+ * against 640 at a 1440px viewport — and one `sizes` string cannot describe
+ * both. It used to, because it did not have to: no project shipped a cover, and
+ * then the first one to do so was not the lead.
+ *
+ * It is the lead now, and a `sizes` that understates its slot is not a rounding
+ * error. Measured on a real build before this line existed: the opening plot
+ * laid out at 1342px and loaded the 768w variant, a 1.75× upscale of the
+ * largest, most-scrutinised image on the site — soft in exactly the place the
+ * whole media pass exists to be sharp. `fetchpriority="high"` had faithfully
+ * rushed the wrong file.
+ *
+ * The measured widths, from `.card__media` at each breakpoint: lead is ~95vw
+ * capped at the 84rem container; default is 95vw in one column, ~45vw in two,
+ * settling at 40rem once the container caps. `sizes` is allowed to overstate —
+ * that costs bytes — but understating costs resolution, so each stop is rounded
+ * up rather than down.
+ */
+const coverSizes =
+  emphasis === 'lead' ? '(min-width: 84rem) 84rem, 95vw' : '(min-width: 84rem) 40rem, (min-width: 48rem) 45vw, 95vw';
+
+/**
+ * Which reserved box this cover gets.
+ *
+ * The covers are figures, not photographs, and their aspect ratios are set by
+ * matplotlib rather than by a designer: a 14-day forecast plot is 2.5:1, a 6×6
+ * confusion matrix is 1.1:1. One fixed box plus `object-fit: cover` would crop
+ * the axis labels off the first and the class labels off the second, and
+ * `fill` would squash both. Neither is acceptable for evidence.
+ *
+ * So the box is chosen from a *closed* set of two ratios and the image is
+ * always `contain`ed inside it: nothing is ever cropped, nothing is ever
+ * distorted, the ratio is known at build time so CLS stays at zero, and a
+ * listing can only ever contain two media heights rather than one per project.
+ * The leftover is paper, which is what the rest of the card is made of.
+ *
+ * A data attribute rather than a computed `aspect-ratio`, because the CSP
+ * drops inline `style` attributes — see the long note above `.card__title-text`.
+ */
+const coverShape = cover && cover.width / cover.height >= 2 ? 'wide' : 'standard';
+
+/**
+ * Alt text for a project image.
+ *
+ * `project.json` carries no `alt` field and must not grow one: alt is
+ * user-facing copy, and every user-facing string on this site lives in the
+ * dictionaries (`src/i18n/types.ts`; audit 2.8 was 14 of them hardcoded in
+ * components). The key is `<slug>/<file stem>`, so a project with two figures
+ * gets two descriptions rather than one title reused for images that show
+ * different things.
+ *
+ * `mediaAlt` is an open `Record<string, string>` — it has to be, since the keys
+ * are filenames — so under `noUncheckedIndexedAccess` a lookup is
+ * `string | undefined` no matter how complete the dictionaries are. That
+ * `undefined` must go somewhere, and the choice is not cosmetic:
+ *
+ *   · `?? ''` renders `alt=""`, which is the ARIA convention for a *decorative*
+ *     image. Announcing a chart that carries the project's evidence as
+ *     decoration is the one outcome worse than describing it vaguely, and it
+ *     fails silently, to the readers least able to notice.
+ *   · `!` asserts the case away without handling it, which is how the four
+ *     latent defects in this component's media branch survived to begin with.
+ *   · The localized title is vague but never wrong, and it is the alt
+ *     convention `docs/PROJECT_CONTENT_CONTRACT.md` §10 already documents.
+ *
+ * So the fallback stays, and `tests/i18n.test.ts` is what makes sure it never
+ * actually fires: that suite sweeps every project's `media/` directory and
+ * fails unless each committed figure has a non-empty entry in both locales, no
+ * orphans. The test guarantees the quality; the fallback guarantees the floor.
+ * They are not redundant — one runs over the repo at build time, the other
+ * covers the type hole that remains at runtime.
+ */
+const coverKey = meta.cover ? `${meta.slug}/${meta.cover.replace(/^media\//, '').replace(/\.\w+$/, '')}` : undefined;
+const coverAlt = (coverKey === undefined ? undefined : t.projects.mediaAlt[coverKey]) ?? title;
 
 const domains = meta.domains.map((id) => {
   const domain = getDomain(id);
@@ -156,13 +258,29 @@ const mediaTransition = `project-media-${meta.slug}`;
 
   {
     cover && (
-      <div class="card__media" data-vt={mediaTransition}>
+      <div class="card__media" data-shape={coverShape} data-vt={mediaTransition}>
+        {/* Loading priority is per-card, not hardcoded.
+             `loading="lazy"` on every cover was free while no project shipped
+             one; the moment real media lands, the opening card's cover becomes
+             the LCP element of both the projects index and the homepage's
+             projects band, and a lazy-loaded LCP image is discovered only
+             after layout instead of by the preload scanner.
+
+             `fetchpriority="high"` is the other half. `loading="eager"` alone
+             only removes the deferral; it does not lift the image above the
+             low-priority default the browser gives images during initial
+             layout.
+
+             Everything below the opener stays lazy, and the reserved
+             `aspect-ratio` box under `.card__media img` means neither branch
+             can shift the page — CLS stays at zero either way. */}
         <Image
           src={cover}
-          alt={title}
-          widths={[480, 768, 1080]}
-          sizes="(min-width: 60rem) 40rem, 100vw"
-          loading="lazy"
+          alt={coverAlt}
+          widths={coverWidths}
+          sizes={coverSizes}
+          loading={priority ? 'eager' : 'lazy'}
+          fetchpriority={priority ? 'high' : 'auto'}
           decoding="async"
         />
       </div>
@@ -367,12 +485,27 @@ const mediaTransition = `project-media-${meta.slug}`;
   /* `<Image />` renders its own <img>, so it is reached through the wrapper
      rather than through a class the scoper may or may not forward. `<Image />`
      already emits width/height attributes from the source's `ImageMetadata`;
-     the reserved aspect box below means the card cannot shift even before the
-     bytes arrive (audit: raw <img> without dimensions was the CLS finding). */
+     the reserved aspect box here means the card cannot shift even before the
+     bytes arrive (audit: raw <img> without dimensions was the CLS finding).
+
+     `contain`, not `cover`. Every cover on this site is a figure lifted from
+     the repository that produced it — a forecast plot, a confusion matrix —
+     and the axis labels, the class names and the legend *are* the evidence.
+     `cover` crops them off; `fill` distorts the geometry a reader is being
+     asked to trust. So the figure is fitted whole into the box and the
+     remainder is paper. Two boxes exist, `standard` and `wide`, chosen in the
+     frontmatter from the source's own ratio, which keeps a listing to two
+     media heights while letting a 2.5:1 plot sit in something near its own
+     shape. Both are fixed ratios, so CLS is zero either way. */
   .card__media :global(img) {
+    display: block;
     width: 100%;
     aspect-ratio: 16 / 10;
-    object-fit: cover;
+    object-fit: contain;
+  }
+
+  .card__media[data-shape='wide'] :global(img) {
+    aspect-ratio: 5 / 2;
   }
 
   /* ---------------------------------------------------------------------------

@@ -1,33 +1,34 @@
 ---
 title: 'Hybrid Classical–Quantum Neural Networks for Audio Emotion Classification'
-summary: 'An end-to-end speech emotion recognition pipeline on CREMA-D using mel-spectrograms, transfer learning, and hybrid quantum/classical heads — focused on controlled experimentation under realistic resource constraints.'
+summary: 'A speech emotion recognition pipeline on CREMA-D using mel-spectrograms, frozen pre-trained backbones and a variational quantum head — with selected inference replayed on real IBM Quantum hardware.'
 ---
 
 ## Overview
 
-An end-to-end research pipeline for speech emotion recognition using the CREMA-D dataset. The central contribution is a systematic comparison between classical and hybrid quantum/classical neural network architectures under controlled, resource-realistic conditions.
+An end-to-end research pipeline for speech emotion recognition on the CREMA-D dataset. The central contribution is a controlled comparison between a classical head and a variational quantum head, both trained on top of the same frozen classical backbone.
 
 ## Problem
 
-Quantum machine learning is a field with significant theoretical promise but limited empirical validation under realistic constraints. This project asks: can hybrid quantum/classical models compete with — or improve upon — classical baselines on an audio classification task when resources are constrained?
+Quantum machine learning is a field with significant theoretical promise but limited empirical validation under realistic constraints. This project asks: can a variational quantum circuit head compete with — or improve upon — a classical head on an audio classification task, when both receive identical features and the circuit is small enough to run on today's hardware?
 
 ## Pipeline
 
-1. **Data preparation**: CREMA-D audio clips preprocessed into fixed-length mel-spectrogram representations.
-2. **Feature extraction**: Pre-trained CNN backbone (transfer learning) to extract compact audio embeddings.
-3. **Dimensionality reduction**: PCA applied to map embeddings to the small qubit-compatible space required by quantum circuits.
-4. **Classical head baseline**: Fully connected classifier trained on the reduced embeddings.
-5. **Quantum head**: Parameterized quantum circuit (PQC) implemented in PennyLane, acting as a classifier head.
-6. **Hybrid model**: CNN backbone → dimensionality reduction → PQC head, trained end-to-end.
-7. **Hardware verification**: Selected experiments run on IBM Quantum hardware to validate real-device behavior vs. simulation.
+1. **Data preparation**: CREMA-D audio clips preprocessed into fixed-length mel-spectrograms, MFCCs and precomputed embeddings.
+2. **Feature extraction**: A pre-trained backbone — ResNet18, VGG16 or PANNs CNN14 — produces compact audio representations.
+3. **Projection to qubit scale**: A small trainable head (Linear → ReLU → Linear → ReLU) maps the backbone representation down to `n_qubits` values, the input width a circuit of this size can accept.
+4. **Classical head baseline**: An MLP classifier trained on the projected features.
+5. **Quantum head**: A variational circuit built from `AngleEmbedding` and `BasicEntanglerLayers`, wrapped as a PennyLane `TorchLayer` and used as the classifier head.
+6. **Two-stage training**: The backbone and projector are pretrained with a linear classifier, then frozen; only the selected head — classical or quantum — is fine-tuned in the second stage.
+7. **Hardware verification**: Exported circuit weights and inputs are replayed on a real IBM QPU through Qiskit Runtime. The committed notebook shows the circuit transpiled for `ibm_kingston`, alongside the same circuit on a local simulator.
 
 ## Key Design Decisions
 
-- **Controlled comparison**: Classical and quantum heads receive the same inputs, ensuring fair evaluation.
-- **Realistic resource constraints**: Qubit count and circuit depth are constrained to what is executable on current hardware.
-- **Transfer learning for embeddings**: Using a frozen pre-trained backbone removes the need for quantum circuits to handle raw audio — a practical necessity given current qubit counts.
-- **PennyLane + PyTorch integration**: Allows gradient flow through hybrid classical/quantum circuits using standard PyTorch training loops.
+- **Controlled comparison**: Both heads sit on the same frozen backbone and the same projector width, so the head type is the only variable.
+- **Realistic resource constraints**: Qubit count and circuit depth are held to what current hardware can execute, and the projector exists precisely to meet that limit.
+- **Transfer learning for representations**: A frozen pre-trained backbone removes any need for the circuit to handle raw audio — a practical necessity at present qubit counts, not a shortcut.
+- **PennyLane + PyTorch integration**: `TorchLayer` lets gradients flow through the hybrid model inside an ordinary PyTorch training loop.
+- **Exported quantum artifacts**: Weights, inputs and circuit metadata are exported and unit-tested for reconstruction, which is what makes the hardware replay possible at all.
 
 ## Key Learnings
 
-The limiting factor is not algorithmic — it is hardware noise and limited qubit counts. Dimensionality reduction is a practical necessity, not an optimization. The results provide an honest empirical benchmark for hybrid models at current hardware capability levels.
+The limiting factor is not algorithmic — it is hardware noise and limited qubit counts. Dimensionality reduction is a practical necessity, not an optimization: the circuit dictates the input width, and everything upstream has to meet it. Running the same circuit in simulation and on a real device is where the gap between the two stops being theoretical.

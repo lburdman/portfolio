@@ -131,7 +131,87 @@ const covers = import.meta.glob<{ default: ImageMetadata }>(
   '/src/content/projects/*/media/*.{webp,avif,png,jpg,jpeg}',
   { eager: true },
 );
-const cover = meta.cover ? covers[`/src/content/projects/${meta.slug}/${meta.cover}`]?.default : undefined;
+const coverPath = meta.cover ? `/src/content/projects/${meta.slug}/${meta.cover}` : undefined;
+const cover = coverPath ? covers[coverPath]?.default : undefined;
+
+/**
+ * Every other image the project ships, in filename order.
+ *
+ * A case study is the one surface where a second figure earns its place: the
+ * listing has room for exactly one image per project, but this page is the
+ * argument, and the repository often contains a second artefact that supports
+ * it — the rolling-origin backtest behind a forecast, the transpiled circuit
+ * behind a claim about real quantum hardware.
+ *
+ * Discovered from the directory rather than declared, deliberately. `cover` is
+ * a *choice* — which figure represents the project in a listing — and it earns
+ * its schema field. "The other images in media/" is not a choice, it is the
+ * contents of a folder, and giving it a second array in `project.json` would
+ * mean every added file had to be named twice and could silently disagree with
+ * itself. Dropping a figure into `media/` publishes it here; deleting it
+ * unpublishes it. No schema change, and `project:validate` already refuses any
+ * stray file outside `media/`.
+ */
+const figures = Object.entries(covers)
+  .filter(([path]) => path.startsWith(`/src/content/projects/${meta.slug}/media/`) && path !== coverPath)
+  .sort(([a], [b]) => a.localeCompare(b))
+  .map(([path, module]) => ({ path, image: module.default }));
+
+/**
+ * Alt text for project media — the same contract `ProjectCard.astro`
+ * documents at length: alt is user-facing copy, so it comes from the
+ * dictionaries keyed by `<slug>/<file stem>`, one string per image rather than
+ * one title reused for figures that show different things.
+ *
+ * The fallback to the localized title stays for the reason `ProjectCard.astro`
+ * sets out in full: `mediaAlt` is keyed by filename, so it is an open `Record`
+ * and `noUncheckedIndexedAccess` makes every lookup `string | undefined`. The
+ * absent case has to be handled, `alt=""` would announce an evidential chart as
+ * decorative, and `!` would assert the case away rather than handle it.
+ * `tests/i18n.test.ts` sweeps `media/` in both locales so the fallback never
+ * fires; it is the floor under that test, not a substitute for it.
+ */
+const altFor = (path: string): string => {
+  const stem = path
+    .split('/')
+    .pop()
+    ?.replace(/\.\w+$/, '');
+  return (stem === undefined ? undefined : t.projects.mediaAlt[`${meta.slug}/${stem}`]) ?? title;
+};
+const coverAlt = coverPath ? altFor(coverPath) : title;
+
+/** Never ask sharp to upscale a 431px plot to 1280px. See `ProjectCard.astro`. */
+const RESPONSIVE_WIDTHS = [640, 960, 1280];
+const widthsFor = (image: ImageMetadata): number[] => {
+  const fitted = RESPONSIVE_WIDTHS.filter((width) => width <= image.width);
+  return fitted.length > 0 ? fitted : [image.width];
+};
+
+/**
+ * `sizes`, capped at the figure's own resolution.
+ *
+ * `--container-prose` is 68rem; at the default root size that is the 1088px
+ * this page's column can be. A figure narrower than that must not be stretched
+ * to fill it — a 431px confusion matrix blown up to 1088px is a blurred
+ * picture of a table of numbers, which is worse than no picture, because the
+ * reader is being asked to trust digits their eyes cannot resolve.
+ *
+ * The cap goes in `sizes` rather than in CSS, and that is the part worth
+ * remembering. `max-width` cannot express it: a per-image limit would need an
+ * inline `style`, which this site's CSP drops. `width: auto` looks like it
+ * should work and does not — for an image with a `w`-descriptor `srcset`, the
+ * intrinsic size the CSS box sees is *density-corrected*, which resolves to
+ * whatever `sizes` claims, so `auto` reproduced the full column width exactly.
+ * Measured on a real build: 431px source, `naturalWidth` 1088.
+ *
+ * Declaring the true rendered width is also simply what `sizes` is for, so the
+ * same line stops the browser fetching a variant larger than it can show.
+ */
+const CONTENT_WIDTH = 1088;
+const sizesFor = (image: ImageMetadata): string => {
+  const width = Math.min(CONTENT_WIDTH, image.width);
+  return `(min-width: ${width}px) ${width}px, 100vw`;
+};
 
 /**
  * The accent itself is not carried here. `data-domain` goes on the element and
@@ -266,9 +346,9 @@ const mediaTransition = `project-media-${meta.slug}`;
           <div class="detail__media" data-vt={mediaTransition}>
             <Image
               src={cover}
-              alt={title}
-              widths={[640, 960, 1280]}
-              sizes="(min-width: 68rem) 68rem, 100vw"
+              alt={coverAlt}
+              widths={widthsFor(cover)}
+              sizes={sizesFor(cover)}
               loading="eager"
               decoding="async"
             />
@@ -279,6 +359,25 @@ const mediaTransition = `project-media-${meta.slug}`;
       <div class="prose detail__body">
         {Content && <Content />}
       </div>
+
+      {
+        figures.length > 0 && (
+          <ul class="detail__figures">
+            {figures.map((figure) => (
+              <li class="detail__figure">
+                <Image
+                  src={figure.image}
+                  alt={altFor(figure.path)}
+                  widths={widthsFor(figure.image)}
+                  sizes={sizesFor(figure.image)}
+                  loading="lazy"
+                  decoding="async"
+                />
+              </li>
+            ))}
+          </ul>
+        )
+      }
 
       {
         related.length > 0 && (
@@ -522,8 +621,15 @@ const mediaTransition = `project-media-${meta.slug}`;
     font-size: 0.9em;
   }
 
+  /* The frame hugs the figure. With `width: fit-content` a plot wider than the
+     column still fills it, while a small one keeps its own size instead of
+     sitting alone inside a full-width empty box — the border reads as a plate
+     mounted on the page rather than as a slot the image failed to fill. */
   .detail__media {
+    width: fit-content;
+    max-width: 100%;
     margin-top: var(--spacing-stack);
+    margin-inline: auto;
     overflow: hidden;
     border: var(--border-hairline) solid var(--color-rule);
     border-radius: var(--radius-sm);
@@ -531,10 +637,68 @@ const mediaTransition = `project-media-${meta.slug}`;
     view-transition-name: var(--vt-media, attr(data-vt type(<custom-ident>), none));
   }
 
-  .detail__media :global(img) {
-    width: 100%;
-    aspect-ratio: 16 / 9;
-    object-fit: cover;
+  /* No reserved ratio here, and no `object-fit`: the figure renders at its own
+     shape, full width.
+
+     The listing has to reconcile several projects into one rhythm, so the card
+     fits each cover into one of two boxes and lets the leftover be paper. This
+     page has exactly one column and one argument, so the right answer is the
+     plot as its author exported it — no crop, no letterbox, no distortion. The
+     14-day forecast is 2.5:1 and the transpiled circuit is 8:1; forcing either
+     into 16/9 with `object-fit: cover` cropped the y-axis label off one and
+     most of the gates off the other, which is what this page shipped before a
+     project had a cover to expose it.
+
+     CLS is still zero. `<Image />` writes `width` and `height` attributes from
+     the source's `ImageMetadata`, and every browser derives an aspect ratio
+     from that pair, so the box is reserved before a byte of the image arrives
+     — the same guarantee a CSS `aspect-ratio` gives, taken from the file
+     instead of guessed at. */
+  .detail__media :global(img),
+  .detail__figure :global(img) {
+    display: block;
+    /* `width: auto` — its own pixels — capped at the column, never stretched
+       past them. A 431px confusion matrix blown up to a 1088px column is a
+       blurred picture of a table of numbers, which is worse than no picture:
+       the reader is being shown digits they cannot trust their eyes on. The
+       column is the ceiling, the file's own resolution is the target, and a
+       small figure simply sits centred on the paper at the size it exists at.
+       The 1500px forecast and the 2148px circuit still fill the column. */
+    width: auto;
+    max-width: 100%;
+    height: auto;
+    margin-inline: auto;
+  }
+
+  /* Supporting figures: the artefacts that back the case study up, after the
+     body rather than inside it, because the body is Markdown that carries no
+     components. Same plate treatment as the cover, one per row, so a reader
+     scrolling past the argument meets the evidence in the order the project
+     directory lists it. */
+  /* Block flow rather than a flex column, deliberately. Each plate sizes itself
+     with `width: fit-content` — the same rule `.detail__media` uses — and a
+     flex item's shrink-to-fit cross size fights that: the item resolves against
+     the image, the image's `max-width: 100%` resolves against the item, and the
+     8:1 circuit collapsed to a few pixels. Measured on a real build. In normal
+     flow `fit-content` has a definite containing block to work from. */
+  .detail__figures {
+    margin-top: var(--spacing-block);
+    padding: 0;
+    list-style: none;
+  }
+
+  .detail__figure {
+    width: fit-content;
+    max-width: 100%;
+    margin-inline: auto;
+    overflow: hidden;
+    border: var(--border-hairline) solid var(--color-rule);
+    border-radius: var(--radius-sm);
+    background-color: var(--color-paper-raised);
+  }
+
+  .detail__figure + .detail__figure {
+    margin-top: var(--spacing-stack);
   }
 
   .detail__body {

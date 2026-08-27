@@ -1,3 +1,6 @@
+import { existsSync, readdirSync } from 'node:fs';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { DOMAIN_IDS } from '../src/config/domains';
 import { SECTION_IDS } from '../src/config/navigation';
@@ -161,6 +164,30 @@ describe('navigation strings', () => {
   });
 });
 
+describe('the contact group owns no heading', () => {
+  it('has no `contact.heading`, in either locale', () => {
+    // It went dead when `'contact'` joined `SECTION_IDS`: the margin word is
+    // now `sections.contact` and the `<h2>` is `contact.invitation`, so the
+    // key was a second, unread source of truth for a heading that already has
+    // one. Same shape as the `nav.notes` guard above, and for the same reason.
+    for (const locale of LOCALES) {
+      expect(Object.keys(DICTIONARIES[locale].contact), `${locale} contact.heading is back`).not.toContain('heading');
+    }
+  });
+
+  it('names the section from the sections group, which every other section also uses', () => {
+    for (const locale of LOCALES) {
+      const t = DICTIONARIES[locale];
+      expect(t.sections.contact, `${locale} sections.contact`).toBeTruthy();
+      expect(t.contact.invitation, `${locale} contact.invitation`).toBeTruthy();
+      // The visible heading is a sentence, not the section word repeated.
+      expect(t.contact.invitation, `${locale} contact.invitation restates the margin word`).not.toBe(
+        t.sections.contact,
+      );
+    }
+  });
+});
+
 describe('accessibility strings', () => {
   it('supplies every a11y key in both locales', () => {
     const required = [
@@ -205,6 +232,16 @@ describe('section labels', () => {
         expect(t.sections[id], ` sections.`).toBeTruthy();
       }
     }
+  });
+
+  it('includes contact, so the section stops needing an override to render', () => {
+    // P0 #7 built the Contact section; it could not join the numbered sequence
+    // until `sections.contact` existed, because `UIStrings['sections']` is a
+    // `Record<SectionId, string>`. It is last, so its figure number is `04`.
+    expect(SECTION_IDS).toContain('contact');
+    expect(SECTION_IDS.indexOf('contact')).toBe(SECTION_IDS.length - 1);
+    expect(en.sections.contact).toBe('Contact');
+    expect(es.sections.contact).toBe('Contacto');
   });
 
   it('authors them in normal case and leaves the shouting to CSS', () => {
@@ -306,6 +343,213 @@ describe('default share card alt text', () => {
       const t = DICTIONARIES[locale];
       const pageTitles = [t.seo.home.title, t.seo.projectsIndex.title, t.seo.about.title];
       expect(pageTitles, ` ogImageAlt reuses a page title`).not.toContain(t.seo.ogImageAlt);
+    }
+  });
+});
+
+describe('the thesis is stated once', () => {
+  /**
+   * REDESIGN_DECISIONS P5 #19: the first two screens said the same thing three
+   * times — `hero.positioning`, then `layers.heading` as a *verbatim substring*
+   * of it, then `worlds.subtitle` restating it a third time over a list of the
+   * same five layers the Hero already names in order.
+   *
+   * Substring equality alone would not have caught the third telling, so this
+   * compares three-word shingles: any phrase of three consecutive words shared
+   * by two of the three strings is repetition, whatever the wording around it.
+   */
+  const shingles = (sentence: string, size = 3): Set<string> => {
+    const words = sentence
+      .toLowerCase()
+      .replace(/[^\p{L}\p{N}\s]/gu, ' ')
+      .split(/\s+/)
+      .filter(Boolean);
+    const grams = new Set<string>();
+    for (let i = 0; i + size <= words.length; i += 1) grams.add(words.slice(i, i + size).join(' '));
+    return grams;
+  };
+
+  it('never repeats a three-word phrase across the three opening strings', () => {
+    for (const locale of LOCALES) {
+      const t = DICTIONARIES[locale];
+      const opening = {
+        'hero.positioning': t.hero.positioning,
+        'layers.heading': t.layers.heading,
+        'worlds.subtitle': t.worlds.subtitle,
+      };
+      const entries = Object.entries(opening);
+      for (const [aKey, a] of entries) {
+        for (const [bKey, b] of entries) {
+          if (aKey >= bKey) continue;
+          const shared = [...shingles(a)].filter((gram) => shingles(b).has(gram));
+          expect(shared, `${locale}: ${aKey} and ${bKey} repeat each other`).toEqual([]);
+        }
+      }
+    }
+  });
+
+  it('does not carry the layers heading inside the hero sentence', () => {
+    // The exact defect: `layers.heading` was "I build across layers", which
+    // `hero.positioning` opens with.
+    for (const locale of LOCALES) {
+      const t = DICTIONARIES[locale];
+      expect(
+        t.hero.positioning.toLowerCase(),
+        `${locale} hero.positioning still contains layers.heading`,
+      ).not.toContain(t.layers.heading.toLowerCase());
+    }
+  });
+
+  it('keeps layers.narrative, the one line that advances the argument', () => {
+    // Deliberately asserted on content: the heading above it was rewritten and
+    // this string was not, and that asymmetry is the decision.
+    expect(en.layers.narrative).toContain('two layers down');
+    expect(es.layers.narrative).toContain('dos capas más abajo');
+  });
+});
+
+describe('the credibility strip', () => {
+  it('carries exactly three credentials in both locales', () => {
+    for (const locale of LOCALES) {
+      const t = DICTIONARIES[locale];
+      expect(t.hero.credentials, `${locale} hero.credentials`).toHaveLength(3);
+      for (const credential of t.hero.credentials) {
+        expect(credential.trim(), `${locale} empty credential`).toBeTruthy();
+      }
+    }
+  });
+
+  it('shows the same three in the Hero and in About, with no second copy to drift', () => {
+    // `about.facts` used to be `Electronic Engineer / FIUBA / Buenos Aires`,
+    // two of which restated the `<h1>` directly above them.
+    for (const locale of LOCALES) {
+      const t = DICTIONARIES[locale];
+      expect(t.about.facts, `${locale} about.facts`).toEqual(t.hero.credentials);
+      expect(t.about.facts, `${locale} about.facts is a copy, not the trio`).toBe(t.hero.credentials);
+    }
+  });
+
+  it('translates the degree and the MicroMasters but not the certification name', () => {
+    // A translated certification name cannot be looked up, which defeats the
+    // only reason the strip exists.
+    expect(es.hero.credentials[0]).not.toBe(en.hero.credentials[0]);
+    expect(es.hero.credentials[1]).not.toBe(en.hero.credentials[1]);
+    expect(es.hero.credentials[2]).toBe(en.hero.credentials[2]);
+  });
+
+  it('names an issuer on every line, so each one is checkable', () => {
+    const issuers = [/UBA/, /MITx/i, /Claude/i];
+    for (const locale of LOCALES) {
+      const t = DICTIONARIES[locale];
+      issuers.forEach((issuer, index) => {
+        expect(t.hero.credentials[index], `${locale} credential ${index} names no issuer`).toMatch(issuer);
+      });
+    }
+  });
+
+  it('stays short enough to render as one mono line, not a paragraph', () => {
+    for (const locale of LOCALES) {
+      for (const credential of DICTIONARIES[locale].hero.credentials) {
+        expect(credential.length, `${locale} credential too long: ${credential}`).toBeLessThanOrEqual(56);
+        expect(credential, `${locale} credential is a sentence`).not.toContain('.');
+      }
+    }
+  });
+});
+
+describe('project media alt text', () => {
+  /**
+   * Read off the committed `media/` directories, not a list retyped here.
+   *
+   * `ProjectCard.astro` and the project detail page both fall back to the
+   * localized title when a key is missing, so a figure with no alt text fails
+   * nothing at runtime and ships a vague description instead of a real one.
+   * Driving the loop from the filesystem is what makes that loud: dropping an
+   * image into `media/` publishes it, and now it also fails this test until it
+   * has words in both locales.
+   */
+  const PROJECTS_DIR = fileURLToPath(new URL('../src/content/projects', import.meta.url));
+
+  const mediaKeys = readdirSync(PROJECTS_DIR, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
+    .flatMap((project) => {
+      const mediaDir = join(PROJECTS_DIR, project.name, 'media');
+      if (!existsSync(mediaDir)) return [];
+      return readdirSync(mediaDir)
+        .filter((file) => !file.startsWith('.'))
+        .map((file) => `${project.name}/${file.replace(/\.\w+$/, '')}`);
+    })
+    .sort();
+
+  it('finds the committed figures it is meant to be describing', () => {
+    // Guards the guard: an empty sweep would make every assertion below vacuous.
+    expect(mediaKeys.length, 'no project media found — this suite would pass on nothing').toBeGreaterThan(0);
+  });
+
+  it('describes every committed figure, in both locales, keyed <slug>/<file stem>', () => {
+    for (const locale of LOCALES) {
+      const alts = DICTIONARIES[locale].projects.mediaAlt;
+      for (const key of mediaKeys) {
+        const alt = alts[key];
+        expect(alt, `${locale} projects.mediaAlt['${key}'] missing`).toBeTruthy();
+        expect(alt?.length ?? 0, `${locale} projects.mediaAlt['${key}'] too terse`).toBeGreaterThan(60);
+      }
+    }
+  });
+
+  it('describes no figure that is not committed', () => {
+    // The other direction: an entry left behind after an image was deleted is
+    // dead copy that reads as though the figure is still there.
+    for (const locale of LOCALES) {
+      expect(Object.keys(DICTIONARIES[locale].projects.mediaAlt).sort(), `${locale} orphan mediaAlt keys`).toEqual(
+        mediaKeys,
+      );
+    }
+  });
+
+  it('names the series a sighted reader can see in the forecast plot', () => {
+    for (const locale of LOCALES) {
+      const alt = DICTIONARIES[locale].projects.mediaAlt['energy-forecasting/prediction-interval'];
+      expect(alt).toMatch(/XGBoost/);
+      expect(alt).toMatch(/95\s?%/);
+    }
+    expect(en.projects.mediaAlt['energy-forecasting/prediction-interval']).toMatch(/conformal/i);
+    expect(es.projects.mediaAlt['energy-forecasting/prediction-interval']).toMatch(/conformal/i);
+  });
+
+  it('never calls the forecast band a quantile interval', () => {
+    // P0 #3: the repo does conformal prediction; quantile regression is Future
+    // Work. The case-study copy was corrected for exactly this claim, and alt
+    // text is a technical claim like any other — the same trap, one file over.
+    for (const locale of LOCALES) {
+      for (const alt of Object.values(DICTIONARIES[locale].projects.mediaAlt)) {
+        expect(alt, `${locale} mediaAlt claims quantile`).not.toMatch(/quantile|cuantil/i);
+      }
+    }
+  });
+
+  it('attributes the confusion matrix to the classical baseline, not the hybrid model', () => {
+    // No confusion matrix for the QNN exists in any notebook. Alt text that
+    // implied one would be a fabricated result, read aloud to the people least
+    // able to check it.
+    for (const locale of LOCALES) {
+      const alt = DICTIONARIES[locale].projects.mediaAlt['quantum-audio/confusion-matrix'];
+      expect(alt, `${locale} confusion matrix omits the model`).toMatch(/logistic|logística/i);
+      expect(alt, `${locale} confusion matrix implies a quantum result`).not.toMatch(/quantum|cuántic/i);
+    }
+  });
+
+  it('names the processor the circuit was compiled for, in both locales', () => {
+    for (const locale of LOCALES) {
+      expect(DICTIONARIES[locale].projects.mediaAlt['quantum-audio/transpiled-circuit']).toContain('ibm_kingston');
+    }
+  });
+
+  it('is alt text, not a caption arguing a point', () => {
+    for (const locale of LOCALES) {
+      for (const [key, alt] of Object.entries(DICTIONARIES[locale].projects.mediaAlt)) {
+        expect(alt.length, `${locale} projects.mediaAlt['${key}'] too long`).toBeLessThanOrEqual(420);
+      }
     }
   });
 });

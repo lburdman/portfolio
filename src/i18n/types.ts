@@ -35,6 +35,22 @@ export type PerDomain<T> = Record<DomainId, T>;
 export type PerSection<T> = Record<SectionId, T>;
 
 /**
+ * Exactly three verifiable credentials — no more, and no fewer.
+ *
+ * A fixed tuple rather than `string[]`, for the same reason `PerDomain` is a
+ * `Record<DomainId, T>` and `PerSection` a `Record<SectionId, T>`: the
+ * constraint belongs to the type, not to the author's restraint. The Hero
+ * carries a name, a role, one sentence and a row of buttons; three lines of
+ * credential read as provenance, and a fourth reads as a badge wall. Making
+ * the fourth a compile error is the only version of that rule that survives
+ * the next person who has something else worth listing.
+ *
+ * The same trio backs `about.facts`, which previously restated the `<h1>`
+ * directly above it.
+ */
+export type CredentialTrio = readonly [string, string, string];
+
+/**
  * Every user-facing string in the site.
  *
  * This includes `aria-label`s, `alt` text, empty states and page metadata —
@@ -75,12 +91,22 @@ export interface UIStrings {
     role: string;
     /** The central narrative sentence of the whole portfolio. */
     positioning: string;
+    /**
+     * Three verifiable credentials, rendered between `positioning` and the
+     * CTA row. Degree, MicroMasters, certification — in that order, which is
+     * the order of how long each took to earn.
+     *
+     * Proper nouns stay in their issued form in both locales: a translated
+     * certification name cannot be looked up, and an unverifiable credential
+     * is worse than an absent one.
+     */
+    credentials: CredentialTrio;
     ctaProjects: string;
     ctaContact: string;
     ctaResume: string;
   };
 
-  /** Section 01 — "I build across layers". */
+  /** Section 01 — the descent, from the models down to the physics. */
   layers: {
     heading: string;
     /** One line explaining why five domains belong in one portfolio. */
@@ -121,6 +147,28 @@ export interface UIStrings {
     article: string;
     relatedWork: string;
     backToList: string;
+    /**
+     * `alt` for the figures committed under each project's own `media/`
+     * directory, keyed `<slug>/<file stem>` — e.g.
+     * `energy-forecasting/prediction-interval`.
+     *
+     * Alt is user-facing copy, so it lives here and not in `project.json`
+     * (audit 2.8 was 14 strings hardcoded in components). One entry per image
+     * rather than one title reused for figures that show different things:
+     * `ProjectCard.astro` and the project detail page both fall back to the
+     * localized title, which is never *wrong*, only vague — and vague is not
+     * what a reader who cannot see the plot is owed.
+     *
+     * Deliberately an open `Record<string, string>` and **not** a union of the
+     * four keys that exist today. Dropping a file into `media/` publishes it,
+     * with no schema change and no second place to name it; a closed key type
+     * would make adding an image a compile error in both dictionaries, and the
+     * consumers already degrade to the title for a key that is missing.
+     *
+     * Describe what the image *shows* — the series drawn, the axes, the shaded
+     * region — never what it is meant to prove.
+     */
+    mediaAlt: Record<string, string>;
   };
 
   about: {
@@ -128,8 +176,15 @@ export interface UIStrings {
     bio: string;
     /** Meaningful `alt` for the portrait — never "Photo coming soon". */
     portraitAlt: string;
-    /** Short factual chips: profession, university, city. */
-    facts: string[];
+    /**
+     * The same three credentials the Hero carries. Not a second copy — both
+     * dictionaries define the trio once and reference it from both places, so
+     * the two cannot drift.
+     *
+     * These were `Electronic Engineer / FIUBA / Buenos Aires`, two of which
+     * restated the `<h1>` a few pixels above them.
+     */
+    facts: CredentialTrio;
     currentlyHeading: string;
     interests: string[];
     teachingHeading: string;
@@ -144,8 +199,21 @@ export interface UIStrings {
     >;
   };
 
+  /**
+   * The closing section. There is deliberately **no `heading` here.**
+   *
+   * The section's margin annotation is `sections.contact` like every other
+   * section's, and its `<h2>` carries `invitation` — the word "Contact" is
+   * never written twice. A `contact.heading` did exist while the section was
+   * rendered through `Section`'s escape hatch, and it went dead the moment
+   * `'contact'` joined `SECTION_IDS`. It is removed rather than left in place
+   * because an unused key looks authoritative: the next person to need a
+   * heading here wires up the one in this group, and then the margin word and
+   * the visible heading are free to diverge — in one locale only, which is the
+   * version nobody notices. The audit already listed dead dictionary keys
+   * (`nav.notes`, `NoteFrontmatter`) as a finding for exactly this reason.
+   */
   contact: {
-    heading: string;
     invitation: string;
     note: string;
     emailLabel: string;

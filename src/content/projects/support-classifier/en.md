@@ -1,30 +1,31 @@
 ---
 title: 'Support Ticket Classifier'
-summary: 'An AI-assisted support ticket classifier with validated structured outputs, deterministic fallbacks, and a lightweight local UI — focused on maintainable backend design and practical handling of model outputs.'
+summary: 'An AI-assisted support ticket classifier with schema-validated structured output, a deterministic fallback that never raises, and a minimal local UI — focused on maintainable backend design and practical handling of model output.'
 ---
 
 ## Overview
 
-A support ticket classification system that uses a language model to categorize incoming tickets, with structured output validation, deterministic fallback behavior, and a minimal local interface for inspection.
+A FastAPI service that classifies incoming support messages with a language model, validates the result against a typed schema, and falls back to a fixed, safe response whenever the model output cannot be trusted.
 
 ## Problem
 
-Deploying LLM-based classifiers in production exposes a practical challenge: model outputs are not reliably structured. A model that returns "I think this might be a billing issue" is not parseable by downstream systems. This project addresses the gap between LLM flexibility and the structured behavior required for production use.
+Deploying LLM-based classifiers exposes a practical challenge: model output is not reliably structured. A model that returns "I think this might be a billing issue" is not parseable by downstream systems. This project addresses the gap between LLM flexibility and the structured behaviour production callers need.
 
 ## Architecture
 
-- **Classifier backend**: Calls an LLM API with a structured prompt and extracts a Pydantic-validated classification object from the response.
-- **Multi-format parsing**: Handles JSON in code blocks, inline JSON, and prose-wrapped outputs — a common response variability in practice.
-- **Fallback logic**: When parsing fails, falls back to a deterministic rule-based classifier rather than propagating an error.
-- **Audit layer**: Logs classification decisions with confidence scores and parsing status for observability.
-- **Local UI**: A minimal interface for submitting tickets and inspecting classification results.
+- **Classifier service**: Calls the Anthropic API at temperature 0 with a system prompt held in a single module, then validates the reply against a Pydantic response model whose category and priority fields are `Literal` enums.
+- **Multi-format extraction**: A fenced ` ```json ` block is tried first, then a brace-depth scan that finds the exact object boundaries inside surrounding prose.
+- **Deterministic fallback**: The service never raises. Any provider error or invalid output returns one fixed `ClassifyResponse` with `is_fallback` and `needs_human_review` set, so the caller always receives a valid object and can surface a warning.
+- **Provider isolation**: Every Anthropic import lives in `classifier.py`; swapping providers means touching that one file.
+- **Local UI**: A single Jinja2 page for submitting a message and inspecting the classification.
 
 ## Key Design Decisions
 
-- **Schema-first approach**: Output schemas are defined with Pydantic and enforced before any downstream logic executes.
-- **Explicit failure modes**: The system distinguishes between configuration failures, network failures, and parsing failures — each handled differently.
-- **Testable structure**: The parsing and fallback logic is fully unit-testable without live API access.
+- **Schema-first**: Output schemas are defined with Pydantic and enforced before any downstream logic runs.
+- **Explicit failure modes**: Auth and configuration errors, transient network errors, invalid JSON and schema mismatches are caught separately and logged distinctly, so a fallback in production is traceable to its cause.
+- **Testable structure**: Three test modules cover schema edge cases, the service, and the endpoint. Every Anthropic call is mocked, so the suite runs without an API key.
+- **Deliberately small**: No database, no auth, no Docker — the task did not need them, and they would have obscured the classification logic.
 
 ## Key Learnings
 
-The hardest part of LLM-backed systems is not the model — it is everything around it. Parsing, fallbacks, retry logic, and observability are what separate a demo from a production system.
+The hardest part of an LLM-backed system is not the model — it is everything around it. Extraction, fallback behaviour, distinguishing failure classes and keeping the response contract stable are what separate a demo from something a caller can depend on.

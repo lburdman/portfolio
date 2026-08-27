@@ -1,4 +1,19 @@
-import type { UIStrings } from './types';
+import type { CredentialTrio, UIStrings } from './types';
+
+/**
+ * Las tres credenciales, definidas una sola vez y referenciadas desde la
+ * franja del Hero y desde `about.facts`, para que los dos lugares del sitio
+ * que muestran respaldo no puedan contradecirse.
+ *
+ * `Claude Certified Architect · Foundations` conserva su nombre en inglés a
+ * propósito: es un nombre propio, y una certificación traducida es una
+ * certificación que nadie puede verificar.
+ */
+const CREDENTIALS = [
+  'Ingeniería Electrónica · UBA',
+  'MicroMasters MITx · Estadística y Ciencia de Datos',
+  'Claude Certified Architect · Foundations',
+] as const satisfies CredentialTrio;
 
 export const es: UIStrings = {
   nav: {
@@ -13,6 +28,7 @@ export const es: UIStrings = {
     layers: 'Capas',
     worlds: 'Mundos técnicos',
     projects: 'Proyectos seleccionados',
+    contact: 'Contacto',
   },
 
   hero: {
@@ -20,13 +36,14 @@ export const es: UIStrings = {
     role: 'Ingeniero Electrónico · AI Engineer',
     positioning:
       'Construyo a través de capas: de las señales y el hardware, pasando por la lógica digital y el cómputo, hasta los modelos y los sistemas inteligentes.',
+    credentials: CREDENTIALS,
     ctaProjects: 'Ver proyectos',
     ctaContact: 'Hablemos',
     ctaResume: 'Currículum',
   },
 
   layers: {
-    heading: 'Construyo a través de capas',
+    heading: 'Hasta la física',
     narrative:
       'Cada capa define los límites de la que tiene encima. Saber qué ocurre dos capas más abajo cambia las decisiones que se toman arriba.',
     items: {
@@ -58,7 +75,7 @@ export const es: UIStrings = {
 
   worlds: {
     heading: 'Mundos técnicos',
-    subtitle: 'Un mismo sistema visto desde cinco capas, desde los modelos hasta la física que los sostiene.',
+    subtitle: 'Cinco áreas de trabajo. En qué consiste cada una.',
     items: {
       ai: {
         name: 'IA y Machine Learning',
@@ -78,7 +95,7 @@ export const es: UIStrings = {
       electronics: {
         name: 'Electrónica',
         summary:
-          'Diseño de circuitos e instrumentación: la cadena que va del sensor al procesador, leída como se lee la documentación de ingeniería.',
+          'Diseño de circuitos e instrumentación: la cadena que va del sensor al procesador. Es la base sobre la que se apoyan las otras cuatro capas y el eje de la carrera de Ingeniería Electrónica que está detrás de todas ellas.',
       },
       audio: {
         name: 'Audio y acústica',
@@ -105,13 +122,26 @@ export const es: UIStrings = {
     article: 'Artículo',
     relatedWork: 'Trabajo relacionado',
     backToList: 'Volver a proyectos',
+    mediaAlt: {
+      'energy-forecasting/prediction-interval':
+        'Gráfico de líneas de la demanda eléctrica alemana durante 14 días de agosto de 2019: la carga real en negro, la predicción de XGBoost en línea discontinua y un intervalo de predicción conformal del 95 % sombreado a su alrededor. La predicción sigue de cerca los picos y valles diarios; el intervalo se ensancha donde el modelo tiene menos certeza.',
+      'energy-forecasting/backtest-rmse-by-fold':
+        'Gráfico de líneas del RMSE por fold en un backtest de origen deslizante, comparando cuatro modelos a lo largo de cinco folds. La línea base naive se mantiene cerca de 8.500 en todos; Ridge queda entre 4.400 y 5.500; RandomForest y XGBoost parten de unos 3.400 y bajan hasta unos 1.200–1.400 en el tercer fold.',
+      // Una línea base de regresión logística, no el modelo cuántico híbrido:
+      // no existe ninguna matriz de confusión de la QNN en los notebooks, así
+      // que esto no puede redactarse de forma que suene a resultado cuántico.
+      'quantum-audio/confusion-matrix':
+        'Matriz de confusión de seis por seis de una línea base de regresión logística sobre las clases de emoción de CREMA-D HAP, SAD, ANG, DIS, FEA y NEU. La diagonal es la banda más oscura, enfado es la clase más fuerte, y asco y miedo son las que más se confunden con el resto.',
+      'quantum-audio/transpiled-circuit':
+        'Diagrama de un circuito cuántico de dos qubits rotulado «Transpiled for ibm_kingston»: una cadena larga de puertas Rz y raíz de X sobre los qubits q0 y q1, separadas por barreras, con dos puertas de entrelazamiento de dos qubits y una medición de cada qubit sobre un registro clásico de 2 bits.',
+    },
   },
 
   about: {
     heading: 'Sobre mí',
-    bio: 'Soy Ingeniero Electrónico, con base en matemática, física y pensamiento computacional, y trabajo en sistemas de IA, automatización, flujos de datos y productos de software. Mi trabajo combina experimentación, rigor técnico y una implementación pensada para producción.',
+    bio: 'Soy Ingeniero Electrónico por la UBA y trabajo en sistemas de IA en producción. Mi formación viene de las señales, los circuitos y el diseño digital; hoy la mayor parte de mi tiempo va al machine learning y a los sistemas con LLM, y al trabajo de evaluación que decide si un modelo está listo para salir. Soy ayudante de cátedra en Sistemas Digitales y en Computación y Comunicaciones Cuánticas, en la FIUBA.',
     portraitAlt: 'Lucas Burdman, Ingeniero Electrónico y AI Engineer.',
-    facts: ['Ingeniero Electrónico', 'FIUBA', 'Buenos Aires'],
+    facts: CREDENTIALS,
     currentlyHeading: 'Explorando ahora',
     interests: [
       'Sistemas con LLM en producción',
@@ -146,7 +176,6 @@ export const es: UIStrings = {
   },
 
   contact: {
-    heading: 'Contacto',
     invitation: 'Construyamos algo interesante.',
     note: 'El correo es la vía más rápida para llegar a mí. Abajo están GitHub y LinkedIn.',
     emailLabel: 'Correo',

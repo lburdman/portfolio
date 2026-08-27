@@ -12,6 +12,18 @@
  * pointed at an English page. Every href below goes through `localizePath`
  * with the locale it was handed.
  *
+ * ── The credibility strip ───────────────────────────────────────────────────
+ *
+ * Three lines of provenance between the positioning sentence and the CTA row
+ * (REDESIGN_DECISIONS P5 #20). Before it, no string in either dictionary
+ * carried a degree, a certification or a MicroMasters — the site asked to be
+ * believed on the strength of its own copy.
+ *
+ * The cap of three is enforced by the type, not by this file: `credentials` is
+ * a `CredentialTrio`, a fixed 3-tuple, so a fourth badge is a compile error in
+ * both dictionaries. That is the same reasoning as `Record<DomainId, T>`, and
+ * it is what keeps a strip from becoming a wall.
+ *
  * The technical-area row is a real `<nav>` of real links. Nothing about it is
  * hover-only — brief §14 requires that anything a pointer reveals be reachable
  * by tap and by keyboard, so there is nothing to reveal in the first place.
@@ -69,6 +81,10 @@ const HEADING_ID = 'hero-heading';
   </div>
 
   <p class="hero__positioning">{t.hero.positioning}</p>
+
+  <ul class="hero__credentials">
+    {t.hero.credentials.map((credential) => <li class="hero__credential">{credential}</li>)}
+  </ul>
 
   <div class="hero__actions">
     <ActionLink href={projectsHref} variant="primary" arrow>{t.hero.ctaProjects}</ActionLink>
@@ -160,6 +176,53 @@ const HEADING_ID = 'hero-heading';
     font-size: var(--text-xl);
     line-height: var(--leading-snug);
     text-wrap: pretty;
+  }
+
+  /* --- credibility strip ---------------------------------------------------
+     Provenance, not decoration. It borrows the type treatment of the
+     technical-area row below the CTAs — mono, micro, uppercase, slate — so it
+     introduces no new visual language and cannot outweigh the name it sits
+     under. The list is a fixed 3-tuple in the dictionary, so the layout below
+     is allowed to assume exactly three items.
+
+     Below 64rem the three sit in a column with no rules: three uppercase mono
+     lines wrap unpredictably in a row, and a wrapped flex row puts a leading
+     hairline at the start of the second line, which reads as a mistake. At
+     64rem and up they fit on one line, so the separators can be real.
+     ---------------------------------------------------------------------- */
+  .hero__credentials {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4375rem;
+    margin-top: var(--spacing-stack);
+    padding-top: 1rem;
+    border-top: var(--border-hairline) solid var(--color-rule);
+    list-style: none;
+  }
+
+  .hero__credential {
+    font-family: var(--font-mono);
+    font-stretch: normal;
+    font-size: var(--text-micro);
+    font-weight: 500;
+    letter-spacing: var(--tracking-eyebrow);
+    text-transform: uppercase;
+    color: var(--color-slate);
+  }
+
+  @media (min-width: 64rem) {
+    .hero__credentials {
+      flex-direction: row;
+      flex-wrap: nowrap;
+      align-items: baseline;
+      gap: 0;
+    }
+
+    .hero__credential + .hero__credential {
+      margin-inline-start: 1rem;
+      padding-inline-start: 1rem;
+      border-inline-start: var(--border-hairline) solid var(--color-rule);
+    }
   }
 
   .hero__actions {

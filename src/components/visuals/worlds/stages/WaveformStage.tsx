@@ -72,10 +72,13 @@ export function WaveformStage({ domain, active }: StageProps) {
           transform={`translate(0 ${WAVE_CENTRE}) scale(${frequency.toFixed(3)} ${amplitude.toFixed(3)}) translate(0 ${-WAVE_HEIGHT / 2})`}
         >
           <g className="tw-wave-travel">
-            <path className="tw-wave" d={WAVE_PATH} />
+            {/* `pathLength` normalises both copies to a 0–100 dash space, so
+                the activation sweep is one CSS constant rather than two
+                measured lengths handed in through an inline custom property. */}
+            <path className="tw-wave" d={WAVE_PATH} pathLength={100} />
             {/* The second copy is what makes the loop seamless: as the first
                 leaves the frame the second is already in it. */}
-            <path className="tw-wave" d={WAVE_PATH} transform={`translate(${WAVE_TILE} 0)`} />
+            <path className="tw-wave" d={WAVE_PATH} pathLength={100} transform={`translate(${WAVE_TILE} 0)`} />
           </g>
         </g>
       </g>

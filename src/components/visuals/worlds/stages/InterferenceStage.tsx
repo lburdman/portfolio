@@ -21,11 +21,25 @@ import { usePointerField } from '../usePointerField';
 
 const CENTRE_Y = 78;
 const RINGS = 7;
-const RING_STEP = 13;
 const MIN_SEPARATION = 32;
 const MAX_SEPARATION = 108;
 
 const SCREEN_Y = STAGE_HEIGHT - 30;
+
+/**
+ * Emitter-to-screen distance, and therefore the outermost ring's radius.
+ *
+ * Derived rather than chosen. The rings used to be a fixed 13px step, which
+ * put the outer front *near* the detection line by coincidence and let the
+ * inner ones cross it and draw over the histogram — so the wavefronts and the
+ * fringes read as two unrelated pictures stacked in one box (REDESIGN_DECISIONS
+ * P2, Quantum). Spacing the rings across exactly this reach, and clipping the
+ * field at the line, makes the outermost crest *land* on the screen; the CSS
+ * then brightens the constructive bins on the same period, so a crest arriving
+ * and a fringe lighting are visibly one event.
+ */
+const REACH = SCREEN_Y - CENTRE_Y;
+const RING_STEP = REACH / RINGS;
 const BAR_COUNT = 31;
 const BAR_LEFT = 30;
 const BAR_SPAN = STAGE_WIDTH - BAR_LEFT * 2;
@@ -45,7 +59,7 @@ function Emitter({ x }: { readonly x: number }) {
           style because the site's CSP blocks inline `style` attributes. */}
       <g className="tw-ripple">
         {Array.from({ length: RINGS }, (_, index) => (
-          <circle key={index} r={(index + 1) * RING_STEP} />
+          <circle key={index} r={Number(((index + 1) * RING_STEP).toFixed(2))} />
         ))}
       </g>
       <circle className="tw-emitter" r={3} />
@@ -65,9 +79,13 @@ export function InterferenceStage({ domain, active }: StageProps) {
   return (
     <StageFrame domain={domain} active={active} frameRef={ref}>
       {/* Wavefronts are clipped to the frame so they read as a field under
-          observation rather than as circles drawn on top of a box. */}
+          observation rather than as circles drawn on top of a box — and, at the
+          bottom, to the **detection line** rather than to the frame. A wave
+          that continued past the screen it is being measured on would be a
+          picture of nothing; terminating it there is what makes the histogram
+          below read as the consequence of the field above. */}
       <clipPath id={`tw-clip-${domain.id}`}>
-        <rect x={11} y={11} width={STAGE_WIDTH - 22} height={STAGE_HEIGHT - 22} />
+        <rect x={11} y={11} width={STAGE_WIDTH - 22} height={SCREEN_Y - 11} />
       </clipPath>
 
       <g clipPath={`url(#tw-clip-${domain.id})`}>

@@ -117,6 +117,11 @@ export function SignalPathStage({ domain, active }: StageProps) {
           `'unsafe-hashes'`, so a `style` attribute here would simply be
           dropped and the accent would never appear. */}
       <path className="tw-trace-live" d={TRACE_PATH} pathLength={100} strokeDasharray={`${energised} 100`} />
+      {/* Both exist only while the stage is active, so this section still has
+          no element whose resting state is invisible (MOTION_SYSTEM §6).
+          `tw-trace-arrive` is the one-shot: the chain energises left to right
+          once, on arrival. `tw-trace-pulse` is the ambient that follows it. */}
+      {active ? <path className="tw-trace-arrive" d={TRACE_PATH} pathLength={100} /> : null}
       {active ? <path className="tw-trace-pulse" d={TRACE_PATH} pathLength={100} /> : null}
 
       <g className="tw-vias">
@@ -145,10 +150,20 @@ export function SignalPathStage({ domain, active }: StageProps) {
         ))}
       </g>
 
-      {/* Instrumentation bracket over the block currently under measurement. */}
+      {/* Instrumentation bracket over the block currently under measurement.
+
+          Its y coordinates are derived from `CENTRE_Y` rather than written as
+          literals. They used to be literal 30–42, which put the bracket 30px
+          above the chain it was supposed to be bracketing — it read as a stray
+          mark in the top margin rather than as a probe on anything. */}
       <g className="tw-probe" transform={`translate(${selectedCentre} 0)`}>
-        <path d={`M${-BLOCK_WIDTH / 2} 42 L${-BLOCK_WIDTH / 2} 36 L${BLOCK_WIDTH / 2} 36 L${BLOCK_WIDTH / 2} 42`} />
-        <line x1={0} y1={36} x2={0} y2={30} />
+        <path
+          d={
+            `M${-BLOCK_WIDTH / 2} ${CENTRE_Y - 24} L${-BLOCK_WIDTH / 2} ${CENTRE_Y - 30} ` +
+            `L${BLOCK_WIDTH / 2} ${CENTRE_Y - 30} L${BLOCK_WIDTH / 2} ${CENTRE_Y - 24}`
+          }
+        />
+        <line x1={0} y1={CENTRE_Y - 30} x2={0} y2={CENTRE_Y - 38} />
       </g>
 
       <line className="tw-rule" x1={22} y1={STAGE_HEIGHT - 24} x2={STAGE_WIDTH - 22} y2={STAGE_HEIGHT - 24} />

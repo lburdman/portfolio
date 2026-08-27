@@ -1,6 +1,21 @@
 ---
 /**
- * SECTION 01 — "I build across layers" (brief §5).
+ * SECTION 01 — the descent, from the models down to the physics (brief §5).
+ *
+ * ── Why the heading is not the Hero sentence ────────────────────────────────
+ *
+ * It used to be "I build across layers", a verbatim substring of
+ * `hero.positioning` one screen above, sitting over a list of the same five
+ * layers the Hero already names in order — the thesis stated three times
+ * inside two screens (REDESIGN_DECISIONS P5 #19). The heading now announces
+ * the *destination* of the descent instead of restating the premise, and the
+ * margin annotation still reads `01 / LAYERS`, so the word survives without
+ * the sentence.
+ *
+ * `layers.narrative` is the one string here that advances the argument rather
+ * than repeating it, so the intro grid gives it equal width to the heading and
+ * full ink rather than slate. That is a promotion in weight only — the wording
+ * is deliberately untouched.
  *
  * The conceptual bridge: why five technical domains belong in one portfolio.
  * It is typography-led and deliberately quiet — no glitch, no terminal, no
@@ -79,7 +94,9 @@ const HEADING_ID = 'layers-heading';
 
   @media (min-width: 60rem) {
     .layers__intro {
-      grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
+      /* Equal columns, not 7/5: the narrative is the argument, not a caption
+         hung off the heading. */
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
       gap: var(--spacing-block);
       align-items: end;
     }
@@ -93,9 +110,9 @@ const HEADING_ID = 'layers-heading';
   }
 
   .layers__narrative {
-    font-size: var(--text-lg);
-    line-height: var(--leading-prose);
-    color: var(--color-slate);
+    font-size: var(--text-xl);
+    line-height: var(--leading-snug);
+    color: var(--color-ink);
     text-wrap: pretty;
   }
 

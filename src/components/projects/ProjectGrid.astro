@@ -37,6 +37,26 @@ interface Props {
 }
 
 const { projects, t, locale, base, headingLevel = 3, lead = false, numbered = true } = Astro.props;
+
+/**
+ * Which card gets `loading="eager"` + `fetchpriority="high"`.
+ *
+ * The first card that actually has a cover — not simply the first card.
+ * Loading priority exists to name the Largest Contentful Paint candidate, and
+ * a card with no image cannot be one: it renders as type, which the document's
+ * own stylesheet already paints. Handing the priority to position 0
+ * unconditionally was correct only while no project shipped media at all. It
+ * is wrong the moment the opening entry is typographic and the second one
+ * carries a 1500px plot, which is exactly the current ordering — the real LCP
+ * element would have been discovered late, by layout, behind `loading="lazy"`.
+ *
+ * `findIndex` returning −1 (nothing has a cover) collapses to 0, so a
+ * cover-less listing behaves exactly as before and the prop is inert.
+ */
+const priorityIndex = Math.max(
+  0,
+  projects.findIndex((project) => project.meta.cover !== undefined),
+);
 ---
 
 {
@@ -46,6 +66,9 @@ const { projects, t, locale, base, headingLevel = 3, lead = false, numbered = tr
     <ul class="grid">
       {projects.map((project, position) => {
         const isLead = lead && position === 0;
+        // Not `isLead`: emphasis is an editorial decision this listing may
+        // decline to make, while the LCP candidate is a fact about which card
+        // holds the first image. See `priorityIndex` above.
         return (
           <li class:list={['grid__item', isLead && 'grid__item--lead']}>
             <ProjectCard
@@ -56,6 +79,7 @@ const { projects, t, locale, base, headingLevel = 3, lead = false, numbered = tr
               headingLevel={headingLevel}
               index={numbered ? position + 1 : undefined}
               emphasis={isLead ? 'lead' : 'default'}
+              priority={position === priorityIndex}
             />
           </li>
         );
