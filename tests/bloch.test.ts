@@ -434,8 +434,8 @@ describe('the still frame', () => {
   });
 
   it('is exactly the frame the traverse publishes at the centred dwell', () => {
-    // `localProgress` reaches exactly 0.5 while a world is centred, and the
-    // stylesheet's `--tw-progress` default is 0.5. The first client frame after
+    // `localProgress` reaches exactly 0.5 while a world is centred, which is
+    // the progress `STATIC_FRAME` is drawn at. The first client frame after
     // hydration therefore matches the server markup byte for byte.
     expect(blochFrame(0.5, 0)).toEqual(STATIC_FRAME);
   });

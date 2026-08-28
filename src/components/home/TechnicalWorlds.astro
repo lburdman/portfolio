@@ -530,13 +530,12 @@ const SECTION = 'worlds' as const;
        instead — see the negative delays below. */
     --tw-settle: 400ms;
 
-    /* The local progress channel's resting value. `StageFrame` overwrites this
-       through CSSOM while the traverse is running: 0 as the world begins
-       arriving, exactly 0.5 while it is centred, 1 once it has left. Declared
-       here so a stage can read `var(--tw-progress)` in the stacked
-       composition, where nothing is publishing, without a fallback of its
-       own. */
-    --tw-progress: 0.5;
+    /* There is deliberately no `--tw-progress` here. It was declared as a
+       resting 0.5 and rewritten through CSSOM on every traverse tick for all
+       five stages, and no rule in this file — or anywhere else — ever read it.
+       Scroll progress reaches the two stages that need it as a number, through
+       `traverse.ts`'s registry. If a CSS channel is wanted later, declare it
+       with its first `var()` consumer and not before. */
 
     /* The electronics chain's clock, and the phase it starts at. Its pulse and
        its five block glyphs are two readings of one event, so they are driven
@@ -930,8 +929,9 @@ const SECTION = 'worlds' as const;
   /* --- ai / decision landscape -------------------------------------------
      A three-class partition, the confidence corridor either side of it, the
      points it gets wrong, and a meter reading how much of the data it has
-     accounted for. `--tw-progress` drives the boundary's shape, so this is the
-     one stage on the band whose subject is literally the scroll.
+     accounted for. Scroll progress drives the boundary's shape — the stage
+     subscribes to `traverse.ts`'s registry and rewrites `d` per frame — so this
+     is the one stage on the band whose subject is literally the scroll.
 
      Two rules hold the colour scheme together. There is **exactly one accent
      object** — the boundary; and everything the reader is asked to read as

@@ -61,9 +61,9 @@ import { REDUCED_MOTION_QUERY, TRAVERSE_QUERY, useMediaQuery } from './useMediaQ
  * staggers from `:nth-child()`, and dash geometry from SVG `pathLength` and
  * presentation attributes. What the policy governs is the authored attribute,
  * not scripted mutation of a `CSSStyleDeclaration` — which is why GSAP's own
- * transform writes work, and why `StageFrame` may write `--tw-progress`
- * through `setProperty` on the same terms. This island injects no `<script>`
- * or `<style>` element at runtime.
+ * transform writes work, and why the teardown below may call `removeProperty`
+ * on the track. This island injects no `<script>` or `<style>` element at
+ * runtime.
  *
  * ── PROGRESSIVE ENHANCEMENT ────────────────────────────────────────────────
  * The first render — the one Astro runs at build time and the one React
@@ -350,9 +350,10 @@ export default function TechnicalWorlds({ t }: TechnicalWorldsProps) {
       // stacked layout would inherit a leftover horizontal offset.
       track.style.removeProperty('transform');
       track.style.removeProperty('translate');
-      // And the local progress channel, for the same reason: without this every
-      // stage would keep the `--tw-progress` it happened to hold when the
-      // traverse was torn down.
+      // And the progress registry, for the same reason: without this every
+      // subscribed stage would keep drawing whatever progress the timeline
+      // happened to hold when the traverse was torn down. `null` is the signal
+      // to go back to the resting picture.
       resetTraverseProgress();
       setEngaged(false);
       applyIndex(-1);

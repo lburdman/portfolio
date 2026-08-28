@@ -175,9 +175,9 @@ export function LandscapeStage({ domain, active }: StageProps) {
   const queryPointRef = useRef<{ x: number; y: number }>({ ...RESTING_QUERY });
 
   /* ── The scroll channel ─────────────────────────────────────────────────
-     Subscribed directly rather than read back off `--tw-progress`: the stage
-     needs the number, and `StageFrame` writes that custom property for stages
-     that want it as a CSS input. Both read the same registry. */
+     One subscription to `traverse.ts`'s registry, and the raw number: this
+     stage recomputes a path from it, which no CSS custom property could have
+     carried. That registry is the only progress channel the band has. */
   useEffect(() => {
     const index = traverseIndexOf(domain.id);
     if (index < 0) return;

@@ -492,7 +492,7 @@ export function blochFrame(p: number, phi = 0): BlochFrame {
  * The frame every non-scrolling reader gets: |+⟩, φ = 0.
  *
  * It is the server-rendered markup, the reduced-motion picture, the mobile
- * picture, and the value `--tw-progress` already defaults to in the stylesheet.
+ * picture, and the frame `localProgress` publishes at the centred dwell.
  * So the first client frame after hydration is byte-identical to the markup it
  * hydrates against — there is no mismatch and no flash — and it is also the
  * single most informative still: both probabilities equal, the latitude ring at

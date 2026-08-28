@@ -597,8 +597,8 @@ describe('the stage progress registry', () => {
   });
 
   it('tells every listener when the traverse stands down', () => {
-    // `null` is what makes a stage drop its `--tw-progress` rather than stay
-    // frozen at whatever value the timeline was torn down on.
+    // `null` is what makes a stage return to its resting picture rather than
+    // stay frozen at whatever value the timeline was torn down on.
     let last: number | null = 0.25;
     const stop = subscribeStageProgress(1, (value) => {
       last = value;

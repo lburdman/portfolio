@@ -370,11 +370,11 @@ export function scrollTargetForIndex(index: number, count: number, start: number
 
    So it is a plain subscription registry: the island publishes one number per
    update, each subscriber is called with its own world's local progress, and
-   nothing above them re-renders. `StageFrame` uses it to write `--tw-progress`
-   onto its own root through CSSOM — which the site's hash-based CSP permits
-   (it governs style *attributes* as authored, not scripted mutations of a
-   CSSStyleDeclaration; GSAP's transforms already depend on the same thing).
-   A stage that draws to a canvas can subscribe for the raw number instead.
+   nothing above them re-renders. Subscribers take the raw number and rewrite
+   the presentation attributes they own — `d` on the decision boundary, the
+   Bloch vector's geometry, the waveform's scale. There is no CSS mirror of it:
+   one was written per frame for every stage and read by nothing, and it is
+   gone. Add one with its first `var()` consumer, not before.
 
    Module-level rather than a React context on purpose: a context would put the
    value back on the render path, which is the whole thing being avoided.
