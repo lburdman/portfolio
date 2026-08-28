@@ -188,10 +188,16 @@ const SECTION = 'worlds' as const;
        stop. The remaining 14% is the peek of the next domain, which is what
        tells the reader the band continues sideways.
 
-       It is a custom property because two rules have to agree on it — the
-       panel's flex basis and the track's trailing spacer — and they were
-       silently allowed to disagree before. See the spacer rule below. */
+       It is a custom property because three rules have to agree on it — the
+       panel's flex basis, the track's two spacers and the viewport's edge
+       mask — and the first two were silently allowed to disagree before. See
+       the spacer rule below. */
     --tw-panel-pitch: 86%;
+
+    /* Half the peek, which is also the distance from the frame's edge to the
+       centred panel's own edge. Everything that has to stay clear of the
+       active panel is expressed against this rather than against a literal. */
+    --tw-peek: calc((100% - var(--tw-panel-pitch)) / 2);
   }
 
   /* The pinned composition. `data-traverse` is set imperatively by the island
@@ -259,9 +265,42 @@ const SECTION = 'worlds' as const;
     row-gap: var(--spacing-section);
   }
 
+  /* The frame clips at 100% of its width, and for most of the traverse a
+     neighbouring `h3` or `p` is crossing that boundary — measured on the
+     deployed build, some text fragment was hard-cut for 83% of the pinned
+     scroll, chopped mid-word ("Computac", "clási") with nothing to say it was
+     a frame edge rather than the end of the sentence.
+
+     The gradient mask makes the boundary a fade instead of a guillotine. Its
+     width is derived from `--tw-peek`, so it can never reach the centred
+     panel's own text: the active panel starts one full peek in from each edge,
+     and the fade is at most 68% of that. The `min()` caps it on very wide
+     windows, where a peek is large enough that a proportional fade would start
+     washing out the neighbour's whole approach rather than just its edge.
+
+     `black`/`transparent` are alpha, not colour — the mask carries no hue and
+     names none, so tokens.css remains the only place a colour is chosen. Both
+     spellings are declared: without the prefixed one WebKit renders no mask at
+     all, which is the defect back for a large share of the traffic. */
   .tw[data-traverse='true'] .tw-viewport {
+    --tw-fade: min(64px, calc(var(--tw-peek) * 0.68));
+
     height: 100%;
     overflow: hidden;
+    -webkit-mask-image: linear-gradient(
+      to right,
+      transparent 0,
+      black var(--tw-fade),
+      black calc(100% - var(--tw-fade)),
+      transparent 100%
+    );
+    mask-image: linear-gradient(
+      to right,
+      transparent 0,
+      black var(--tw-fade),
+      black calc(100% - var(--tw-fade)),
+      transparent 100%
+    );
   }
 
   .tw[data-traverse='true'] .tw-track {
@@ -272,42 +311,50 @@ const SECTION = 'worlds' as const;
     will-change: transform;
   }
 
-  /* --- The trailing spacer, and the bug it fixes -------------------------
-     This is the single rule that removes the orphaned text fragments recorded
-     in docs/REDESIGN_DECISIONS.md #15, and it is worth stating the arithmetic
-     because the defect was pure geometry rather than anything visual.
+  /* --- The spacers, and the two bugs they fix ---------------------------
+     These two rules are what make the traverse's geometry come out whole, and
+     the arithmetic is worth stating because both defects were pure layout
+     rather than anything visual.
 
-     Five panels at 86% make a track 430% of the viewport wide, so the track
-     travels 430% − 100% = 330%. The traverse has four steps between five
-     stops, so each step moves 330 / 4 = 82.5% — while the panels are pitched
-     86% apart. The 3.5% shortfall accumulates: at stop *i* the outgoing panel
-     is left standing 3.5×*i* percent inside the frame.
+     **Whole-pitch registration** (docs/REDESIGN_DECISIONS.md #15). Five panels
+     at 86% make a track 430% of the viewport wide, so a bare track travels
+     430% − 100% = 330%. The traverse has four steps between five stops, so
+     each step moves 330 / 4 = 82.5% — while the panels are pitched 86% apart.
+     The 3.5% shortfall accumulates: at stop *i* the outgoing panel is left
+     standing 3.5×*i* percent inside the frame. Measured at 1440×900, viewport
+     box 1344px: slivers of 46, 102, 157 and 213px at the four stops after the
+     first, each showing the clipped tail of the previous stage's annotation.
+     They were not a transient — they were where the traverse came to rest.
 
-     Measured on the built site at 1440×900, viewport box 1344px: slivers of
-     46, 102, 157 and 213px at the four stops after the first, each showing the
-     right-hand end of the previous stage's clipped annotation — the "ing" and
-     "tas/das" fragments in the review, which are the tails of `.tw-stage__meta`
-     labels. They persisted 700ms after scrolling stopped because they were not
-     a transient at all: they were where the traverse comes to rest.
+     Adding 14% of spacer fixes that, because it makes the travel a whole
+     number of pitches:
 
-     Hiding them would have been treating a layout error as a paint artefact.
-     The real fix is to make the travel distance equal a whole number of panel
-     pitches, and a flex spacer of exactly the peek width does that:
+       track = 14% + 5 × 86% = 444%   travel = 444% − 100% = 344% = 4 × 86%
 
-       track = 5 × 86% + 14% = 444%   travel = 444% − 100% = 344% = 4 × 86%
+     **Centring.** That 14% used to be one trailing spacer, and *where* it sat
+     decided where the panels sat. With all of it after the last panel, panel
+     0's centre was half a peek — 94px at 1440×900 — right of the frame's
+     centre at zero translation, and it only moved further away from there. The
+     first world therefore never reached the middle of the frame at all
+     (measured closest approach: 94.6px), and the last one passed through the
+     centre and settled 94px past it. Neither is a taste question: the pinned
+     composition's whole claim is that one domain is being *shown*.
 
-     Now every stop lands a panel flush against the left edge of the frame with
-     the previous one entirely outside it, and at the last stop the spacer —
-     not a stranded neighbour — fills the peek. The island's `distance()` picks
-     this up for free, because it measures `scrollWidth`.
+     Splitting the same 14% into a leading and a trailing half moves every
+     panel half a peek left and makes the arithmetic exact — stop *i* is
+     centred at a translation of exactly −*i* × pitch, and the last stop's
+     translation is exactly the full travel. Neither the track width nor the
+     travel distance changes by a pixel; the island's `distance()` and `pitch()`
+     pick it up for free, because they measure `scrollWidth`.
 
-     A pseudo-element rather than a real element: it is a spacer, it carries no
-     content, and it must not exist in the stacked composition, where the track
-     is a grid and an empty child would add a row and a row-gap. Declaring it
-     only here means it is never generated there. */
+     Pseudo-elements rather than real ones: they are spacers, they carry no
+     content, and they must not exist in the stacked composition, where the
+     track is a grid and empty children would add rows and row-gaps. Declaring
+     them only here means they are never generated there. */
+  .tw[data-traverse='true'] .tw-track::before,
   .tw[data-traverse='true'] .tw-track::after {
     content: '';
-    flex: 0 0 calc(100% - var(--tw-panel-pitch));
+    flex: 0 0 var(--tw-peek);
   }
 
   .tw-viewport:focus-visible {
@@ -470,9 +517,36 @@ const SECTION = 'worlds' as const;
        See the ACTIVATION GRAMMAR block below. */
     --tw-arrive: var(--duration-deliberate);
     --tw-arrive-lag: 240ms;
-    /* Past the 720ms arrival, and a whole number of FPGA clock ticks (0.4s) so
-       the fabric's register blink stays in phase with its own clock. */
-    --tw-settle: 800ms;
+    /* Ambient must be *visibly running* by the time the arrival finishes, not
+       starting after it. The arrival ends at `--tw-arrive-lag + --tw-arrive` =
+       960ms; at the old 800ms the first ambient cycle only became meaningful
+       3–7.5s in, which was routinely longer than a world stayed on screen, so
+       the settled state was a thing the reader was told about and never shown.
+
+       400ms overlaps the second half of the arrival and is still a whole
+       number of FPGA clock ticks (0.4s), which is what keeps the fabric's
+       register blink in phase with its own clock. The ambient animations that
+       do not have to phase-lock to anything skip this and start mid-cycle
+       instead — see the negative delays below. */
+    --tw-settle: 400ms;
+
+    /* The local progress channel's resting value. `StageFrame` overwrites this
+       through CSSOM while the traverse is running: 0 as the world begins
+       arriving, exactly 0.5 while it is centred, 1 once it has left. Declared
+       here so a stage can read `var(--tw-progress)` in the stacked
+       composition, where nothing is publishing, without a fallback of its
+       own. */
+    --tw-progress: 0.5;
+
+    /* The electronics chain's clock, and the phase it starts at. Its pulse and
+       its five block glyphs are two readings of one event, so they are driven
+       off one period with one shared offset — change either here and the
+       causal link between them survives. The offset is negative for the same
+       reason the ripple's is: the signal is already in flight when the world
+       arrives, instead of the reader watching an empty trace until it sets
+       off. */
+    --tw-chain: 2.4s;
+    --tw-chain-phase: -0.9s;
   }
 
   .tw-stage__meta {
@@ -881,13 +955,19 @@ const SECTION = 'worlds' as const;
      out from the rule: one observation arriving after another, which is what
      the faint line through the band is for. It rides on an element the island
      renders only while the stage is active, so nothing here has a resting
-     state that depends on an animation running. */
+     state that depends on an animation running.
+
+     2.4s rather than 3.6s: the roll's meaningful phase runs from 12% to 68% of
+     its period, so at 3.6s behind an 800ms settle the reader waited 1.2s for it
+     to become legible and 3.2s to see it complete. Behind a 400ms settle at
+     2.4s, it is legible at 690ms — while the arrival is still finishing — and
+     has closed a full pass by 2.0s, comfortably inside one world's dwell. */
   .tw-stage[data-active='true'] .tw-fc-scan {
-    animation: tw-fc-roll 3.6s var(--ease-instrument) var(--tw-settle) infinite;
+    animation: tw-fc-roll 2.4s var(--ease-instrument) var(--tw-settle) infinite;
   }
 
   .tw-stage[data-active='true'] .tw-fc-resolved {
-    animation: tw-fc-resolve 3.6s var(--ease-instrument) var(--tw-settle) infinite;
+    animation: tw-fc-resolve 2.4s var(--ease-instrument) var(--tw-settle) infinite;
   }
 
   /* --- fpga / routing ---------------------------------------------------- */
@@ -1033,8 +1113,19 @@ const SECTION = 'worlds' as const;
      that used to sit on top of it was decoration: the spectrum's meaning is
      its *shape*, which the pointer already changes, and blinking the bars said
      nothing the wave was not already saying (REDESIGN_DECISIONS P2, Audio). */
+  /* 3.6s, and starting a third of the way in.
+
+     At 7.5s behind an 800ms settle this was the worst offender on the band: a
+     world's whole dwell could pass before the wave had crossed a fifth of a
+     tile, so the one thing this stage says — that a waveform *travels* — was
+     never actually shown. The negative delay is the same device
+     `.tw-ripple circle` already uses successfully: the wave is already moving
+     the instant the world arrives, rather than starting from a standstill at
+     keyframe 0 with nothing having happened yet. There is no phase to protect
+     here — the second tile makes the loop seamless from any offset. */
   .tw-stage[data-active='true'] .tw-wave-travel {
-    animation: tw-wave-travel 7.5s linear var(--tw-settle) infinite;
+    animation: tw-wave-travel 3.6s linear infinite;
+    animation-delay: -1.2s;
   }
 
   /* --- Signal pulses -----------------------------------------------------
@@ -1056,10 +1147,15 @@ const SECTION = 'worlds' as const;
      `tests/worlds.test.ts`, since a timing function cannot read a module
      constant. The linear offset this replaced read as *flow*, which is the
      wrong physics: a fabric latches on an edge, it does not trickle. */
+  /* The negative delay is exactly two clock ticks, so the pulse is already two
+     cells along when the world arrives and is still on the same 0.4s edge as
+     `.tw-clock-active` below. A pulse that starts from cell zero every time a
+     world is entered reads as the fabric booting; a fabric is always clocking. */
   .tw-route-pulse {
     stroke-width: 3.6;
     stroke-dasharray: 17 83;
     animation: tw-pulse-travel 2.4s steps(6, end) infinite;
+    animation-delay: -0.8s;
   }
 
   /* The clock those ticks are counted against: 2.4s / 6 = one blink per
@@ -1073,7 +1169,8 @@ const SECTION = 'worlds' as const;
   .tw-trace-pulse {
     stroke-width: 3;
     stroke-dasharray: 22 78;
-    animation: tw-pulse-travel 3s linear var(--tw-settle) infinite;
+    animation: tw-pulse-travel var(--tw-chain) linear infinite;
+    animation-delay: var(--tw-chain-phase);
   }
 
   .tw-trace-arrive {
@@ -1084,27 +1181,29 @@ const SECTION = 'worlds' as const;
      order, so the signal is visibly passing through the stages rather than the
      trace merely glowing.
 
-     Its period is the pulse's own 3s and its stagger is a fifth of that, so a
-     block brightens as the pulse reaches it. Same idea as the quantum fringe:
-     the response has to be caused by the thing arriving, or the two halves of
-     the picture are just sharing a box. */
+     Its period is the pulse's own `--tw-chain` and its stagger is a fifth of
+     that (0.48s), so a block brightens as the pulse reaches it. Same idea as
+     the quantum fringe: the response has to be caused by the thing arriving, or
+     the two halves of the picture are just sharing a box. Both are offset by
+     `--tw-chain-phase`, which is what keeps them in step now that the pulse
+     starts mid-flight rather than after a settle. */
   .tw-stage[data-active='true'] .tw-blocks g[data-energised='true'] .tw-block-glyph {
-    animation: tw-block-step 3s var(--ease-instrument) infinite;
+    animation: tw-block-step var(--tw-chain) var(--ease-instrument) infinite;
   }
   .tw-stage[data-active='true'] .tw-blocks g:nth-child(1) .tw-block-glyph {
-    animation-delay: calc(var(--tw-settle) + 0.15s);
+    animation-delay: calc(var(--tw-chain-phase) + 0.12s);
   }
   .tw-stage[data-active='true'] .tw-blocks g:nth-child(2) .tw-block-glyph {
-    animation-delay: calc(var(--tw-settle) + 0.75s);
+    animation-delay: calc(var(--tw-chain-phase) + 0.6s);
   }
   .tw-stage[data-active='true'] .tw-blocks g:nth-child(3) .tw-block-glyph {
-    animation-delay: calc(var(--tw-settle) + 1.35s);
+    animation-delay: calc(var(--tw-chain-phase) + 1.08s);
   }
   .tw-stage[data-active='true'] .tw-blocks g:nth-child(4) .tw-block-glyph {
-    animation-delay: calc(var(--tw-settle) + 1.95s);
+    animation-delay: calc(var(--tw-chain-phase) + 1.56s);
   }
   .tw-stage[data-active='true'] .tw-blocks g:nth-child(5) .tw-block-glyph {
-    animation-delay: calc(var(--tw-settle) + 2.55s);
+    animation-delay: calc(var(--tw-chain-phase) + 2.04s);
   }
 
   /* ===========================================================================

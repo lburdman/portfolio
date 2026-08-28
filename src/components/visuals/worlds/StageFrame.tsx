@@ -1,6 +1,7 @@
-import type { ReactNode, RefObject } from 'react';
+import { useCallback, useEffect, useRef, type ReactNode, type RefObject } from 'react';
 import { domainOrdinal, type Domain } from '../../../config/domains';
 import { STAGE_HEIGHT, STAGE_INSET, STAGE_WIDTH } from './stage-geometry';
+import { subscribeStageProgress, traverseIndexOf } from './traverse';
 
 export interface StageProps {
   readonly domain: Domain;
@@ -36,17 +37,65 @@ const TICK = 12;
  *
  * `data-domain` rather than an inline `style` is what carries the accent: the
  * site ships a hash-based CSP with no `'unsafe-inline'` and no
- * `'unsafe-hashes'`, under which every inline `style=""` attribute is blocked.
- * `--tw-accent` is therefore resolved from a stylesheet rule keyed on this
- * attribute. Nothing in this island writes an inline style.
+ * `'unsafe-hashes'`, under which every inline `style=""` *attribute* is
+ * blocked. `--tw-accent` is therefore resolved from a stylesheet rule keyed on
+ * this attribute. Nothing in this island renders a `style=""` attribute.
+ *
+ * ## The local progress channel
+ *
+ * `--tw-progress` is the exception, and it is not an authored attribute: it is
+ * written through CSSOM (`element.style.setProperty`) from a subscription in
+ * `traverse.ts`, which CSP does not govern — the same mechanism GSAP already
+ * uses for the track's transform. It runs `0 → 1` across this world's whole
+ * ownership window and reads exactly `0.5` while the world is centred, so a
+ * scroll-driven stage has a continuous value to key off without the island
+ * re-rendering anything per frame. A stage that needs the number rather than
+ * the custom property subscribes to the same registry directly.
+ *
+ * The property is only ever written while the traverse is engaged. Stacked,
+ * the stylesheet's own `--tw-progress` default stands, so nothing here depends
+ * on a subscription existing.
  */
 export function StageFrame({ domain, active, frameRef, children }: StageFrameProps) {
   const right = STAGE_WIDTH - STAGE_INSET;
   const bottom = STAGE_HEIGHT - STAGE_INSET;
 
+  const rootRef = useRef<HTMLDivElement | null>(null);
+
+  // One callback ref for two consumers: the stage's own pointer hook, which
+  // passes `frameRef` in, and this file's progress subscription. Assigning
+  // `frameRef.current` by hand is what lets both exist on one element.
+  const setRoot = useCallback(
+    (node: HTMLDivElement | null) => {
+      rootRef.current = node;
+      if (frameRef) frameRef.current = node;
+    },
+    [frameRef],
+  );
+
+  useEffect(() => {
+    const index = traverseIndexOf(domain.id);
+    if (index < 0) return;
+    return subscribeStageProgress(index, (progress) => {
+      const node = rootRef.current;
+      if (!node) return;
+      // `null` is the traverse standing down. Removing the property rather
+      // than writing a resting number hands the stage back to the stylesheet's
+      // own default, so the stacked composition cannot inherit a frozen
+      // mid-traverse value.
+      if (progress === null) {
+        node.style.removeProperty('--tw-progress');
+        return;
+      }
+      // Four decimals: below the resolution of anything that can read it, and
+      // short enough that the string does not churn on sub-pixel scrolls.
+      node.style.setProperty('--tw-progress', progress.toFixed(4));
+    });
+  }, [domain.id]);
+
   return (
     <div
-      ref={frameRef}
+      ref={setRoot}
       className="tw-stage"
       data-domain={domain.id}
       data-stage={domain.stage}
