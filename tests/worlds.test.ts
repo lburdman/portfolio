@@ -1486,9 +1486,19 @@ describe('the band stylesheet', () => {
     const css = await readStylesheet();
     // A commit removed every negative `animation-delay` on this band except the
     // ripple's, and the ripple is the one stage that still read as continuous.
-    // These are the groups that got theirs back.
-    const negatives = css.match(/animation-delay:\s*-\d/g) ?? [];
-    expect(negatives.length).toBeGreaterThanOrEqual(8);
+    // These are the groups that got theirs back — counted in both the forms
+    // they take, a literal negative and an offset from the chain's own negative
+    // phase, so moving one group between the two cannot quietly reduce the
+    // count.
+    //
+    // Quantum is deliberately not in this population any more. Its ambient loop
+    // was the interference ripple, and the Bloch sphere that replaced it has no
+    // loop at all: its motion is the reader's own scroll, so there is no cycle
+    // for it to start part-way through. Seven is the whole of what is left, and
+    // every one of the seven is real.
+    const literal = css.match(/animation-delay:\s*-\d/g) ?? [];
+    const phased = css.match(/animation-delay:\s*calc\(var\(--tw-chain-phase\)/g) ?? [];
+    expect(literal.length + phased.length).toBeGreaterThanOrEqual(7);
     expect(css).toContain('--tw-chain-phase: -0.9s;');
   });
 

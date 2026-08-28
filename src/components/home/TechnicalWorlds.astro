@@ -612,7 +612,7 @@ const SECTION = 'worlds' as const;
      domain, because the primitive is the thing each domain is *about*:
 
        ai           the forecast fan opens from the `now` rule
-       quantum      wavefronts expand once from each emitter
+       quantum      the sphere draws itself, then the state vector arrives
        fpga         the selected route draws, its cells latching as it resolves
        electronics  the trace energises left to right through the chain
        audio        the waveform sweeps in, the spectrum rises to meet it
@@ -676,16 +676,63 @@ const SECTION = 'worlds' as const;
     animation: tw-fan-open var(--tw-arrive) var(--ease-entrance) var(--tw-arrive-lag) both;
   }
 
-  /* quantum — one expansion from each emitter. `fill-box` puts the origin at
-     the centre of the ring group's own bounding box, which is the emitter, so
-     both wavefronts expand from their own source rather than from the frame. */
-  .tw-ripple {
-    transform-box: fill-box;
-    transform-origin: center;
+  /* quantum — the instrument assembles, outside in, and the state arrives last.
+     860ms end to end: the silhouette traces itself, then the graticule, the
+     axes and the latitude ring fade up in that order, then the labels and the
+     readout, and only then the vector.
+
+     Two rules govern this and both are load-bearing.
+
+     1. **The animation may only touch `opacity` and `stroke-dashoffset`.**
+        Nothing here writes a coordinate, so there is no moment where a
+        keyframe and the scroll are both authoring the same attribute. That is
+        what makes "no jump at activation" structural rather than tuned: the
+        vector's geometry is already correct on frame zero, the arrival only
+        reveals it.
+     2. **No `transition` may ever be declared on `.tw-bl-shaft`'s `d`,
+        `.tw-bl-head`'s `transform` or `.tw-bl-lat`'s `d`.** A transition there
+        would smear the 1:1 scroll contract and fight reverse scroll, which is
+        the whole point of the piece. `tests/bloch.test.ts` fails if one
+        appears in this file.
+
+     This world has no ambient loop, and that is the correct answer for it
+     rather than an omission. Its motion is the reader's own scroll: θ tracks
+     the traverse continuously, so through the whole centred dwell the state
+     sweeps roughly 47° and the probability bars move with it. An idling
+     animation on top of that would be a second, unrelated clock ticking over a
+     value the reader is already driving. */
+  .tw-stage[data-active='true'] .tw-bl-limb {
+    animation: tw-draw 300ms var(--ease-instrument) both;
   }
 
-  .tw-stage[data-active='true'] .tw-ripple {
-    animation: tw-expand var(--tw-arrive) var(--ease-entrance) both;
+  .tw-stage[data-active='true'] .tw-bl-veil,
+  .tw-stage[data-active='true'] .tw-bl-arc,
+  .tw-stage[data-active='true'] .tw-bl-axis,
+  .tw-stage[data-active='true'] .tw-bl-lat,
+  .tw-stage[data-active='true'] .tw-bl-labels,
+  .tw-stage[data-active='true'] .tw-bl-readout,
+  .tw-stage[data-active='true'] .tw-bl-vector {
+    animation: tw-bl-in 300ms var(--ease-entrance) both;
+  }
+
+  .tw-stage[data-active='true'] .tw-bl-arc[data-arc='equator'] {
+    animation-delay: 90ms;
+  }
+  .tw-stage[data-active='true'] .tw-bl-arc[data-arc='meridian'] {
+    animation-delay: 150ms;
+  }
+  .tw-stage[data-active='true'] .tw-bl-axis {
+    animation-delay: 210ms;
+  }
+  .tw-stage[data-active='true'] .tw-bl-lat {
+    animation-delay: 260ms;
+  }
+  .tw-stage[data-active='true'] .tw-bl-labels,
+  .tw-stage[data-active='true'] .tw-bl-readout {
+    animation-delay: 420ms;
+  }
+  .tw-stage[data-active='true'] .tw-bl-vector {
+    animation-delay: 560ms;
   }
 
   /* fpga — the selected route resolves, and its cells latch left to right.
@@ -880,75 +927,95 @@ const SECTION = 'worlds' as const;
     fill: var(--tw-accent);
   }
 
-  /* --- quantum / interference -------------------------------------------- */
+  /* --- quantum / Bloch sphere ---------------------------------------------
+     A state, not a diagram of one. `src/lib/visuals/bloch.ts` holds every
+     coordinate; this block holds every colour, because the site's CSP forbids
+     the inline `style` a canvas-based version would have needed to read a
+     token back out of JavaScript.
 
-  .tw-ripple circle {
+     THE ONE RULE THAT IS NOT TASTE: `stroke-opacity` and `fill-opacity` must
+     never appear below. Presentation attributes lose to CSS rules, so a single
+     `stroke-opacity` declaration here would silently outrank the crossfade the
+     component writes onto `.tw-bl-vector` and the arrow would stop passing
+     behind the sphere. Only `fill`, `stroke`, `stroke-width`, `stroke-linecap`
+     and dash geometry belong in this block. ------------------------------- */
+
+  /* The graticule: equator, meridian, latitude ring. Hairlines, because the
+     sphere is the frame of reference and not the subject. */
+  .tw-bl-arc,
+  .tw-bl-lat,
+  .tw-bl-axis,
+  .tw-bl-limb {
+    fill: none;
+    stroke: var(--color-ink-rule);
+    stroke-width: 0.9;
+    vector-effect: non-scaling-stroke;
+  }
+
+  .tw-bl-axis,
+  .tw-bl-lat {
+    stroke-width: 0.8;
+  }
+
+  /* Behind the sphere, dashed. Depth read as a line style rather than as a
+     second colour, which is what a drafting convention would do and what keeps
+     the accent reserved for the one thing that is actually the state. */
+  .tw-bl-arc[data-face='back'],
+  .tw-bl-lat[data-face='back'] {
+    stroke-dasharray: 2.2 2.2;
+  }
+
+  .tw-bl-axis[data-face='back'] {
+    stroke-dasharray: 1.6 2.4;
+  }
+
+  /* The glass — a wash the back half is seen *through*.
+
+     Its 10% lives on the element as a `fill-opacity` attribute, NOT as an
+     `opacity` declaration here, and the difference is not cosmetic: the arrival
+     animates `opacity` from 0 to 1 with `both`, which would end by *replacing*
+     a resting `opacity: 0.1` with 1 and leave an opaque grey disc over the
+     whole sphere. It was drawn that way once. Animated opacity may only ever
+     multiply a paint-level opacity, never stand in for one. */
+  .tw-bl-veil {
+    fill: var(--color-ink-rule);
+    stroke: none;
+  }
+
+  /* The state vector. The only accented thing in the frame, in both copies. */
+  .tw-bl-shaft {
     fill: none;
     stroke: var(--tw-accent);
-    stroke-width: 1;
-    opacity: 0.3;
+    stroke-width: 1.75;
+    stroke-linecap: round;
     vector-effect: non-scaling-stroke;
   }
 
-  .tw-emitter {
+  .tw-bl-head {
     fill: var(--tw-accent);
+    stroke: none;
   }
 
-  .tw-dimension line {
-    stroke: var(--color-ink-rule);
-    stroke-width: 1;
-    vector-effect: non-scaling-stroke;
-  }
-
-  .tw-histogram rect {
+  .tw-bl-label {
     fill: var(--color-on-ink-muted);
-    opacity: 0.45;
+    font-family: var(--font-mono);
+    font-size: 9px;
+    letter-spacing: 0.04em;
   }
 
-  .tw-histogram rect[data-peak='true'] {
+  /* The label the state has actually reached. A basis state is a fact about
+     the picture, so it is stated in the picture. */
+  .tw-bl-label[data-hit='true'] {
     fill: var(--tw-accent);
-    opacity: 1;
   }
 
-  /* A wavefront travelling outward, made of nothing but staggered opacity over
-     rings at fixed radii. No transform, no animated geometry, no rAF.
-
-     The delays count *down* with radius (ring 1 is the innermost and starts
-     latest in the cycle), which is what makes the bright front move outward
-     rather than collapse inward. */
-  .tw-stage[data-active='true'] .tw-ripple circle {
-    animation: tw-ripple 3.2s linear infinite;
-  }
-  .tw-stage[data-active='true'] .tw-ripple circle:nth-child(1) {
-    animation-delay: -2.4s;
-  }
-  .tw-stage[data-active='true'] .tw-ripple circle:nth-child(2) {
-    animation-delay: -2s;
-  }
-  .tw-stage[data-active='true'] .tw-ripple circle:nth-child(3) {
-    animation-delay: -1.6s;
-  }
-  .tw-stage[data-active='true'] .tw-ripple circle:nth-child(4) {
-    animation-delay: -1.2s;
-  }
-  .tw-stage[data-active='true'] .tw-ripple circle:nth-child(5) {
-    animation-delay: -0.8s;
-  }
-  .tw-stage[data-active='true'] .tw-ripple circle:nth-child(6) {
-    animation-delay: -0.4s;
-  }
-  .tw-stage[data-active='true'] .tw-ripple circle:nth-child(7) {
-    animation-delay: 0s;
+  .tw-bl-track {
+    fill: var(--color-ink-rule);
+    opacity: 0.22;
   }
 
-  /* The causal link the live review found missing: the rings and the histogram
-     were two pictures stacked in one box. Ring 7 is the outermost, its radius
-     is exactly the emitter-to-screen distance, and it carries delay `0s` — so
-     a crest lands on the detection line at the top of every 3.2s cycle. The
-     constructive bins brighten on that same beat, phased to rise as it
-     arrives. Dark fringes stay dark, which is the other half of the statement. */
-  .tw-stage[data-active='true'] .tw-histogram rect[data-peak='true'] {
-    animation: tw-fringe 3.2s var(--ease-instrument) infinite;
+  .tw-bl-bar {
+    fill: var(--tw-accent);
   }
 
   /* ai ambient — the origin rolls forward. Each pass re-walks the realised path
@@ -1118,8 +1185,8 @@ const SECTION = 'worlds' as const;
      At 7.5s behind an 800ms settle this was the worst offender on the band: a
      world's whole dwell could pass before the wave had crossed a fifth of a
      tile, so the one thing this stage says — that a waveform *travels* — was
-     never actually shown. The negative delay is the same device
-     `.tw-ripple circle` already uses successfully: the wave is already moving
+     never actually shown. The negative delay is the same device the FPGA
+     fabric's register blink already uses successfully: the wave is already moving
      the instant the world arrives, rather than starting from a standstill at
      keyframe 0 with nothing having happened yet. There is no phase to protect
      here — the second tile makes the loop seamless from any offset. */
@@ -1245,14 +1312,14 @@ const SECTION = 'worlds' as const;
     }
   }
 
-  /* quantum: one wavefront expansion from each emitter. */
-  @keyframes tw-expand {
+  /* quantum: one element of the instrument coming up. Opacity only — the Bloch
+     stage's geometry belongs to the scroll from frame zero, and a keyframe that
+     also wrote a coordinate would be a second author of the same attribute. */
+  @keyframes tw-bl-in {
     from {
-      transform: scale(0.05);
-      opacity: 0.25;
+      opacity: 0;
     }
     to {
-      transform: scale(1);
       opacity: 1;
     }
   }
@@ -1302,33 +1369,6 @@ const SECTION = 'worlds' as const;
   }
 
   /* ── Ambient ─────────────────────────────────────────────────────────── */
-
-  @keyframes tw-ripple {
-    from {
-      opacity: 0.72;
-    }
-    to {
-      opacity: 0.06;
-    }
-  }
-
-  /* A constructive fringe answering the crest that just landed on it: a fast
-     rise as the front arrives, a slow decay while the next one crosses. Same
-     3.2s period as `tw-ripple`, and in phase with the outermost ring. */
-  @keyframes tw-fringe {
-    0% {
-      opacity: 1;
-    }
-    58% {
-      opacity: 0.32;
-    }
-    90% {
-      opacity: 0.36;
-    }
-    100% {
-      opacity: 1;
-    }
-  }
 
   /* ai: the forecast origin rolling forward over the realised path. */
   @keyframes tw-fc-roll {
