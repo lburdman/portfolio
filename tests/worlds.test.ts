@@ -28,19 +28,13 @@ import {
 } from '../src/components/visuals/worlds/traverse';
 import { HYDRATION_QUERY, REDUCED_MOTION_QUERY, TRAVERSE_QUERY } from '../src/components/visuals/worlds/useMediaQuery';
 import {
-  bandHalfWidth,
   createRandom,
-  forecastSignal,
   interferenceProfile,
-  interpolateAt,
   manhattanLength,
   manhattanPath,
-  polylinePath,
-  ribbonPath,
   spectrumBars,
   wavePath,
 } from '../src/components/visuals/worlds/stage-geometry';
-import { FORECAST_NOW_X } from '../src/components/visuals/worlds/stages/ForecastStage';
 import { ROUTE_CELLS, ROUTE_STEPS } from '../src/components/visuals/worlds/stages/RoutingStage';
 
 /**
@@ -717,143 +711,6 @@ describe('createRandom', () => {
   });
 });
 
-describe('forecastSignal', () => {
-  it('is deterministic — the server render and the hydration render must agree', () => {
-    // A `Math.random()` in the series would make React discard the server
-    // markup and re-render the island. That failure is invisible but for a
-    // console warning, so it is asserted rather than assumed.
-    const once = Array.from({ length: 40 }, (_, i) => forecastSignal(i / 39));
-    const twice = Array.from({ length: 40 }, (_, i) => forecastSignal(i / 39));
-    expect(once).toEqual(twice);
-  });
-
-  it('stays inside the amplitude the stage maps it with', () => {
-    // `ForecastStage` multiplies by a single constant and assumes roughly ±0.8.
-    // A series that exceeded it would draw outside the frame.
-    for (let i = 0; i <= 400; i += 1) {
-      expect(Math.abs(forecastSignal(i / 400))).toBeLessThan(0.8);
-    }
-  });
-
-  it('carries structure rather than being a single sine', () => {
-    // A forecastable series has to have something a model could have learned.
-    // Counting sign changes in the first difference separates "one carrier"
-    // from "several": a pure sine over this window turns twice, no more.
-    let turns = 0;
-    let previous = forecastSignal(0.001) - forecastSignal(0);
-    for (let i = 2; i <= 400; i += 1) {
-      const delta = forecastSignal(i / 400) - forecastSignal((i - 1) / 400);
-      if (delta * previous < 0) turns += 1;
-      previous = delta;
-    }
-    expect(turns).toBeGreaterThan(6);
-  });
-
-  it('answers a finite value for a non-finite input rather than NaN', () => {
-    expect(Number.isFinite(forecastSignal(Number.NaN))).toBe(true);
-  });
-});
-
-describe('bandHalfWidth', () => {
-  it('is already non-zero at the origin — residuals are not zero one step ahead', () => {
-    expect(bandHalfWidth(0, 0.085, 0.44, 0.6)).toBeCloseTo(0.085, 10);
-  });
-
-  it('widens monotonically with horizon, which is the whole statement', () => {
-    let previous = -1;
-    for (let i = 0; i <= 50; i += 1) {
-      const width = bandHalfWidth(i / 50, 0.085, 0.44, 0.6);
-      expect(width).toBeGreaterThan(previous);
-      previous = width;
-    }
-  });
-
-  it('widens concavely, not as a straight cone', () => {
-    // A calibrated interval grows sublinearly. Halfway out it must already be
-    // more than half of its final extra width; a linear fan would be exactly
-    // half, and this is what distinguishes the two pictures.
-    const base = 0.085;
-    const span = 0.44;
-    const mid = bandHalfWidth(0.5, base, span, 0.6) - base;
-    expect(mid).toBeGreaterThan(span * 0.5);
-  });
-
-  it('clamps the horizon rather than extrapolating past the frame', () => {
-    expect(bandHalfWidth(4, 0.085, 0.44, 0.6)).toBeCloseTo(0.525, 10);
-    expect(bandHalfWidth(-2, 0.085, 0.44, 0.6)).toBeCloseTo(0.085, 10);
-    expect(bandHalfWidth(Number.NaN, 0.085, 0.44, 0.6)).toBeCloseTo(0.085, 10);
-  });
-
-  it('falls back to a linear exponent when given a useless one', () => {
-    expect(bandHalfWidth(0.5, 0, 1, 0)).toBeCloseTo(0.5, 10);
-    expect(bandHalfWidth(0.5, 0, 1, Number.NaN)).toBeCloseTo(0.5, 10);
-  });
-});
-
-describe('polylinePath and ribbonPath', () => {
-  const upper = [
-    { x: 0, y: 10 },
-    { x: 10, y: 8 },
-    { x: 20, y: 4 },
-  ];
-  const lower = [
-    { x: 0, y: 12 },
-    { x: 10, y: 16 },
-    { x: 20, y: 22 },
-  ];
-
-  it('moves once and lines thereafter', () => {
-    expect(polylinePath(upper)).toBe('M0.00 10.00 L10.00 8.00 L20.00 4.00');
-  });
-
-  it('answers an empty string for no points', () => {
-    expect(polylinePath([])).toBe('');
-  });
-
-  it('closes the ribbon and returns along the lower edge in reverse', () => {
-    expect(ribbonPath(upper, lower)).toBe(
-      'M0.00 10.00 L10.00 8.00 L20.00 4.00 L20.00 22.00 L10.00 16.00 L0.00 12.00 Z',
-    );
-  });
-
-  it('does not mutate the edge it reverses', () => {
-    const snapshot = lower.map((point) => ({ ...point }));
-    ribbonPath(upper, lower);
-    expect(lower).toEqual(snapshot);
-  });
-
-  it('answers an empty string when either edge is missing', () => {
-    expect(ribbonPath([], lower)).toBe('');
-    expect(ribbonPath(upper, [])).toBe('');
-  });
-});
-
-describe('interpolateAt', () => {
-  const values = [0, 1, -1];
-
-  it('hits the table exactly at the sample positions', () => {
-    expect(interpolateAt(values, 0)).toBe(0);
-    expect(interpolateAt(values, 0.5)).toBe(1);
-    expect(interpolateAt(values, 1)).toBe(-1);
-  });
-
-  it('interpolates linearly between them', () => {
-    expect(interpolateAt(values, 0.25)).toBeCloseTo(0.5, 10);
-    expect(interpolateAt(values, 0.75)).toBeCloseTo(0, 10);
-  });
-
-  it('clamps outside the unit interval instead of running off the table', () => {
-    expect(interpolateAt(values, -3)).toBe(0);
-    expect(interpolateAt(values, 9)).toBe(-1);
-    expect(interpolateAt(values, Number.NaN)).toBe(0);
-  });
-
-  it('degrades safely on short tables', () => {
-    expect(interpolateAt([], 0.4)).toBe(0);
-    expect(interpolateAt([7], 0.4)).toBe(7);
-  });
-});
-
 /**
  * One number in this island lives in both TypeScript and CSS — the FPGA route's
  * step count, because a keyframe timing function cannot import a module and
@@ -869,15 +726,6 @@ describe('the constant duplicated into the stylesheet', () => {
     expect(ROUTE_CELLS.length).toBeGreaterThan(0);
     for (const route of ROUTE_CELLS) expect(route.length).toBe(ROUTE_STEPS);
     expect(stylesheet).toContain(`steps(${ROUTE_STEPS}, end)`);
-  });
-
-  it('opens the forecast fan without naming the rule in CSS', () => {
-    // The activation reveals the band with a clip whose percentages resolve
-    // against the band's own box. A `transform-origin` in view-box coordinates
-    // would work too, and would put a copy of `FORECAST_NOW_X` in a stylesheet
-    // that cannot import it. That copy is what this forbids.
-    expect(stylesheet).not.toContain(`${FORECAST_NOW_X}px`);
-    expect(stylesheet).toContain('clip-path: inset(-30% 100%');
   });
 });
 
@@ -1090,28 +938,6 @@ describe('server-rendered markup', () => {
     // in and no pointer, so nothing may claim the frame.
     expect(html.match(/data-active="false"/g)).toHaveLength(DOMAINS.length);
     expect(html).not.toContain('data-active="true"');
-  });
-
-  /**
-   * The forecast stage's one claim is that the observed series *stops* and a
-   * calibrated interval *starts*, at one instant. Three separate paths have to
-   * agree on where that instant is, and none of them is derived from the
-   * others at runtime — they are three walks over the same `t`.
-   */
-  it('starts the forecast exactly where the observation stops', async () => {
-    const { html } = await render();
-    const x = FORECAST_NOW_X.toFixed(2);
-    // The rule itself.
-    expect(html).toContain(`class="tw-fc-now" x1="${FORECAST_NOW_X}"`);
-    // The observed history ends on it…
-    expect(html).toMatch(new RegExp(`class="tw-fc-history" d="[^"]*L${x} [\\d.]+"`));
-    // …and the point forecast, the realised continuation and both band edges
-    // all begin on it. A band that opened anywhere else would be drawing an
-    // interval around horizons that had already happened.
-    for (const cls of ['tw-fc-median', 'tw-fc-realised']) {
-      expect(html).toMatch(new RegExp(`class="${cls}" d="M${x} `));
-    }
-    expect(html.match(new RegExp(`class="tw-fc-band" data-level="\\w+" d="M${x} `, 'g'))).toHaveLength(2);
   });
 
   it('ships the stack, not the traverse', async () => {
