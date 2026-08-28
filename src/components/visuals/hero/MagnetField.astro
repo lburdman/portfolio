@@ -1,0 +1,158 @@
+---
+/**
+ * The hero's background visual: a ruled field, locally disturbed by the pointer.
+ *
+ * Adapted from React Bits' "Magnet Lines" (reactbits.dev). Nothing was
+ * installed; the runtime depends on that project in no way. The behavioural
+ * half is `./magnet-lines.ts`, the mathematics is
+ * `src/lib/motion/magnet-field.ts`, and this file owns exactly one thing:
+ * **every visual property**, in a `<style>` element, where the site's
+ * hash-based CSP can authorise it.
+ *
+ * ── Why there is not a single `style=""` here ───────────────────────────────
+ *
+ * `astro.config.mjs` emits a CSP with no `'unsafe-inline'` and no
+ * `'unsafe-hashes'`. A hash authorises a `<style>` ELEMENT; it never
+ * authorises a style ATTRIBUTE, and `style-src-attr` falls back to `style-src`.
+ * So the browser drops every inline style attribute on this site — silently,
+ * with no console error, and only in production, because `astro dev` serves no
+ * CSP at all. The original component inline-styles the grid tracks, the line
+ * size, the colour and `transform: rotate(var(--rotate))`; under this policy it
+ * would render as {@link HERO_FIELD_LINE_COUNT} invisible zero-size spans that
+ * look perfect in development.
+ *
+ * The unlock is that `rotate()` below. Because the declaration lives in the
+ * stylesheet, the custom property the controller writes through
+ * `element.style.setProperty()` — a CSSOM write, which CSP does not touch, and
+ * which GSAP already relies on in production here — actually drives something.
+ *
+ * `tests/hero-field.test.ts` asserts all of this against `dist/`, so the
+ * failure mode cannot come back quietly.
+ *
+ * ── Why the grid is literal ─────────────────────────────────────────────────
+ *
+ * `repeat()` cannot take a `var()` as its count, and a track list computed in
+ * JavaScript would have to be written back as an inline style — the thing that
+ * does not work here. So the tracks are literals at the same breakpoints as
+ * `HERO_FIELD_TIERS`, and the test parses this stylesheet and fails if the two
+ * copies of those numbers ever disagree.
+ *
+ * The document renders enough lines for the widest tier; narrower tiers hide
+ * the tail with one `:nth-child()` rule, because a static build ships one HTML
+ * document to every viewport and the count cannot be a media query. A hidden
+ * line has a zero-size box, and the controller skips it by measurement.
+ */
+
+import { HERO_FIELD_LINE_COUNT } from '@/lib/motion/magnet-field';
+
+const lines: readonly undefined[] = Array.from({ length: HERO_FIELD_LINE_COUNT });
+---
+
+<div class="section__bleed hero-field" data-hero-field aria-hidden="true">
+  {lines.map(() => <span class="hero-field__line" data-hero-line />)}
+</div>
+
+<style>
+  .hero-field {
+    display: grid;
+    place-items: center;
+    /* Tier 1 — phones. Mirrors HERO_FIELD_TIERS[0]. */
+    grid-template-columns: repeat(6, 1fr);
+    grid-template-rows: repeat(14, 1fr);
+    overflow: hidden;
+    /* Decorative. It must never intercept a click meant for a link beneath it;
+       pointer input reaches the controller through the section, not through
+       this element. */
+    pointer-events: none;
+    /* Two hundred siblings whose transforms change together. Containment keeps
+       that work off the rest of the page's layout and paint. */
+    contain: layout paint style;
+  }
+
+  .hero-field__line {
+    /* THE RESTING FIELD, declared in the stylesheet rather than on the element.
+       `-16deg` is `REST_ANGLE_DEG`; the two must agree, and the built CSS is
+       read back in `tests/hero-field.test.ts` to check that they do. It is
+       raked off level so a hairline can never be mistaken for a strikethrough
+       through the hero's own copy, nor for the level rules that carry real
+       structure elsewhere in this section.
+       Two consequences, both deliberate:
+         · the field is already correct before any script runs, and stays
+           correct if none ever does — no JavaScript, reduced motion and a
+           touchscreen all resolve to this same ruled sheet, which is a
+           finished composition and not a degraded one;
+         · the custom property below has a real declaration consuming it, so
+           the controller's `setProperty` writes actually move something. */
+    --hero-field-angle: -16deg;
+    --hero-field-heat: 0;
+
+    /* 28px of line on a ~72px pitch: a mark, not a rule. Long enough for its
+       angle to be legible, short enough that two hundred of them read as
+       texture behind the name rather than as a competing grid. */
+    width: 1.75rem;
+    height: var(--border-hairline);
+    transform: rotate(var(--hero-field-angle));
+    transform-origin: center;
+
+    /* The hierarchy: slate at rest, ultramarine at the core of the
+       disturbance. `--color-rule` and `--color-accent` are the same two tokens
+       the hairlines and links on this page already use, so the field belongs
+       to the composition instead of introducing a palette of its own. */
+    background-color: color-mix(in oklab, var(--color-accent) calc(var(--hero-field-heat) * 100%), var(--color-rule));
+    opacity: calc(0.34 + var(--hero-field-heat) * 0.6);
+
+    /* No `will-change`. The original sets it on every span; promoting two
+       hundred elements to their own compositing layers costs far more than the
+       repaint of a 28x1px box it is meant to save. */
+  }
+
+  /* The tail beyond tier 1's 6x14 grid. */
+  .hero-field__line:nth-child(n + 85) {
+    display: none;
+  }
+
+  /* Tier 2 — large phones and narrow windows. Mirrors HERO_FIELD_TIERS[1]. */
+  @media (min-width: 30rem) {
+    .hero-field {
+      grid-template-columns: repeat(9, 1fr);
+      grid-template-rows: repeat(12, 1fr);
+    }
+
+    .hero-field__line:nth-child(n + 85) {
+      display: block;
+    }
+
+    .hero-field__line:nth-child(n + 109) {
+      display: none;
+    }
+  }
+
+  /* Tier 3 — tablets. Mirrors HERO_FIELD_TIERS[2]. */
+  @media (min-width: 48rem) {
+    .hero-field {
+      grid-template-columns: repeat(12, 1fr);
+      grid-template-rows: repeat(10, 1fr);
+    }
+
+    .hero-field__line:nth-child(n + 109) {
+      display: block;
+    }
+
+    .hero-field__line:nth-child(n + 121) {
+      display: none;
+    }
+  }
+
+  /* Tier 4 — the desktop composition the response is tuned for. Mirrors
+     HERO_FIELD_TIERS[3]. */
+  @media (min-width: 80rem) {
+    .hero-field {
+      grid-template-columns: repeat(20, 1fr);
+      grid-template-rows: repeat(10, 1fr);
+    }
+
+    .hero-field__line:nth-child(n + 121) {
+      display: block;
+    }
+  }
+</style>
