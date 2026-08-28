@@ -381,30 +381,42 @@ The common thread is worth more than the individual fixes: `astro dev` serves no
 CSP, and an SVG that computes to nothing still renders as valid, silent markup.
 "It looks right in dev" and "the tests pass" were both true the whole time.
 
-### 6.1 A shared dash keyframe used without `pathLength`
+### 6.1 A `pathLength` dash under `vector-effect: non-scaling-stroke`
 
-`.tw-route` (FPGA) animated with `tw-draw`, whose finished state is
-`stroke-dasharray: 100 100` — solid only in the `pathLength="100"` space that
-every _other_ user of that keyframe declares. This path declared none. Its real
-length was 290 units, so it rendered 100 on / 100 off / 90 on: **a third of the
-routed net was invisible at rest, and its two ends read as unconnected.**
+`pathLength` normalises a path in **user** space. `vector-effect:
+non-scaling-stroke` measures dash array, width and offset in **screen** space.
+An element carrying both paints `1/scale` of itself, silently.
 
-Do not use a `pathLength`-normalised dash keyframe on an element that does not
-declare `pathLength`.
+No element transform is needed to trigger it. Every stage SVG is
+`viewBox="0 0 320 200"` rendered at up to 544 CSS px, so the plain viewport
+scale is up to **1.70x** and a finished `stroke-dasharray: 100 100` covers
+1/1.70 = **58.8%**. Measured across nine elements, every painted fraction landed
+on 1/scale and none on 100%: the Bloch sphere's rim was a **broken circle** with
+41.4% of its arc absent, and the FPGA selected route painted **27.8%** and never
+reached its destination block. Four more elements tiled the pattern 1.70x and
+drew **two pulses on a strip that has one clock edge to mark**.
 
-### 6.2 A dashed stroke under a scaled group with `non-scaling-stroke`
+**The fix is to drop `vector-effect` from every element that declares
+`pathLength`**, which is scale-invariant by construction: with both quantities
+in user space, `100 100` over `pathLength="100"` is the whole path by
+definition, and no viewport number appears in the fix at all. The trade is
+deliberate — **ground** (grid, rules, ticks, outlines, frame) keeps a constant
+pen; **subject** (accent lines, signals, pulses, anything whose _length_ is the
+meaning) is drawn in the plate's own units, like its geometry and type already
+are. `tests/stroke-space.test.ts` now fails if any `pathLength` element is
+reached by a `non-scaling-stroke` rule.
 
-`.tw-wave` (audio) sat under a group the scroll scales _and_ carried
-`vector-effect: non-scaling-stroke`. Under both, the dash pattern and
-`pathLength`'s normalisation are measured in different spaces, so `tw-draw`'s
-finished state is not a solid stroke: **a third to a half of the waveform was
-unpainted at rest.**
+**Two earlier diagnoses of this defect were wrong, which is the lesson worth
+keeping.** The first blamed a specific element transform and "fixed" it by
+adding `pathLength="100"` to the FPGA route — a no-op that left the defect
+shipping and made the code look correct. The second, recorded in this file and
+in `docs/MOTION_SYSTEM.md`, called it "a dashed stroke under a _scaled group_",
+which is also wrong: there is no group, only the viewport. A plausible cause
+that explains the symptom is not the cause. This one was only settled by
+measuring the painted fraction at three viewport widths and watching every
+figure land on 1/scale.
 
-Isolated: `vector-effect: none` renders solid, `stroke-dasharray: none` renders
-solid, both together do not. Before adding any `stroke-dasharray` animation,
-check all three conditions.
-
-### 6.3 An arrival animation replacing a resting value instead of composing with it
+### 6.2 An arrival animation replacing a resting value instead of composing with it
 
 The Bloch sphere's entry animated `opacity: 0 → 1` on a group whose glass veil
 rested at `opacity: 0.1`. The animation replaced that value rather than
@@ -416,7 +428,7 @@ that element in the stylesheet, and a property animated by CSS must not be the
 same one a resting value depends on. Keep them on different properties and add a
 guard test.
 
-### 6.4 A test whose scope silently widened when a section was renamed
+### 6.3 A test whose scope silently widened when a section was renamed
 
 `tests/decision-landscape.test.ts` scoped itself with
 `slice(indexOf(start), indexOf(end))`. When the Bloch sphere renamed the end
