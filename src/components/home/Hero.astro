@@ -305,6 +305,7 @@ const HEADING_ID = 'hero-heading';
    * `script-src 'self'` plus a hash per inline block.
    */
   import { createMagnetLines } from '../visuals/hero/magnet-lines';
+  import { bindPageLifecycle } from '../../lib/motion/page-lifecycle';
 
   const field = document.querySelector<HTMLElement>('[data-hero-field]');
   const section = field?.closest<HTMLElement>('section') ?? null;
@@ -330,8 +331,10 @@ const HEADING_ID = 'hero-heading';
      */
     const rival = document.querySelector('[data-stops-hero-visual]');
 
+    let observer: IntersectionObserver | null = null;
+
     if (rival && 'IntersectionObserver' in window) {
-      const observer = new IntersectionObserver(
+      observer = new IntersectionObserver(
         (entries) => {
           for (const entry of entries) {
             if (entry.isIntersecting) lines.stop();
@@ -344,12 +347,32 @@ const HEADING_ID = 'hero-heading';
     }
 
     /**
-     * Navigation here is cross-document (there is no `<ClientRouter />`), so
-     * the page is torn down wholesale and this is belt-and-braces. It is worth
-     * the two lines anyway: it makes "no listener and no pending frame survive
-     * this hero" a property the controller can be tested for rather than one
-     * the runtime happens to provide.
+     * Teardown, and the back/forward cache.
+     *
+     * Ordinary navigation here is cross-document (there is no `<ClientRouter />`),
+     * so the page is torn down wholesale and the `destroy()` branch is
+     * belt-and-braces. It is worth the line anyway: it makes "no listener and no
+     * pending frame survives this hero" a property the controller can be tested
+     * for rather than one the runtime happens to provide.
+     *
+     * The freeze branch is not belt-and-braces, and it is why this goes through
+     * `bindPageLifecycle` instead of a bare `pagehide` listener. This hero
+     * shipped destroying itself on every `pagehide`, including the persisted one
+     * — so on Safari and Firefox, where Back restores the document without
+     * re-running this module, the field came back permanently dead. The rule and
+     * the reasoning live in `src/lib/motion/page-lifecycle.ts`, where they are
+     * unit-tested; `ProjectGrid.astro` binds its card light through the same
+     * function, so the two cannot drift apart again.
+     *
+     * The observer is released on a real unload because `destroy()` cannot reach
+     * it — it belongs to this script, not to the controller — and left connected
+     * it would go on calling `start()`/`stop()` on a dead handle. It is
+     * deliberately kept across a freeze: the restored document is the same
+     * document, and the rival element is still the one it observes.
      */
-    window.addEventListener('pagehide', () => lines.destroy(), { once: true });
+    bindPageLifecycle(window, lines, () => {
+      observer?.disconnect();
+      observer = null;
+    });
   }
 </script>

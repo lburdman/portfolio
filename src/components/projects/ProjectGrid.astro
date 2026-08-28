@@ -178,6 +178,7 @@ const priorityIndex = Math.max(
    */
   import { FINE_POINTER_QUERY, matchesMedia, REDUCED_MOTION_QUERY, watchMedia } from '../../lib/motion/media';
   import { lightPosition, pickBox, type CardBox } from '../../lib/motion/card-light';
+  import { bindPageLifecycle } from '../../lib/motion/page-lifecycle';
 
   const fields = Array.from(document.querySelectorAll<HTMLElement>('[data-card-field]'));
   const observable = 'IntersectionObserver' in window && 'ResizeObserver' in window;
@@ -385,10 +386,13 @@ const priorityIndex = Math.max(
     // where the document is frozen rather than destroyed: a pending frame that
     // resumed on restore would paint against boxes measured before the page was
     // ever hidden.
-    window.addEventListener('pagehide', detach);
-    window.addEventListener('pageshow', (event) => {
-      if (event.persisted) attach();
-    });
+    //
+    // The light has no one-way teardown — `detach()` is complete and `attach()`
+    // undoes it — so both endings map onto it. The branching itself, and the
+    // reason it matters, is in `src/lib/motion/page-lifecycle.ts`: the hero
+    // shipped the other half of this contract wrong for months because the two
+    // files each had to remember it separately.
+    bindPageLifecycle(window, { start: attach, stop: detach, destroy: detach });
 
     attach();
   }
