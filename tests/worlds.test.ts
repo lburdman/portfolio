@@ -29,7 +29,6 @@ import {
 import { HYDRATION_QUERY, REDUCED_MOTION_QUERY, TRAVERSE_QUERY } from '../src/components/visuals/worlds/useMediaQuery';
 import {
   createRandom,
-  interferenceProfile,
   manhattanLength,
   manhattanPath,
   spectrumBars,
@@ -729,50 +728,6 @@ describe('the constant duplicated into the stylesheet', () => {
   });
 });
 
-describe('interferenceProfile', () => {
-  it('is fully constructive at the centre of the screen', () => {
-    const profile = interferenceProfile(21, 60, 26);
-    expect(profile[10]).toBeCloseTo(1, 10);
-  });
-
-  it('stays within 0…1 everywhere', () => {
-    for (const value of interferenceProfile(64, 140, 19)) {
-      expect(value).toBeGreaterThanOrEqual(0);
-      expect(value).toBeLessThanOrEqual(1);
-    }
-  });
-
-  it('packs more fringes in as the sources move apart', () => {
-    const fringes = (separation: number) => {
-      const profile = interferenceProfile(400, separation, 26);
-      let peaks = 0;
-      for (let i = 1; i < profile.length - 1; i += 1) {
-        const previous = profile[i - 1] ?? 0;
-        const current = profile[i] ?? 0;
-        const next = profile[i + 1] ?? 0;
-        if (current > previous && current >= next) peaks += 1;
-      }
-      return peaks;
-    };
-    // This is the relationship the stage exists to demonstrate; if it inverts,
-    // the pointer teaches the reader something false.
-    expect(fringes(110)).toBeGreaterThan(fringes(35));
-  });
-
-  it('survives a zero wavelength without producing NaN', () => {
-    for (const value of interferenceProfile(8, 50, 0)) {
-      expect(Number.isFinite(value)).toBe(true);
-    }
-  });
-
-  it('samples the centre of the screen for a single-bin histogram', () => {
-    // With one sample there is no `(i / (count - 1))` to compute; the guard
-    // has to answer the on-axis position, which is always constructive.
-    expect(interferenceProfile(1, 90, 26)).toEqual([1]);
-    expect(interferenceProfile(0, 90, 26)).toEqual([1]);
-  });
-});
-
 describe('wavePath', () => {
   it('starts at the vertical centre and stays inside the box', () => {
     const path = wavePath(320, 100, 4, 200);
@@ -1333,8 +1288,16 @@ describe('the band stylesheet', () => {
     // 7.5s for the travelling wave was longer than a whole world's ownership
     // window. Nothing ambient on this band may run slower than the chain's
     // own period by more than half again.
+    //
+    // The floor is a guard against the regex matching nothing and passing
+    // vacuously, not a target. It moved 6 -> 5 when the forecast stage was
+    // replaced: the forecast ran two ambient keyframes (`tw-fc-roll` and
+    // `tw-fc-resolve`), the decision landscape that replaced it runs one
+    // (`tw-dl-scan`). Five is the whole remaining population, listed here so
+    // the next person to see this number knows what it is counting:
+    // tw-energise, tw-dl-scan, tw-wave-travel, tw-pulse-travel, tw-clock-tick.
     const periods = [...css.matchAll(/animation:\s*tw-[a-z-]+\s+([\d.]+)s/g)].map((m) => Number(m[1]));
-    expect(periods.length).toBeGreaterThanOrEqual(6);
+    expect(periods.length).toBeGreaterThanOrEqual(5);
     for (const period of periods) expect(period).toBeLessThanOrEqual(3.6);
   });
 });

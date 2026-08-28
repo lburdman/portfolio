@@ -415,10 +415,15 @@ describe('the server-rendered stage', () => {
 
   it('carries exactly one accent object, and it is the boundary', () => {
     const stylesheet = readFileSync(new URL('src/components/home/TechnicalWorlds.astro', ROOT), 'utf8');
-    const block = stylesheet.slice(
-      stylesheet.indexOf('--- ai / decision landscape'),
-      stylesheet.indexOf('--- quantum / interference'),
-    );
+    // Both markers must exist. `indexOf` returns -1 for a section that has
+    // been renamed, and `slice(start, -1)` then quietly runs to the end of the
+    // stylesheet and scoops up every other stage's accent rules — which is
+    // exactly how this test passed on a branch that had no Bloch sphere in it.
+    const start = stylesheet.indexOf('--- ai / decision landscape');
+    const end = stylesheet.indexOf('--- quantum / Bloch sphere');
+    expect(start).toBeGreaterThan(-1);
+    expect(end).toBeGreaterThan(start);
+    const block = stylesheet.slice(start, end);
     expect(block.length).toBeGreaterThan(0);
     // `--tw-accent` may only be claimed by the boundary and by the meter that
     // reports on it. Anything else in this frame competing for the accent

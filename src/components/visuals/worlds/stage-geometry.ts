@@ -44,27 +44,6 @@ export function createRandom(seed: number): () => number {
 }
 
 /**
- * Two-source interference intensity across a detection screen, normalised to
- * `0 → 1`.
- *
- * `I = cos²(π · d · u / λ)` for a screen coordinate `u ∈ [-1, 1]`. The centre
- * sample is always fully constructive; widening `separation` packs more fringes
- * into the same screen, which is the whole point being demonstrated.
- */
-export function interferenceProfile(samples: number, separation: number, wavelength: number): number[] {
-  const count = Math.max(1, Math.trunc(samples));
-  const lambda = Math.max(Math.abs(wavelength), 1e-6);
-  const out: number[] = [];
-
-  for (let i = 0; i < count; i += 1) {
-    const u = count === 1 ? 0 : (i / (count - 1)) * 2 - 1;
-    out.push(Math.cos((Math.PI * separation * u) / lambda) ** 2);
-  }
-
-  return out;
-}
-
-/**
  * A sampled sine, as an SVG path.
  *
  * `cycles` is counted over `width`, and the path is generated once at rest

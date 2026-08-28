@@ -156,31 +156,50 @@ visitors download three different amounts. A single ceiling would either be so
 loose it permits a bloated critical path, or so tight it forbids the one
 animation the design is built around.
 
-| Path                              | What loads it                            | Limit    | Measured |
-| --------------------------------- | ---------------------------------------- | -------- | -------- |
-| **Critical**                      | Every visitor, before first paint        | **0 KB** | **0 KB** |
-| **Stack**                         | Mobile, reduced motion, narrow window    | ≤ 70 KB  | 65.6 KB  |
-| **Desktop traverse**              | Desktop pointer user with motion enabled | ≤ 115 KB | 109 KB   |
-| CSS, gzipped                      | Every visitor                            | < 15 KB  | 11.5 KB  |
-| Blocking third-party requests     | —                                        | **0**    | **0**    |
-| Preloader / loading screen        | —                                        | **none** | none     |
-| WebGL contexts                    | —                                        | **0**    | **0**    |
-| Simultaneously animating canvases | —                                        | **1**    | **0**    |
+| Path                              | What loads it                            | Limit    | Measured  |
+| --------------------------------- | ---------------------------------------- | -------- | --------- |
+| **Critical**                      | Every visitor, before first paint        | **0 KB** | **0 KB**  |
+| **Stack**                         | Mobile, reduced motion, narrow window    | ≤ 4 KB   | 1.88 KB   |
+| **Desktop traverse**              | Desktop pointer user with motion enabled | ≤ 120 KB | 116.28 KB |
+| — of which **framework**          | React + GSAP + ScrollTrigger             | fixed    | 102.02 KB |
+| — of which **the island**         | Everything this repo actually writes     | ≤ 18 KB  | 14.26 KB  |
+| CSS, gzipped                      | Every visitor                            | < 15 KB  | 12.27 KB  |
+| Blocking third-party requests     | —                                        | **0**    | **0**     |
+| Preloader / loading screen        | —                                        | **none** | none      |
+| WebGL contexts                    | —                                        | **0**    | **0**     |
+| Simultaneously animating canvases | —                                        | **1**    | **0**     |
 
-**Justification for the desktop traverse ceiling.** This document originally set
-a flat 90 KB. The Technical Worlds island measured 109 KB on the desktop motion
-path — React and ReactDOM at 60 KB, the island itself at 7 KB, and GSAP with
-ScrollTrigger at 44 KB. That is a real 19 KB overrun against the old number and
-it is accepted deliberately, on four grounds:
+**Why the ceiling is split in two (pass 3).** The old row was a single ≤ 115 KB,
+which was "109 measured, rounded up". It had the same defect as the pinned
+band's old page-share target: it measured a total the authors mostly do not
+control, so the only lever it ever pulled was against the work. 102 KB of that
+number is React plus GSAP plus ScrollTrigger — a fixed floor that no amount of
+care in this repo moves. The ~14 KB of island is the part that is actually
+authored, and it is the part a budget should govern.
+
+So the traverse ceiling is now ≤ 120 KB with an explicit **≤ 18 KB island
+allowance** inside it. Adding a signature visual is charged against the number
+it genuinely affects, and shaving the framework floor stops counting as a win
+that was never available. The total moved 109 → 116.28 KB across this pass, and
+what bought it was a mathematically correct Bloch sphere (+2.0 KB) and a baked
+decision landscape (+3.0 KB of data) replacing two visuals that did less — while
+the hero went **down** 0.64 KB by replacing a canvas with DOM and CSS.
+
+**Justification for the framework floor.** This document originally set a flat
+90 KB. React and ReactDOM are 58.7 KB, GSAP with ScrollTrigger 43.4 KB. That is
+a real overrun against the old number and it is accepted deliberately, on four
+grounds:
 
 1. **The critical path is 0 KB and stays 0 KB.** No `<script src>`, no
    modulepreload, no render-blocking JavaScript. The semantic hero never waits
    on any of this. That is the number the brief's performance contract (§30) is
    actually protecting, and it is not merely met but at zero.
-2. **The users most likely to be constrained never download it.** Mobile,
-   reduced-motion and short-window visitors get the stack path at 65.6 KB —
-   inside the original budget. GSAP is dynamically imported and loads only when
-   a desktop user with motion enabled engages the traverse.
+2. **The users most likely to be constrained never download it.** The island is
+   `client:media`, so mobile, reduced-motion and short-window visitors fetch
+   none of it: their whole JavaScript payload is the hero controller, **1.88 KB**
+   — not the 65.6 KB this line used to claim, which predated the hydration gate.
+   GSAP is dynamically imported and loads only when a desktop user with motion
+   enabled engages the traverse.
 3. **GSAP's cost is irreducible here.** Importing `gsap/gsap-core` plus
    CSSPlugin explicitly rather than the full bundle saves 27 bytes. There is no
    cheaper configuration of this dependency.
