@@ -27,22 +27,64 @@
  *
  * Every piece of information — summary, domains, stack, role, year, links — is
  * in the resting state. Hover and focus change *emphasis*, never content, and
- * `:focus-within` produces byte-identical styling to `:hover`, so a keyboard
- * user sees exactly what a pointer user sees. On touch (`hover: none`) the card
- * simply starts in the stronger state (brief §33, MOTION_SYSTEM §7).
+ * `:focus-within` is listed beside `:hover` on every rule in this file, so a
+ * keyboard user sees exactly what a pointer user sees — with one difference, by
+ * construction: a pointer also decides where the light falls. Nothing is
+ * conditional on it. On touch (`hover: none`) the card simply starts in the
+ * stronger state (brief §33, MOTION_SYSTEM §7).
  *
- * ## Motion
+ * ## Motion — one object, one physical event
  *
- * One state change: a 2px lift, the top rule darkening from `--color-rule` to
- * `--color-ink`, and a soft pool of `--color-paper-raised` behind the card —
- * light falling on a sheet that has risen slightly off the page. That is the
- * brief's "subtle depth + spotlight" baseline rendered as a *single* effect,
- * which is also what MOTION_SYSTEM §9 asks for. Deliberately absent: tilt (of
- * any angle), scale, glare sweep, media zoom, and metadata reveal.
+ * **A sheet of paper lifted off the page under a raking light whose source is
+ * the cursor.** That single sentence is the whole interaction, and every
+ * declaration below is a consequence of it rather than an effect in its own
+ * right: the sheet rises 3px, it grows a hairline edge and casts an ink
+ * shadow, and the light falling across it is brightest where the pointer is.
+ * MOTION_SYSTEM §9 allows "subtle depth **or** spotlight, not both stacked" —
+ * this is not two stacked effects but one lit, raised surface, which is why it
+ * is a single pseudo-element with a single opacity transition.
  *
- * The spotlight is anchored to the card, not to the pointer. A pointer-tracked
- * spotlight cannot be reproduced for a keyboard user, and this system does not
- * ship states that only one input method can reach.
+ * Deliberately absent, and each for a reason rather than for restraint alone:
+ * tilt (fights the "flat sheet on a desk" reading the whole card is built on,
+ * and §9 caps it at 2–3° where it would read as noise anyway), media zoom
+ * (every cover is a figure whose axis labels are the evidence — see
+ * `.card__media`, which contains rather than crops precisely so nothing is
+ * lost), glare sweep, and metadata reveal.
+ *
+ * ### What the previous version got wrong
+ *
+ * The same structure was already here and was, measured on a real build,
+ * invisible: the "spotlight" was a pool of `--color-paper-raised` on the
+ * `--color-paper` ground, two values a fraction of a step apart, and there was
+ * no shadow and no edge at all. The visible half of a hover was a 2px text
+ * shift. Three things fix it, none of which is a new colour:
+ *
+ *   1. the pool now runs from `--color-paper-raised` at the light down to a
+ *      7% `--color-ink` mix away from it, so the sheet is *shaded* rather than
+ *      uniformly tinted, and the gradient has somewhere to travel;
+ *   2. a real drop shadow, mixed from `--color-ink`, because "lifted" without
+ *      a shadow is just a 3px jump;
+ *   3. a hairline edge, so the sheet has a boundary the eye can find.
+ *
+ * ### The pointer, and the users who do not have one
+ *
+ * `--card-x` / `--card-y` position the light. They default to `18% 0%` in this
+ * stylesheet — upper left, the conventional light direction — and
+ * `ProjectGrid.astro` overwrites them per card, through CSSOM, only for a
+ * visitor with a fine pointer and motion enabled.
+ *
+ * So the resting composition is already a *complete* lit sheet. Keyboard,
+ * touch, reduced motion and no-JavaScript all get the identical shadow, edge,
+ * gradient and colour response; the only thing they do not get is a light that
+ * moves. That is the inverse of the usual arrangement, where the pointer user
+ * gets the design and everyone else gets the leftovers, and it is what lets
+ * `:focus-within` stay byte-identical to `:hover` while the pointer effect
+ * still exists.
+ *
+ * The custom properties are written with `element.style.setProperty()`, which
+ * is CSSOM and permitted, and consumed by the completely static rule below.
+ * A `style=""` **attribute** would be dropped by the CSP — see the long note
+ * above `.card__title-text`.
  *
  * ## Strings and colour
  *
@@ -244,7 +286,17 @@ const titleTransition = `project-title-${meta.slug}`;
 const mediaTransition = `project-media-${meta.slug}`;
 ---
 
-<article class:list={['card', `card--${emphasis}`, !cover && 'card--typographic']} data-project={meta.slug}>
+{
+  /* `data-card-light` is the hook `ProjectGrid.astro`'s pointer script looks
+     for. A data attribute rather than the `card` class so the enhancement is
+     addressed by role, not by styling: a listing that ever renders a card
+     variant which should not track the pointer simply omits it. */
+}
+<article
+  class:list={['card', `card--${emphasis}`, !cover && 'card--typographic']}
+  data-project={meta.slug}
+  data-card-light
+>
   {
     /* The card's masthead rule: one tinted segment per technical domain, then a
       hairline running out to the measure. A datasheet channel legend. It is
@@ -376,9 +428,21 @@ const mediaTransition = `project-media-${meta.slug}`;
      ------------------------------------------------------------------------ */
 
   .card {
+    /* THE LIGHT SOURCE. Overwritten per card, through CSSOM, by the pointer
+       script in `ProjectGrid.astro`; this pair is what every other input
+       method sees, so it has to be a good composition on its own rather than a
+       neutral placeholder. Upper left is the conventional direction for light
+       falling on a raised surface.
+
+       Kept in sync with `RESTING_LIGHT` in `src/lib/motion/card-light.ts`,
+       which is what the script resets to when the pointer leaves —
+       `tests/project-card.test.ts` fails if the two drift. */
+    --card-x: 18%;
+    --card-y: 0%;
+
     position: relative;
-    /* Keeps the spotlight's negative z-index inside this card rather than
-       letting it slide behind the page ground. */
+    /* Keeps the sheet's negative z-index inside this card rather than letting
+       it slide behind the page ground. */
     isolation: isolate;
     display: flex;
     flex-direction: column;
@@ -387,27 +451,93 @@ const mediaTransition = `project-media-${meta.slug}`;
     transition: transform var(--duration-base) var(--ease-standard);
   }
 
-  /* The spotlight: a pool of raised paper, anchored to the card's leading
-     corner. It bleeds outside the card box so the lift reads without any text
-     moving, and it is opacity-only so it costs one composited layer. */
+  /* ---------------------------------------------------------------------------
+     THE SHEET.
+
+     One pseudo-element carrying the entire physical event: a panel of raised
+     paper, a hairline edge, an ink shadow, and a raking light across it. It
+     bleeds outside the card box so the lift reads without any text moving, and
+     the only property that transitions is `opacity`, so the state change costs
+     one composited layer rather than a relayout.
+
+     ── Why the gradient is shaded and not tinted ──────────────────────────────
+     `--color-paper-raised` on the `--color-paper` ground is a fraction of a
+     step of contrast; a pool of it is not a highlight, it is nothing, which is
+     exactly what the previous version measured as. A gradient needs somewhere
+     to travel, and the only direction available on a paper ground is *down*.
+     So the lit end is `--color-paper-raised` and the shaded end is a 7% mix
+     toward `--color-ink`: the sheet is shaded away from the light rather than
+     brightened towards it, which is also what a real sheet under a real lamp
+     does.
+
+     7% is a measured ceiling, not a taste. Measured on a real build, that mix
+     resolves to #deddd9, and every foreground this card puts on it holds:
+
+       --color-ink   (headings, domain labels)   13.20:1  AAA
+       --color-slate (summary, credits, stack)    4.94:1  AA
+       --color-accent (the armed CTA)             5.60:1  AA
+       domain mark, 68% mix (worst: fpga)         3.13:1  passes 1.4.11
+       --color-rule  (hairlines)                  2.82:1  FAILS 1.4.11
+
+     That last line is why `.card__media` and `.card__stack-item` darken their
+     borders to `--color-slate` (4.94:1) whenever the sheet is showing, and why
+     `.card__channel-rule` goes to `--color-ink`. The only `--color-rule` left
+     is this pseudo-element's own border, and that one is a boundary *between*
+     the sheet and the page rather than a mark *on* the sheet — it reads at
+     3.07:1 against the paper it separates the sheet from, which is the pair
+     1.4.11 is about.
+
+     7% is therefore a ceiling in two directions at once: past it
+     `--color-slate` drops under 4.5:1 and the fpga channel mark drops under
+     3:1. Do not raise it without re-measuring every row above.
+
+     The far stop is `--color-paper-raised` and NOT `transparent`. `transparent`
+     is `rgba(0,0,0,0)`, and interpolating an opaque colour towards it in an
+     unpremultiplied space drags every intermediate stop toward black — a grey
+     halo around the highlight, on a surface whose entire subject is clean
+     paper.
+
+     ── Why there is a shadow at all ──────────────────────────────────────────
+     "Lifted" with no shadow is a 3px jump. The audit of the deployed build
+     found the hover changed no shadow, no border and no background, and it was
+     right: the only thing a visitor could actually see move was the text. The
+     two-layer shadow is the contact edge plus the cast — mixed from
+     `--color-ink`, so no colour value is introduced here either.
+     ------------------------------------------------------------------------ */
+
   .card::before {
     content: '';
     position: absolute;
     inset: calc(-1 * var(--spacing-gutter)) calc(-0.75 * var(--spacing-gutter));
     z-index: -1;
+    border: var(--border-hairline) solid var(--color-rule);
     border-radius: var(--radius-sm);
-    background: radial-gradient(115% 90% at 10% 0%, var(--color-paper-raised) 0%, transparent 72%);
+    background-color: var(--color-paper-raised);
+    background-image: radial-gradient(
+      88% 74% at var(--card-x) var(--card-y),
+      var(--color-paper-raised) 0%,
+      color-mix(in oklab, var(--color-ink) 3%, var(--color-paper-raised)) 46%,
+      color-mix(in oklab, var(--color-ink) 7%, var(--color-paper-raised)) 100%
+    );
+    box-shadow:
+      0 1px 1px color-mix(in oklab, var(--color-ink) 10%, transparent),
+      0 10px 22px -12px color-mix(in oklab, var(--color-ink) 38%, transparent),
+      0 24px 48px -28px color-mix(in oklab, var(--color-ink) 30%, transparent);
     opacity: 0;
     transition: opacity var(--duration-fast) var(--ease-standard);
   }
 
   .card:hover,
   .card:focus-within {
-    transform: translateY(-2px);
+    transform: translateY(-3px);
   }
 
   /* :focus-within is listed alongside :hover on every rule in this file. If a
-     pointer can see it, a keyboard can see it. */
+     pointer can see it, a keyboard can see it — and because the pointer's only
+     privilege is *where* the light sits, the two states are identical in
+     everything but that. `.card__link` is the first focusable element inside
+     the card and its stretched `::after` is the whole hit area, so both
+     selectors are driven by the same anchor. */
   .card:hover::before,
   .card:focus-within::before {
     opacity: 1;
@@ -479,7 +609,17 @@ const mediaTransition = `project-media-${meta.slug}`;
     border: var(--border-hairline) solid var(--color-rule);
     border-radius: var(--radius-sm);
     background-color: var(--color-paper-raised);
+    transition: border-color var(--duration-fast) var(--ease-standard);
     view-transition-name: var(--vt-media, attr(data-vt type(<custom-ident>), none));
+  }
+
+  /* The figure's frame firms up with the rest of the card — and it has to.
+     `--color-rule` measures 2.82:1 against the sheet's shaded end, under the
+     3:1 that WCAG 1.4.11 asks of a boundary; `--color-slate` measures 4.94:1.
+     See the contrast table above `.card::before`. */
+  .card:hover .card__media,
+  .card:focus-within .card__media {
+    border-color: var(--color-slate);
   }
 
   /* `<Image />` renders its own <img>, so it is reached through the wrapper
@@ -550,9 +690,53 @@ const mediaTransition = `project-media-${meta.slug}`;
     view-transition-name: var(--vt-title, attr(data-vt type(<custom-ident>), none));
   }
 
+  /* ---------------------------------------------------------------------------
+     The link's own state.
+
+     `.card__link` is the element that is actually focusable and actually
+     clickable — its `::after` is the card's whole hit area — and until now it
+     carried no `:hover` and no `:focus-visible` of its own at all. Everything
+     visible on hover was hung off the `<article>`, which is not the control.
+     A live inspection of the deployed build reported a `transition: all` here
+     as the cause; that reading was wrong (`all` is the *initial* value of
+     `transition-property`, so it is what `getComputedStyle` returns for an
+     element with no transition whatsoever), but the missing state was real.
+
+     A hairline rule in `--color-ink`, and not the two obvious alternatives.
+     Ultramarine was tried first and rendered: a three-line, 40px heading turned
+     entirely to the accent reads as an unvisited hyperlink rather than as an
+     armed affordance, and on a card whose cover happens to be a blue plot it
+     fights the evidence for attention. A colour change on the text itself was
+     the same problem in a different form. The rule keeps the title in ink,
+     where the whole system puts its headings, and says "link" in the register
+     the rest of the page already uses — `.link`, `.selected__all` and
+     `.card__external` are all underlined ink or slate.
+
+     Reserved at rest with a transparent decoration colour rather than switched
+     on with `text-decoration-line`, so arming the link changes only a paint and
+     cannot reflow a heading that wraps.
+
+     `--color-transparent` rather than the bare keyword: tokens.css is the only
+     file in this repository allowed to name a colour, keyword or otherwise.
+
+     Hovering anywhere on the card triggers this, because the stretched
+     `::after` is what the pointer is over. That is the intended reading — the
+     whole card is one link, and this says so. The two external links sit above
+     that overlay with their own `z-index`, so hovering `GITHUB` correctly does
+     *not* arm the case-study link. */
+
   .card__link {
     color: inherit;
-    text-decoration: none;
+    text-decoration: underline;
+    text-decoration-color: var(--color-transparent);
+    text-decoration-thickness: var(--border-hairline);
+    text-underline-offset: 0.18em;
+    transition: text-decoration-color var(--duration-fast) var(--ease-standard);
+  }
+
+  .card__link:hover,
+  .card__link:focus-visible {
+    text-decoration-color: var(--color-ink);
   }
 
   .card__link::after {
@@ -767,7 +951,27 @@ const mediaTransition = `project-media-${meta.slug}`;
       border-top-color: var(--color-ink);
     }
 
-    .card:hover {
+    .card__stack-item,
+    .card__media {
+      border-color: var(--color-slate);
+    }
+
+    /* The sheet is simply *there*, permanently — the listing becomes a stack of
+       physical sheets rather than four regions of the same page, and every
+       affordance a pointer user gets by hovering is already on screen
+       (MOTION_SYSTEM §7: "the card itself is the affordance").
+
+       The cast shadow is dropped and only the contact edge kept, because a
+       lifted sheet would be claiming a state that no longer exists here: there
+       is nothing to hover, so nothing has risen. Flat on the page, with a
+       boundary. */
+    .card::before {
+      opacity: 1;
+      box-shadow: 0 1px 1px color-mix(in oklab, var(--color-ink) 10%, transparent);
+    }
+
+    .card:hover,
+    .card:focus-within {
       transform: none;
     }
   }
@@ -777,9 +981,22 @@ const mediaTransition = `project-media-${meta.slug}`;
 
      Durations already collapse globally (global.css), so the state change is
      instant rather than removed — nothing disappears and nothing waits on an
-     animation. What must be switched off here is the cross-document view
-     transition: an unnamed element is simply not paired, and the browser
-     performs an ordinary navigation.
+     animation.
+
+     What is withdrawn is the *movement*: the lift, and the light's travel. The
+     pointer script in `ProjectGrid.astro` never attaches under this query, so
+     `--card-x` / `--card-y` keep the resting values declared at the top of this
+     file and the light simply stays where it is.
+
+     Everything the hover actually communicates survives untouched — the raised
+     panel, the hairline edge, the ink shadow, the masthead rule darkening, the
+     accent CTA, the armed link underline. That is deliberate and it is the
+     point: a card that speaks only through motion says nothing at all to the
+     visitor who asked for less of it.
+
+     The cross-document view transition is switched off too — an unnamed
+     element is simply not paired, and the browser performs an ordinary
+     navigation.
      ------------------------------------------------------------------------ */
 
   @media (prefers-reduced-motion: reduce) {
