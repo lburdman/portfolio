@@ -367,3 +367,74 @@ Genuinely lean and mostly correct. Total client JS is ~1 KB across three inline 
 5. A11y pass: About `<h1>`, skip link, reduced-motion (with the `.animate-in` override), contrast tokens, menu Escape handling (2.2–2.7).
 6. Collapse the EN/ES page pairs and move the remaining hardcoded strings into `UIStrings` (5.1, 2.8) — after which most of this class of bug cannot recur.
 7. Hygiene: `.gitignore`, `.prettierignore`, `npm audit fix`, `.nvmrc` (4, 5.5).
+
+---
+
+## Priority 6 — Defects found live in pass 3 (2026-08-28)
+
+Added to the do-not-reintroduce baseline. All four had **shipped to production**.
+None raised a console error, none was visible in source review, and none would
+have been caught by the existing test suite. Every one was found by measuring
+rendered output in a real browser against the production build.
+
+The common thread is worth more than the individual fixes: `astro dev` serves no
+CSP, and an SVG that computes to nothing still renders as valid, silent markup.
+"It looks right in dev" and "the tests pass" were both true the whole time.
+
+### 6.1 A `pathLength` dash under `vector-effect: non-scaling-stroke`
+
+`pathLength` normalises a path in **user** space. `vector-effect:
+non-scaling-stroke` measures dash array, width and offset in **screen** space.
+An element carrying both paints `1/scale` of itself, silently.
+
+No element transform is needed to trigger it. Every stage SVG is
+`viewBox="0 0 320 200"` rendered at up to 544 CSS px, so the plain viewport
+scale is up to **1.70x** and a finished `stroke-dasharray: 100 100` covers
+1/1.70 = **58.8%**. Measured across nine elements, every painted fraction landed
+on 1/scale and none on 100%: the Bloch sphere's rim was a **broken circle** with
+41.4% of its arc absent, and the FPGA selected route painted **27.8%** and never
+reached its destination block. Four more elements tiled the pattern 1.70x and
+drew **two pulses on a strip that has one clock edge to mark**.
+
+**The fix is to drop `vector-effect` from every element that declares
+`pathLength`**, which is scale-invariant by construction: with both quantities
+in user space, `100 100` over `pathLength="100"` is the whole path by
+definition, and no viewport number appears in the fix at all. The trade is
+deliberate — **ground** (grid, rules, ticks, outlines, frame) keeps a constant
+pen; **subject** (accent lines, signals, pulses, anything whose _length_ is the
+meaning) is drawn in the plate's own units, like its geometry and type already
+are. `tests/stroke-space.test.ts` now fails if any `pathLength` element is
+reached by a `non-scaling-stroke` rule.
+
+**Two earlier diagnoses of this defect were wrong, which is the lesson worth
+keeping.** The first blamed a specific element transform and "fixed" it by
+adding `pathLength="100"` to the FPGA route — a no-op that left the defect
+shipping and made the code look correct. The second, recorded in this file and
+in `docs/MOTION_SYSTEM.md`, called it "a dashed stroke under a _scaled group_",
+which is also wrong: there is no group, only the viewport. A plausible cause
+that explains the symptom is not the cause. This one was only settled by
+measuring the painted fraction at three viewport widths and watching every
+figure land on 1/scale.
+
+### 6.2 An arrival animation replacing a resting value instead of composing with it
+
+The Bloch sphere's entry animated `opacity: 0 → 1` on a group whose glass veil
+rested at `opacity: 0.1`. The animation replaced that value rather than
+multiplying it, leaving **an opaque disc over the whole sphere**. Fixed by moving
+the resting value to a `fill-opacity` attribute so the two compose.
+
+General form: a property written per frame by script must not also be set for
+that element in the stylesheet, and a property animated by CSS must not be the
+same one a resting value depends on. Keep them on different properties and add a
+guard test.
+
+### 6.3 A test whose scope silently widened when a section was renamed
+
+`tests/decision-landscape.test.ts` scoped itself with
+`slice(indexOf(start), indexOf(end))`. When the Bloch sphere renamed the end
+marker, `indexOf` returned `-1` and `slice(start, -1)` ran to the end of the
+file, so an "exactly one accent object" assertion began silently inspecting every
+other stage's rules. It passed for the wrong reason.
+
+Any `indexOf`-delimited slice in a test must assert that **both** markers were
+found. This is 3.2's pattern — a test block that cannot fail — in a new costume.

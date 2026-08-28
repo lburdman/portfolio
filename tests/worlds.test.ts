@@ -5,34 +5,36 @@ import {
   activeIndexFromProgress,
   clamp01,
   clampIndex,
-  FINALE_DWELL,
+  HOLD_HEIGHTS,
+  holdCentre,
+  localProgress,
+  MOVE_HEIGHTS,
   nextIndexForKey,
   pinnedScrollLength,
   progressForIndex,
+  publishTraverseProgress,
+  resetTraverseProgress,
   scrollTargetForIndex,
-  SCROLL_PER_STEP,
-  TRAVEL_SHARE,
-  travelProgress,
-  travelShare,
+  segmentPitch,
+  snapProgress,
+  stageProgressSubscriberCount,
+  subscribeStageProgress,
+  timelineAt,
   TRAVERSE_LENGTH,
   TRAVERSE_SCROLL_HEIGHTS,
   traverseIds,
+  traverseIndexOf,
+  traverseScrollHeights,
 } from '../src/components/visuals/worlds/traverse';
 import { HYDRATION_QUERY, REDUCED_MOTION_QUERY, TRAVERSE_QUERY } from '../src/components/visuals/worlds/useMediaQuery';
 import {
-  bandHalfWidth,
+  clockPath,
   createRandom,
-  forecastSignal,
-  interferenceProfile,
-  interpolateAt,
   manhattanLength,
   manhattanPath,
-  polylinePath,
-  ribbonPath,
-  spectrumBars,
+  STAGE_WIDTH,
   wavePath,
 } from '../src/components/visuals/worlds/stage-geometry';
-import { FORECAST_NOW_X } from '../src/components/visuals/worlds/stages/ForecastStage';
 import { ROUTE_CELLS, ROUTE_STEPS } from '../src/components/visuals/worlds/stages/RoutingStage';
 
 /**
@@ -97,27 +99,98 @@ describe('clampIndex', () => {
   });
 });
 
+/* ===========================================================================
+   The timeline's shape
+
+   The traverse is not one slope. It alternates `hold(0) move(0→1) hold(1) …
+   hold(n-1)`: `count` dwells with a panel exactly centred, and `count - 1`
+   eased slides of one panel pitch between them.
+
+   The helpers below rebuild that shape from the two constants, so every
+   assertion is written against the structure rather than against a number that
+   happens to be true at today's tuning.
+   ======================================================================== */
+
+const PITCH = HOLD_HEIGHTS + MOVE_HEIGHTS;
+const TOTAL = COUNT * HOLD_HEIGHTS + (COUNT - 1) * MOVE_HEIGHTS;
+/** Scroll progress at a timeline position given in viewport heights. */
+const at = (heights: number) => heights / TOTAL;
+/** The start, centre and end of world `i`'s hold, as scroll progress. */
+const holdStart = (i: number) => at(i * PITCH);
+const holdMid = (i: number) => at(i * PITCH + HOLD_HEIGHTS / 2);
+const holdEnd = (i: number) => at(i * PITCH + HOLD_HEIGHTS);
+
+describe('the timeline geometry helpers', () => {
+  it('agrees with the shape the island builds', () => {
+    expect(segmentPitch()).toBeCloseTo(PITCH, 12);
+    expect(traverseScrollHeights()).toBeCloseTo(TOTAL, 12);
+    expect(TRAVERSE_SCROLL_HEIGHTS).toBeCloseTo(TOTAL, 12);
+    // `count` holds and `count - 1` moves, which is the same thing said twice:
+    // the range is `count - 1` whole periods plus one closing hold.
+    expect(TOTAL).toBeCloseTo((COUNT - 1) * PITCH + HOLD_HEIGHTS, 12);
+  });
+
+  it('converts progress into timeline position and clamps at both ends', () => {
+    expect(timelineAt(0, COUNT)).toBe(0);
+    expect(timelineAt(1, COUNT)).toBeCloseTo(TOTAL, 12);
+    expect(timelineAt(1.7, COUNT)).toBeCloseTo(TOTAL, 12);
+    expect(timelineAt(Number.NaN, COUNT)).toBe(0);
+  });
+
+  it('centres each hold half a hold after its start', () => {
+    for (let i = 0; i < COUNT; i += 1) {
+      expect(holdCentre(i, COUNT)).toBeCloseTo(i * PITCH + HOLD_HEIGHTS / 2, 12);
+    }
+  });
+
+  it('answers a degenerate pitch as zero rather than NaN', () => {
+    expect(segmentPitch(0, 0)).toBe(0);
+    expect(segmentPitch(Number.NaN, 1)).toBe(0);
+    expect(traverseScrollHeights(0)).toBe(0);
+  });
+});
+
 describe('activeIndexFromProgress', () => {
-  it('maps progress 0 to the first domain', () => {
+  /* The rule: world `i` becomes active at the START of hold(i) — the instant
+     its panel reaches the centre — and stays active through the move that
+     carries it out again. That is what makes each arrival animation fire while
+     its own panel is centred, and what keeps the outgoing world's ambient
+     running as it slides away instead of freezing mid-exit. */
+
+  it('makes a world active exactly when it reaches the centre', () => {
+    for (let i = 0; i < COUNT; i += 1) {
+      expect(activeIndexFromProgress(holdStart(i), COUNT)).toBe(i);
+      expect(activeIndexFromProgress(holdMid(i), COUNT)).toBe(i);
+    }
+  });
+
+  it('keeps the outgoing world active for the whole of its exit move', () => {
+    for (let i = 0; i < COUNT - 1; i += 1) {
+      // Anywhere strictly inside move(i → i+1) is still world i.
+      expect(activeIndexFromProgress(at(i * PITCH + HOLD_HEIGHTS + MOVE_HEIGHTS * 0.05), COUNT)).toBe(i);
+      expect(activeIndexFromProgress(at(i * PITCH + HOLD_HEIGHTS + MOVE_HEIGHTS * 0.5), COUNT)).toBe(i);
+      expect(activeIndexFromProgress(at(i * PITCH + HOLD_HEIGHTS + MOVE_HEIGHTS * 0.95), COUNT)).toBe(i);
+      // …and the handover is the arrival, not the departure.
+      expect(activeIndexFromProgress(holdStart(i + 1), COUNT)).toBe(i + 1);
+    }
+  });
+
+  it('never skips a world, however coarse the sampling', () => {
+    // The 800px-jump defect: a scroll delta large enough to cross a whole
+    // segment used to step past a domain. Because this is a pure function of
+    // progress and never accumulates, sampling it at any resolution visits
+    // every index in order.
+    const seen: number[] = [];
+    for (let step = 0; step <= 40; step += 1) {
+      const index = activeIndexFromProgress(step / 40, COUNT);
+      if (seen[seen.length - 1] !== index) seen.push(index);
+    }
+    expect(seen).toEqual(Array.from({ length: COUNT }, (_, i) => i));
+  });
+
+  it('maps both ends of the range to the first and last domain', () => {
     expect(activeIndexFromProgress(0, COUNT)).toBe(0);
-  });
-
-  it('maps progress 1 to the last domain, not past it', () => {
     expect(activeIndexFromProgress(1, COUNT)).toBe(COUNT - 1);
-  });
-
-  it('advances one domain per interval across the whole range', () => {
-    // The track travels `count - 1` panel widths, so the stops sit at
-    // 0, 0.25, 0.5, 0.75, 1 for five domains.
-    const stops = Array.from({ length: COUNT }, (_, index) => activeIndexFromProgress(index / (COUNT - 1), COUNT));
-    expect(stops).toEqual([0, 1, 2, 3, 4].slice(0, COUNT));
-  });
-
-  it('rounds to the nearer stop rather than truncating', () => {
-    // Just past the midpoint between stop 1 and stop 2 must already read as 2.
-    const midpoint = (1 / (COUNT - 1) + 2 / (COUNT - 1)) / 2;
-    expect(activeIndexFromProgress(midpoint - 0.001, COUNT)).toBe(1);
-    expect(activeIndexFromProgress(midpoint + 0.001, COUNT)).toBe(2);
   });
 
   it('clamps progress reported outside 0…1 by an over-scrolled ScrollTrigger', () => {
@@ -128,19 +201,31 @@ describe('activeIndexFromProgress', () => {
   it('answers 0 for a single-domain or empty sequence instead of dividing by zero', () => {
     expect(activeIndexFromProgress(0.5, 1)).toBe(0);
     expect(activeIndexFromProgress(0.5, 0)).toBe(0);
+    expect(activeIndexFromProgress(0.5, COUNT, 0, 0)).toBe(0);
   });
 });
 
 describe('progressForIndex', () => {
-  it('is the inverse of activeIndexFromProgress at every stop', () => {
+  it('is the centre of the stop’s hold, not its leading edge', () => {
+    for (let index = 0; index < COUNT; index += 1) {
+      expect(progressForIndex(index, COUNT)).toBeCloseTo(holdMid(index), 12);
+    }
+  });
+
+  it('lands inside the right hold at every stop', () => {
     for (let index = 0; index < COUNT; index += 1) {
       expect(activeIndexFromProgress(progressForIndex(index, COUNT), COUNT)).toBe(index);
     }
   });
 
-  it('puts the first stop at 0 and the last at 1', () => {
-    expect(progressForIndex(0, COUNT)).toBe(0);
-    expect(progressForIndex(COUNT - 1, COUNT)).toBe(1);
+  it('opens and closes the range with half a hold', () => {
+    // Neither end is 0 or 1 any more, and that is the fix: the first world is
+    // already centred when the pin engages and the last one is still centred
+    // when it lets go. Before, the first stop sat at progress 0 — where its
+    // panel was 94px off centre — and the last at progress 1, after 350px in
+    // which nothing moved at all.
+    expect(progressForIndex(0, COUNT)).toBeCloseTo(HOLD_HEIGHTS / 2 / TOTAL, 12);
+    expect(1 - progressForIndex(COUNT - 1, COUNT)).toBeCloseTo(HOLD_HEIGHTS / 2 / TOTAL, 12);
   });
 
   it('answers 0 for a single-domain or empty sequence instead of dividing by zero', () => {
@@ -187,10 +272,29 @@ describe('nextIndexForKey', () => {
 });
 
 describe('scrollTargetForIndex', () => {
-  it('spreads the stops evenly across the pinned scroll range', () => {
-    expect(scrollTargetForIndex(0, 5, 1000, 3000)).toBe(1000);
-    expect(scrollTargetForIndex(2, 5, 1000, 3000)).toBe(2000);
-    expect(scrollTargetForIndex(4, 5, 1000, 3000)).toBe(3000);
+  it('lands on the centre of each stop’s hold', () => {
+    const start = 1000;
+    const end = 3000;
+    for (let index = 0; index < COUNT; index += 1) {
+      expect(scrollTargetForIndex(index, COUNT, start, end)).toBeCloseTo(start + holdMid(index) * (end - start), 8);
+    }
+  });
+
+  it('spreads the stops evenly, one period apart', () => {
+    // Consecutive stops are exactly one `hold + move` apart, so a keypress
+    // always costs the same scroll wherever in the traverse it is pressed.
+    const gaps: number[] = [];
+    for (let index = 1; index < COUNT; index += 1) {
+      gaps.push(scrollTargetForIndex(index, COUNT, 1000, 3000) - scrollTargetForIndex(index - 1, COUNT, 1000, 3000));
+    }
+    for (const gap of gaps) expect(gap).toBeCloseTo(gaps[0] ?? 0, 8);
+  });
+
+  it('keeps both end stops strictly inside the pinned range', () => {
+    // The last stop must not sit at the very end: there it would be the frame
+    // the pin releases on, which is the finale defect this shape removes.
+    expect(scrollTargetForIndex(0, COUNT, 1000, 3000)).toBeGreaterThan(1000);
+    expect(scrollTargetForIndex(COUNT - 1, COUNT, 1000, 3000)).toBeLessThan(3000);
   });
 
   it('answers the range start for an unmeasured ScrollTrigger', () => {
@@ -200,27 +304,9 @@ describe('scrollTargetForIndex', () => {
     expect(scrollTargetForIndex(3, 5, 1200, 400)).toBe(1200);
   });
 
-  it('clamps an out-of-range index into the pinned range', () => {
-    expect(scrollTargetForIndex(-3, 5, 1000, 3000)).toBe(1000);
-    expect(scrollTargetForIndex(50, 5, 1000, 3000)).toBe(3000);
-  });
-
-  it('keeps every stop inside the travelling part of the range', () => {
-    // With a quarter of the range reserved as the finale's hold, the last stop
-    // is three quarters of the way along — not at the very end, where the
-    // track has already been parked and stopped moving.
-    expect(scrollTargetForIndex(4, 5, 1000, 3000, 0.75)).toBe(2500);
-    expect(scrollTargetForIndex(2, 5, 1000, 3000, 0.75)).toBe(1750);
-    // Home is unaffected by the hold, which is exactly why the End case has to
-    // be asserted separately: a missing share is half-right and looks fine.
-    expect(scrollTargetForIndex(0, 5, 1000, 3000, 0.75)).toBe(1000);
-  });
-
-  it('treats a missing or nonsensical share as the whole range', () => {
-    expect(scrollTargetForIndex(4, 5, 1000, 3000)).toBe(3000);
-    expect(scrollTargetForIndex(4, 5, 1000, 3000, 0)).toBe(3000);
-    expect(scrollTargetForIndex(4, 5, 1000, 3000, Number.NaN)).toBe(3000);
-    expect(scrollTargetForIndex(4, 5, 1000, 3000, 4)).toBe(3000);
+  it('clamps an out-of-range index onto the first and last stop', () => {
+    expect(scrollTargetForIndex(-3, COUNT, 1000, 3000)).toBe(scrollTargetForIndex(0, COUNT, 1000, 3000));
+    expect(scrollTargetForIndex(50, COUNT, 1000, 3000)).toBe(scrollTargetForIndex(COUNT - 1, COUNT, 1000, 3000));
   });
 
   it('answers 0 for a non-finite range start', () => {
@@ -238,39 +324,87 @@ describe('scrollTargetForIndex', () => {
 });
 
 /* ===========================================================================
-   The pin's scroll budget, and the finale's dwell
+   The pin's scroll budget
 
-   docs/REDESIGN_DECISIONS.md #14 and the Audio row of §P2. Before this, the
-   pinned range WAS the horizontal travel distance in pixels, which made the
-   section 43% of the document (measured: 4400px of 10207px at 1440×900) and
-   gave the last of five worlds no dwell at all — it reached the centre of the
-   viewport at y=6500 and the pin released at y=6500.
+   docs/REDESIGN_DECISIONS.md #14 and the Audio row of §P2. Before that pass,
+   the pinned range WAS the horizontal travel distance in pixels, which made
+   the section 43% of the document (measured: 4400px of 10207px at 1440×900)
+   and gave the last of five worlds no dwell at all.
 
-   Both numbers below are budgets, not measurements of anything, so what is
-   worth asserting is the relationships they have to hold to.
+   The pass that fixed it introduced a `FINALE_DWELL` appended after the
+   travel. A later browser audit measured what that produced: 350px of pinned
+   scroll in which the transform did not change, and — because the dwell ate
+   into the range without adding travel — a track moving 2.14px per scrolled
+   px, with no plateau anywhere and every world within 60px of centre for about
+   50px of scroll.
+
+   The dwell is now inside the timeline, one per world, so there is no separate
+   finale constant to bound. What is asserted here instead is the structure
+   that replaced it, and one honest ceiling on how long the whole thing may be.
    ======================================================================== */
 
 describe('the pinned scroll budget', () => {
-  it('is the travel steps plus one dwell for the finale', () => {
-    expect(TRAVERSE_SCROLL_HEIGHTS).toBeCloseTo((TRAVERSE_LENGTH - 1) * SCROLL_PER_STEP + FINALE_DWELL, 10);
+  it('is one hold per world plus one move between each pair', () => {
+    expect(TRAVERSE_SCROLL_HEIGHTS).toBeCloseTo(
+      TRAVERSE_LENGTH * HOLD_HEIGHTS + (TRAVERSE_LENGTH - 1) * MOVE_HEIGHTS,
+      10,
+    );
   });
 
-  it('gives the last world a dwell comparable to a full step', () => {
-    // The defect was a finale with zero dwell. A hold shorter than about half
-    // a step would not fix it, and one longer than a step would read as the
-    // page having stalled.
-    expect(FINALE_DWELL).toBeGreaterThanOrEqual(SCROLL_PER_STEP / 2);
-    expect(FINALE_DWELL).toBeLessThanOrEqual(SCROLL_PER_STEP * 1.5);
+  /* This replaces the old `FINALE_DWELL` range assertion, which protected a
+     constant that no longer exists. What needs protecting now is the property
+     that constant was standing in for: the range must END in a dwell, and that
+     dwell must be a real one and no longer than anyone else's. */
+
+  it('ends the pin in a dwell, not in a frozen tail', () => {
+    // The last world is already active, and still active, at the very end.
+    expect(activeIndexFromProgress(1, COUNT)).toBe(COUNT - 1);
+    // Its local progress runs out exactly at the pin's end — so the last thing
+    // the reader scrolls through is the finale leaving, not nothing at all.
+    expect(localProgress(COUNT - 1, 1, COUNT)).toBe(1);
+    // And the tail after the last stop is exactly half a hold. A re-added dead
+    // tail of any length would make this remainder larger.
+    expect((1 - progressForIndex(COUNT - 1, COUNT)) * TOTAL).toBeCloseTo(HOLD_HEIGHTS / 2, 12);
   });
 
-  it('keeps the band under a third of a five-section page', () => {
-    // The rest of this document measured ~5750px with the band excluded. A pin
-    // longer than half of that is the "half the page is one section" finding.
-    const rest = 5750;
+  it('gives every world the same dwell, the finale included', () => {
+    const dwell = (i: number) => (holdEnd(i) - holdStart(i)) * TOTAL;
+    for (let i = 0; i < COUNT; i += 1) expect(dwell(i)).toBeCloseTo(HOLD_HEIGHTS, 12);
+  });
+
+  it('holds long enough to read as a stop and not so long as to stall', () => {
+    // Under about half a move and the plateau stops registering as a plateau —
+    // which is the defect that started this. Over about a move and the band
+    // reads as having stalled, which is the defect the pass before it started.
+    expect(HOLD_HEIGHTS).toBeGreaterThanOrEqual(MOVE_HEIGHTS / 2);
+    expect(HOLD_HEIGHTS).toBeLessThanOrEqual(MOVE_HEIGHTS);
+  });
+
+  /* ── The ceiling ────────────────────────────────────────────────────────
+     This bound used to be `pin / document < 1/3` against a hardcoded
+     `rest = 5750`, which capped the per-step scroll at 0.698 viewport heights.
+     That number was never measured — it was a round fraction, and the retune
+     above (which is what makes every world actually reach and hold the centre)
+     exceeds it.
+
+     A round budget does not outrank correct pacing, so the bound is retuned
+     rather than deleted or weakened away. What it protects is unchanged and
+     still real: this document has five sections, and a pinned band that is
+     approaching half of it is the "43% of the page is one section" finding
+     that started the whole line of work.
+
+     `rest` is now measured, not assumed — 6549px on the built site at
+     1440×900, the document height with the pin's own range excluded. The
+     ceiling is 40%: the current shape sits at 34.0%, the pre-fix behaviour at
+     40.2% fails it, and the constants above would have to grow by about 14%
+     before it bit. It is a ceiling on absurdity, not a target. */
+
+  it('keeps the band under two fifths of the document', () => {
+    const rest = 6549;
     const pin = pinnedScrollLength(900);
-    expect(pin / (rest + pin)).toBeLessThan(1 / 3);
-    // …and the previous behaviour, ~4400px, would have failed exactly this.
-    expect(4400 / (rest + 4400)).toBeGreaterThan(1 / 3);
+    expect(pin / (rest + pin)).toBeLessThan(0.4);
+    // …and the behaviour this line of work started from, ~4400px, fails it.
+    expect(4400 / (rest + 4400)).toBeGreaterThan(0.4);
   });
 
   it('scales the pin with the viewport rather than with the track width', () => {
@@ -287,77 +421,214 @@ describe('the pinned scroll budget', () => {
   });
 });
 
-describe('travelProgress', () => {
-  it('reaches the end of the track before the end of the scroll range', () => {
-    expect(travelProgress(0, 0.8)).toBe(0);
-    expect(travelProgress(0.4, 0.8)).toBeCloseTo(0.5, 10);
-    expect(travelProgress(0.8, 0.8)).toBe(1);
+describe('localProgress', () => {
+  /* The continuous channel a scroll-driven stage reads. Its contract is three
+     points: 0 as the world begins arriving, exactly 0.5 while it is centred,
+     1 once it has finished leaving. A later feature keys its midpoint state to
+     that 0.5, so it is asserted for every world including the clamped ends. */
+
+  it('reads exactly 0.5 at the centre of every hold', () => {
+    for (let i = 0; i < COUNT; i += 1) {
+      expect(localProgress(i, holdMid(i), COUNT)).toBeCloseTo(0.5, 12);
+      // …and at the same progress the keyboard would target for that stop.
+      expect(localProgress(i, progressForIndex(i, COUNT), COUNT)).toBeCloseTo(0.5, 12);
+    }
   });
 
-  it('saturates through the finale hold instead of overrunning', () => {
-    // This is the assertion that stops the traverse reporting a sixth stop
-    // that does not exist while the last world is holding.
-    expect(travelProgress(0.9, 0.8)).toBe(1);
-    expect(travelProgress(1, 0.8)).toBe(1);
-    expect(activeIndexFromProgress(travelProgress(1, 0.8), COUNT)).toBe(COUNT - 1);
-    expect(activeIndexFromProgress(travelProgress(0.85, 0.8), COUNT)).toBe(COUNT - 1);
+  it('spans the whole ownership window: entry move, hold, exit move', () => {
+    for (let i = 1; i < COUNT - 1; i += 1) {
+      // 0 at the instant its entry move begins…
+      expect(localProgress(i, at(i * PITCH - MOVE_HEIGHTS), COUNT)).toBeCloseTo(0, 12);
+      // …and 1 at the instant its exit move ends.
+      expect(localProgress(i, at((i + 1) * PITCH), COUNT)).toBeCloseTo(1, 12);
+    }
   });
 
-  it('is the identity when the whole range travels', () => {
-    expect(travelProgress(0.3, 1)).toBeCloseTo(0.3, 10);
+  it('clamps the first world’s window to the start of the pin', () => {
+    // World 0 has no entry move, so its window opens where the pin does.
+    expect(localProgress(0, 0, COUNT)).toBe(0);
+    expect(localProgress(0, holdMid(0), COUNT)).toBeCloseTo(0.5, 12);
+    expect(localProgress(0, at(PITCH), COUNT)).toBeCloseTo(1, 12);
   });
 
-  it('answers "arrived" rather than NaN for a degenerate share', () => {
-    expect(travelProgress(0.5, 0)).toBe(1);
-    expect(travelProgress(0.5, Number.NaN)).toBe(1);
+  it('clamps the last world’s window to the end of the pin', () => {
+    const last = COUNT - 1;
+    expect(localProgress(last, at(last * PITCH - MOVE_HEIGHTS), COUNT)).toBeCloseTo(0, 12);
+    expect(localProgress(last, holdMid(last), COUNT)).toBeCloseTo(0.5, 12);
+    expect(localProgress(last, 1, COUNT)).toBe(1);
   });
 
-  it("defaults to the island's own share", () => {
-    expect(TRAVEL_SHARE).toBeGreaterThan(0);
-    expect(TRAVEL_SHARE).toBeLessThan(1);
-    expect(travelProgress(TRAVEL_SHARE)).toBe(1);
-    expect(travelProgress(1)).toBe(1);
+  it('rises monotonically and never leaves the unit interval', () => {
+    for (let i = 0; i < COUNT; i += 1) {
+      let previous = -1;
+      for (let step = 0; step <= 200; step += 1) {
+        const value = localProgress(i, step / 200, COUNT);
+        expect(value).toBeGreaterThanOrEqual(0);
+        expect(value).toBeLessThanOrEqual(1);
+        expect(value).toBeGreaterThanOrEqual(previous);
+        previous = value;
+      }
+    }
   });
 
-  it('clamps a progress reported outside 0…1', () => {
-    expect(travelProgress(-0.5, 0.8)).toBe(0);
-    expect(travelProgress(1.6, 0.8)).toBe(1);
-    expect(travelProgress(Number.NaN, 0.8)).toBe(0);
-    expect(travelProgress(-0.5, 1)).toBe(0);
+  it('is 0 before its world is anywhere near, and 1 long after', () => {
+    expect(localProgress(COUNT - 1, 0, COUNT)).toBe(0);
+    expect(localProgress(0, 1, COUNT)).toBe(1);
+  });
+
+  it('answers 0 rather than NaN for a sequence with no length', () => {
+    expect(localProgress(0, 0.5, 0)).toBe(0);
+    expect(localProgress(0, 0.5, COUNT, 0, 0)).toBe(0);
+  });
+
+  it('never divides by zero, even with no hold at all', () => {
+    // A zero hold collapses every window to the two moves either side of it.
+    // The midpoint contract survives — it is just instantaneous — and no
+    // sample anywhere in the range comes back NaN.
+    for (let i = 0; i < COUNT; i += 1) {
+      expect(localProgress(i, at(i * MOVE_HEIGHTS) / 1, COUNT, 0, MOVE_HEIGHTS)).toBeGreaterThanOrEqual(0);
+      for (let step = 0; step <= 60; step += 1) {
+        expect(Number.isFinite(localProgress(i, step / 60, COUNT, 0, MOVE_HEIGHTS))).toBe(true);
+      }
+    }
   });
 });
 
-describe('travelShare', () => {
-  it('is travel over travel-plus-hold', () => {
-    expect(travelShare(4, 0.6, 0.4)).toBeCloseTo(2.4 / 2.8, 10);
-    expect(travelShare(3, 1, 1)).toBeCloseTo(0.75, 10);
+describe('snapProgress', () => {
+  /* Releasing mid-move settles onto the nearer world. Releasing inside a hold
+     does nothing at all — a reader who has come to rest on a centred world
+     must not have the page pulled out from under them, which is the line
+     between settling a gesture and jacking the scroll. */
+
+  it('leaves a reader who is resting inside a hold exactly where they are', () => {
+    for (let i = 0; i < COUNT; i += 1) {
+      for (const p of [holdStart(i), holdMid(i), holdEnd(i), (holdStart(i) + holdMid(i)) / 2]) {
+        expect(snapProgress(p, COUNT)).toBeCloseTo(p, 12);
+      }
+    }
   });
 
-  it('is 1 when nothing is held back', () => {
-    expect(travelShare(4, 0.6, 0)).toBe(1);
+  it('settles a release mid-move onto the nearer hold’s centre', () => {
+    for (let i = 0; i < COUNT - 1; i += 1) {
+      const justAfter = at(i * PITCH + HOLD_HEIGHTS + MOVE_HEIGHTS * 0.2);
+      const justBefore = at(i * PITCH + HOLD_HEIGHTS + MOVE_HEIGHTS * 0.8);
+      expect(snapProgress(justAfter, COUNT)).toBeCloseTo(holdMid(i), 12);
+      expect(snapProgress(justBefore, COUNT)).toBeCloseTo(holdMid(i + 1), 12);
+    }
   });
 
-  it('is 0 when nothing travels — a one-domain traverse is all hold', () => {
-    // Reachable: `DOMAINS` is the only source of the step count, so a site cut
-    // down to a single world would land here. `travelProgress` then reports
-    // "arrived" for every scroll position, which is correct: there is nowhere
-    // to travel to.
-    expect(travelShare(0, 0.6, 0.4)).toBe(0);
-    expect(travelProgress(0.5, travelShare(0, 0.6, 0.4))).toBe(1);
+  it('always answers a progress the traverse can rest at', () => {
+    const stops = Array.from({ length: COUNT }, (_, i) => holdMid(i));
+    for (let step = 0; step <= 400; step += 1) {
+      const settled = snapProgress(step / 400, COUNT);
+      const index = activeIndexFromProgress(settled, COUNT);
+      // Either untouched inside a hold, or landed on a stop.
+      const inHold = settled >= holdStart(index) - 1e-9 && settled <= holdEnd(index) + 1e-9;
+      const onStop = stops.some((stop) => Math.abs(stop - settled) < 1e-9);
+      expect(inHold || onStop).toBe(true);
+    }
   });
 
-  it('answers the plain proportional mapping for a range with no length', () => {
-    expect(travelShare(0, 0, 0)).toBe(1);
-    expect(travelShare(4, -1, 0)).toBe(1);
-    expect(travelShare(4, Number.NaN, 0.4)).toBe(1);
+  it('clamps and never answers NaN', () => {
+    expect(snapProgress(-3, COUNT)).toBe(0);
+    expect(snapProgress(4, COUNT)).toBe(1);
+    expect(snapProgress(Number.NaN, COUNT)).toBe(0);
+    expect(snapProgress(0.5, 1)).toBe(0.5);
+    expect(snapProgress(0.5, COUNT, 0, 0)).toBe(0.5);
+  });
+});
+
+/* ===========================================================================
+   The local progress channel
+
+   Stages need a continuous value every frame. Sending it through React state
+   would re-render five panels and five stages per scroll tick, so it travels
+   through a plain subscription registry instead — the island publishes one
+   number and each subscriber is called with its own world's local progress.
+   ======================================================================== */
+
+describe('the stage progress registry', () => {
+  afterEach(() => {
+    resetTraverseProgress();
   });
 
-  it('never exceeds 1, even if a hold is given as negative', () => {
-    expect(travelShare(4, 0.6, -0.4)).toBe(1);
+  it('gives each subscriber its own world’s local progress', () => {
+    const seen = new Map<number, number[]>();
+    const stop = Array.from({ length: COUNT }, (_, i) => {
+      seen.set(i, []);
+      return subscribeStageProgress(i, (value) => {
+        if (value !== null) seen.get(i)?.push(value);
+      });
+    });
+
+    publishTraverseProgress(holdMid(2), COUNT);
+
+    // The centred world reads 0.5; the one before it has already left, the one
+    // after has not begun.
+    expect(seen.get(2)?.[0]).toBeCloseTo(0.5, 12);
+    expect(seen.get(1)?.[0]).toBeCloseTo(1, 12);
+    expect(seen.get(3)?.[0]).toBeCloseTo(0, 12);
+    for (const unsubscribe of stop) unsubscribe();
   });
 
-  it('is the source of the exported constant', () => {
-    expect(TRAVEL_SHARE).toBeCloseTo(travelShare(TRAVERSE_LENGTH - 1, SCROLL_PER_STEP, FINALE_DWELL), 12);
+  it('stops calling a listener once it unsubscribes', () => {
+    const calls: number[] = [];
+    const stop = subscribeStageProgress(0, (value) => {
+      if (value !== null) calls.push(value);
+    });
+    publishTraverseProgress(0.5, COUNT);
+    expect(calls).toHaveLength(1);
+    stop();
+    publishTraverseProgress(0.9, COUNT);
+    expect(calls).toHaveLength(1);
+  });
+
+  it('drops the index entirely when its last listener leaves', () => {
+    // A leak here would keep every torn-down stage's closure alive for the
+    // life of the page, which is the failure mode a registry invites.
+    const before = stageProgressSubscriberCount();
+    const a = subscribeStageProgress(3, () => {});
+    const b = subscribeStageProgress(3, () => {});
+    expect(stageProgressSubscriberCount()).toBe(before + 1);
+    a();
+    expect(stageProgressSubscriberCount()).toBe(before + 1);
+    b();
+    expect(stageProgressSubscriberCount()).toBe(before);
+  });
+
+  it('tells every listener when the traverse stands down', () => {
+    // `null` is what makes a stage return to its resting picture rather than
+    // stay frozen at whatever value the timeline was torn down on.
+    let last: number | null = 0.25;
+    const stop = subscribeStageProgress(1, (value) => {
+      last = value;
+    });
+    publishTraverseProgress(holdMid(1), COUNT);
+    expect(last).toBeCloseTo(0.5, 12);
+    resetTraverseProgress();
+    expect(last).toBeNull();
+    stop();
+  });
+
+  it('publishes nothing when nobody is listening', () => {
+    // The island calls this on every scroll tick of the pin. With the stack
+    // composition rendered there is no subscriber, and it must cost nothing.
+    expect(stageProgressSubscriberCount()).toBe(0);
+    expect(() => publishTraverseProgress(0.5, COUNT)).not.toThrow();
+  });
+});
+
+describe('traverseIndexOf', () => {
+  it('finds each domain at its place in the sequence', () => {
+    traverseIds().forEach((id, index) => {
+      expect(traverseIndexOf(id)).toBe(index);
+    });
+  });
+
+  it('answers -1 for a domain that is not in the traverse', () => {
+    // `StageFrame` uses this to decide whether to subscribe at all, so a wrong
+    // answer here is a stage silently reading another world's progress.
+    expect(traverseIndexOf('not-a-domain')).toBe(-1);
   });
 });
 
@@ -379,7 +650,7 @@ describe('the traverse sequence', () => {
     vi.doMock('../src/config/domains', () => ({
       DOMAIN_IDS: ['alpha', 'beta', 'gamma'],
       DOMAINS: [
-        { id: 'alpha', layerIndex: 0, accentVar: '--color-domain-alpha', stage: 'forecast' },
+        { id: 'alpha', layerIndex: 0, accentVar: '--color-domain-alpha', stage: 'landscape' },
         { id: 'beta', layerIndex: 1, accentVar: '--color-domain-beta', stage: 'waveform' },
         { id: 'gamma', layerIndex: 2, accentVar: '--color-domain-gamma', stage: 'routing' },
       ],
@@ -440,152 +711,14 @@ describe('createRandom', () => {
   });
 });
 
-describe('forecastSignal', () => {
-  it('is deterministic — the server render and the hydration render must agree', () => {
-    // A `Math.random()` in the series would make React discard the server
-    // markup and re-render the island. That failure is invisible but for a
-    // console warning, so it is asserted rather than assumed.
-    const once = Array.from({ length: 40 }, (_, i) => forecastSignal(i / 39));
-    const twice = Array.from({ length: 40 }, (_, i) => forecastSignal(i / 39));
-    expect(once).toEqual(twice);
-  });
-
-  it('stays inside the amplitude the stage maps it with', () => {
-    // `ForecastStage` multiplies by a single constant and assumes roughly ±0.8.
-    // A series that exceeded it would draw outside the frame.
-    for (let i = 0; i <= 400; i += 1) {
-      expect(Math.abs(forecastSignal(i / 400))).toBeLessThan(0.8);
-    }
-  });
-
-  it('carries structure rather than being a single sine', () => {
-    // A forecastable series has to have something a model could have learned.
-    // Counting sign changes in the first difference separates "one carrier"
-    // from "several": a pure sine over this window turns twice, no more.
-    let turns = 0;
-    let previous = forecastSignal(0.001) - forecastSignal(0);
-    for (let i = 2; i <= 400; i += 1) {
-      const delta = forecastSignal(i / 400) - forecastSignal((i - 1) / 400);
-      if (delta * previous < 0) turns += 1;
-      previous = delta;
-    }
-    expect(turns).toBeGreaterThan(6);
-  });
-
-  it('answers a finite value for a non-finite input rather than NaN', () => {
-    expect(Number.isFinite(forecastSignal(Number.NaN))).toBe(true);
-  });
-});
-
-describe('bandHalfWidth', () => {
-  it('is already non-zero at the origin — residuals are not zero one step ahead', () => {
-    expect(bandHalfWidth(0, 0.085, 0.44, 0.6)).toBeCloseTo(0.085, 10);
-  });
-
-  it('widens monotonically with horizon, which is the whole statement', () => {
-    let previous = -1;
-    for (let i = 0; i <= 50; i += 1) {
-      const width = bandHalfWidth(i / 50, 0.085, 0.44, 0.6);
-      expect(width).toBeGreaterThan(previous);
-      previous = width;
-    }
-  });
-
-  it('widens concavely, not as a straight cone', () => {
-    // A calibrated interval grows sublinearly. Halfway out it must already be
-    // more than half of its final extra width; a linear fan would be exactly
-    // half, and this is what distinguishes the two pictures.
-    const base = 0.085;
-    const span = 0.44;
-    const mid = bandHalfWidth(0.5, base, span, 0.6) - base;
-    expect(mid).toBeGreaterThan(span * 0.5);
-  });
-
-  it('clamps the horizon rather than extrapolating past the frame', () => {
-    expect(bandHalfWidth(4, 0.085, 0.44, 0.6)).toBeCloseTo(0.525, 10);
-    expect(bandHalfWidth(-2, 0.085, 0.44, 0.6)).toBeCloseTo(0.085, 10);
-    expect(bandHalfWidth(Number.NaN, 0.085, 0.44, 0.6)).toBeCloseTo(0.085, 10);
-  });
-
-  it('falls back to a linear exponent when given a useless one', () => {
-    expect(bandHalfWidth(0.5, 0, 1, 0)).toBeCloseTo(0.5, 10);
-    expect(bandHalfWidth(0.5, 0, 1, Number.NaN)).toBeCloseTo(0.5, 10);
-  });
-});
-
-describe('polylinePath and ribbonPath', () => {
-  const upper = [
-    { x: 0, y: 10 },
-    { x: 10, y: 8 },
-    { x: 20, y: 4 },
-  ];
-  const lower = [
-    { x: 0, y: 12 },
-    { x: 10, y: 16 },
-    { x: 20, y: 22 },
-  ];
-
-  it('moves once and lines thereafter', () => {
-    expect(polylinePath(upper)).toBe('M0.00 10.00 L10.00 8.00 L20.00 4.00');
-  });
-
-  it('answers an empty string for no points', () => {
-    expect(polylinePath([])).toBe('');
-  });
-
-  it('closes the ribbon and returns along the lower edge in reverse', () => {
-    expect(ribbonPath(upper, lower)).toBe(
-      'M0.00 10.00 L10.00 8.00 L20.00 4.00 L20.00 22.00 L10.00 16.00 L0.00 12.00 Z',
-    );
-  });
-
-  it('does not mutate the edge it reverses', () => {
-    const snapshot = lower.map((point) => ({ ...point }));
-    ribbonPath(upper, lower);
-    expect(lower).toEqual(snapshot);
-  });
-
-  it('answers an empty string when either edge is missing', () => {
-    expect(ribbonPath([], lower)).toBe('');
-    expect(ribbonPath(upper, [])).toBe('');
-  });
-});
-
-describe('interpolateAt', () => {
-  const values = [0, 1, -1];
-
-  it('hits the table exactly at the sample positions', () => {
-    expect(interpolateAt(values, 0)).toBe(0);
-    expect(interpolateAt(values, 0.5)).toBe(1);
-    expect(interpolateAt(values, 1)).toBe(-1);
-  });
-
-  it('interpolates linearly between them', () => {
-    expect(interpolateAt(values, 0.25)).toBeCloseTo(0.5, 10);
-    expect(interpolateAt(values, 0.75)).toBeCloseTo(0, 10);
-  });
-
-  it('clamps outside the unit interval instead of running off the table', () => {
-    expect(interpolateAt(values, -3)).toBe(0);
-    expect(interpolateAt(values, 9)).toBe(-1);
-    expect(interpolateAt(values, Number.NaN)).toBe(0);
-  });
-
-  it('degrades safely on short tables', () => {
-    expect(interpolateAt([], 0.4)).toBe(0);
-    expect(interpolateAt([7], 0.4)).toBe(7);
-  });
-});
-
 /**
- * One number in this island lives in both TypeScript and CSS — the FPGA route's
- * step count, because a keyframe timing function cannot import a module and
- * handing one a value would mean an inline custom property, which the site's
- * CSP drops. It is asserted against the stylesheet's own source, so a change on
- * either side fails here rather than quietly clocking the pulse at the wrong
- * rate.
+ * Two numbers in this island live in both TypeScript and CSS, because a
+ * keyframe cannot import a module and handing one a value would mean an inline
+ * custom property, which the site's CSP drops. Both are asserted against the
+ * stylesheet's own source, so a change on either side fails here rather than
+ * quietly clocking a pulse at the wrong rate or wiping the wrong distance.
  */
-describe('the constant duplicated into the stylesheet', () => {
+describe('the constants duplicated into the stylesheet', () => {
   const stylesheet = readFileSync(new URL('../src/components/home/TechnicalWorlds.astro', import.meta.url), 'utf8');
 
   it('steps the FPGA pulse once per cell on the route', () => {
@@ -594,57 +727,32 @@ describe('the constant duplicated into the stylesheet', () => {
     expect(stylesheet).toContain(`steps(${ROUTE_STEPS}, end)`);
   });
 
-  it('opens the forecast fan without naming the rule in CSS', () => {
-    // The activation reveals the band with a clip whose percentages resolve
-    // against the band's own box. A `transform-origin` in view-box coordinates
-    // would work too, and would put a copy of `FORECAST_NOW_X` in a stylesheet
-    // that cannot import it. That copy is what this forbids.
-    expect(stylesheet).not.toContain(`${FORECAST_NOW_X}px`);
-    expect(stylesheet).toContain('clip-path: inset(-30% 100%');
-  });
-});
-
-describe('interferenceProfile', () => {
-  it('is fully constructive at the centre of the screen', () => {
-    const profile = interferenceProfile(21, 60, 26);
-    expect(profile[10]).toBeCloseTo(1, 10);
+  it('wipes the audio sweep across exactly the frame', () => {
+    expect(stylesheet).toContain(`clip-path: inset(-20px ${STAGE_WIDTH}px -20px 0);`);
   });
 
-  it('stays within 0…1 everywhere', () => {
-    for (const value of interferenceProfile(64, 140, 19)) {
-      expect(value).toBeGreaterThanOrEqual(0);
-      expect(value).toBeLessThanOrEqual(1);
+  /**
+   * The repair this guards. `.tw-wave` is the only stroked path on the band
+   * under a group the scroll *scales*, and it carries
+   * `vector-effect: non-scaling-stroke` so the hairline survives that scale.
+   * With both, the dash pattern and `pathLength`'s normalisation are measured
+   * in different spaces, and `tw-draw`'s finished `stroke-dasharray: 100 100` —
+   * a solid stroke on every other path here — left a third to a half of the
+   * waveform unpainted at rest. It shipped that way. The arrival is a clip
+   * wipe now, and the wave must never be dashed or normalised again.
+   */
+  it('never dashes the waveform, whose stroke lives in a scaled space', () => {
+    const source = readFileSync(
+      new URL('../src/components/visuals/worlds/stages/WaveformStage.tsx', import.meta.url),
+      'utf8',
+    );
+    expect(source).not.toMatch(/className="tw-wave"[^>]*pathLength/);
+    expect(source).not.toMatch(/strokeDasharray/);
+    const rules = stylesheet.replace(/\/\*[\s\S]*?\*\//g, '');
+    for (const match of rules.matchAll(/([^{}]*\.tw-wave\b[^{}]*)\{([^{}]*)\}/g)) {
+      expect(match[2]).not.toMatch(/stroke-dash/);
+      expect(match[2]).not.toMatch(/animation:\s*tw-draw/);
     }
-  });
-
-  it('packs more fringes in as the sources move apart', () => {
-    const fringes = (separation: number) => {
-      const profile = interferenceProfile(400, separation, 26);
-      let peaks = 0;
-      for (let i = 1; i < profile.length - 1; i += 1) {
-        const previous = profile[i - 1] ?? 0;
-        const current = profile[i] ?? 0;
-        const next = profile[i + 1] ?? 0;
-        if (current > previous && current >= next) peaks += 1;
-      }
-      return peaks;
-    };
-    // This is the relationship the stage exists to demonstrate; if it inverts,
-    // the pointer teaches the reader something false.
-    expect(fringes(110)).toBeGreaterThan(fringes(35));
-  });
-
-  it('survives a zero wavelength without producing NaN', () => {
-    for (const value of interferenceProfile(8, 50, 0)) {
-      expect(Number.isFinite(value)).toBe(true);
-    }
-  });
-
-  it('samples the centre of the screen for a single-bin histogram', () => {
-    // With one sample there is no `(i / (count - 1))` to compute; the guard
-    // has to answer the on-axis position, which is always constructive.
-    expect(interferenceProfile(1, 90, 26)).toEqual([1]);
-    expect(interferenceProfile(0, 90, 26)).toEqual([1]);
   });
 });
 
@@ -691,30 +799,61 @@ describe('wavePath', () => {
   });
 });
 
-describe('spectrumBars', () => {
-  it('puts the tallest bar at the requested peak', () => {
-    const bars = spectrumBars(41, 0.25, 12);
-    const tallest = bars.indexOf(Math.max(...bars));
-    expect(tallest / (bars.length - 1)).toBeCloseTo(0.25, 1);
+describe('clockPath', () => {
+  /**
+   * The property the FPGA timing strip is built on. Its accent marker walks the
+   * wave with `steps(6)` over a `pathLength="100"` normalisation, so it lands on
+   * one whole clock period per step **only if every period has the same arc
+   * length**. If a period ever differed, the marker would drift across the
+   * edges it is supposed to be marking and the link between the pulse crossing
+   * the fabric and the clock below it would quietly stop being true.
+   */
+  const periodLengths = (path: string, periods: number) => {
+    const points = [...path.matchAll(/[ML](-?[\d.]+) (-?[\d.]+)/g)].map((m) => [Number(m[1]), Number(m[2])] as const);
+    const perPeriod = (points.length - 1) / periods;
+    const lengths: number[] = [];
+    for (let p = 0; p < periods; p += 1) {
+      let total = 0;
+      for (let i = p * perPeriod; i < (p + 1) * perPeriod; i += 1) {
+        const a = points[i];
+        const b = points[i + 1];
+        if (!a || !b) continue;
+        total += Math.abs(b[0] - a[0]) + Math.abs(b[1] - a[1]);
+      }
+      lengths.push(total);
+    }
+    return lengths;
+  };
+
+  it('gives every period an identical arc length', () => {
+    const lengths = periodLengths(clockPath(40, 100, 240, 14, ROUTE_STEPS), ROUTE_STEPS);
+    expect(lengths).toHaveLength(ROUTE_STEPS);
+    for (const length of lengths) expect(length).toBeCloseTo(lengths[0] ?? 0, 9);
   });
 
-  it('moves the peak when the pointer moves', () => {
-    const low = spectrumBars(41, 0.2, 12);
-    const high = spectrumBars(41, 0.7, 12);
-    expect(low.indexOf(Math.max(...low))).toBeLessThan(high.indexOf(Math.max(...high)));
+  it('starts low on a rising edge and ends low, so the wave tiles cleanly', () => {
+    const path = clockPath(0, 10, 120, 14, 6);
+    expect(path.startsWith('M0.00 24.00')).toBe(true);
+    expect(path.endsWith('120.00 24.00')).toBe(true);
   });
 
-  it('stays within 0…1', () => {
-    for (const value of spectrumBars(41, 0.5, 12)) {
-      expect(value).toBeGreaterThanOrEqual(0);
-      expect(value).toBeLessThanOrEqual(1);
+  it('spans exactly the width it is given, in right angles only', () => {
+    const path = clockPath(46, 144, 232, 14, ROUTE_STEPS);
+    const points = [...path.matchAll(/[ML](-?[\d.]+) (-?[\d.]+)/g)].map((m) => [Number(m[1]), Number(m[2])] as const);
+    expect(Math.min(...points.map((p) => p[0]))).toBeCloseTo(46, 6);
+    expect(Math.max(...points.map((p) => p[0]))).toBeCloseTo(278, 6);
+    for (let i = 1; i < points.length; i += 1) {
+      const a = points[i - 1];
+      const b = points[i];
+      if (!a || !b) continue;
+      // Every segment moves along exactly one axis: a clock has no ramps.
+      expect(a[0] === b[0] || a[1] === b[1]).toBe(true);
     }
   });
 
-  it('answers a single sample at the low end rather than dividing by zero', () => {
-    const [only] = spectrumBars(1, 0.5, 12);
-    expect(Number.isFinite(only)).toBe(true);
-    expect(spectrumBars(0, 0.5, 12)).toHaveLength(1);
+  it('answers a single period rather than dividing by zero', () => {
+    expect(clockPath(0, 0, 60, 10, 0)).toContain('M0.00 10.00');
+    expect(clockPath(0, 0, 60, 10, 0)).not.toMatch(/NaN/);
   });
 });
 
@@ -813,28 +952,6 @@ describe('server-rendered markup', () => {
     // in and no pointer, so nothing may claim the frame.
     expect(html.match(/data-active="false"/g)).toHaveLength(DOMAINS.length);
     expect(html).not.toContain('data-active="true"');
-  });
-
-  /**
-   * The forecast stage's one claim is that the observed series *stops* and a
-   * calibrated interval *starts*, at one instant. Three separate paths have to
-   * agree on where that instant is, and none of them is derived from the
-   * others at runtime — they are three walks over the same `t`.
-   */
-  it('starts the forecast exactly where the observation stops', async () => {
-    const { html } = await render();
-    const x = FORECAST_NOW_X.toFixed(2);
-    // The rule itself.
-    expect(html).toContain(`class="tw-fc-now" x1="${FORECAST_NOW_X}"`);
-    // The observed history ends on it…
-    expect(html).toMatch(new RegExp(`class="tw-fc-history" d="[^"]*L${x} [\\d.]+"`));
-    // …and the point forecast, the realised continuation and both band edges
-    // all begin on it. A band that opened anywhere else would be drawing an
-    // interval around horizons that had already happened.
-    for (const cls of ['tw-fc-median', 'tw-fc-realised']) {
-      expect(html).toMatch(new RegExp(`class="${cls}" d="M${x} `));
-    }
-    expect(html.match(new RegExp(`class="tw-fc-band" data-level="\\w+" d="M${x} `, 'g'))).toHaveLength(2);
   });
 
   it('ships the stack, not the traverse', async () => {
@@ -1094,24 +1211,35 @@ describe('the band stylesheet', () => {
     expect(css).toMatch(/\.tw-track\s*\{[^}]*display:\s*grid/);
   });
 
-  /* ── The trailing spacer (docs/REDESIGN_DECISIONS.md #15) ────────────────
+  /* ── The spacers (docs/REDESIGN_DECISIONS.md #15, plus the centring fix) ──
      Five panels pitched 86% apart travel 430% − 100% = 330% across four steps,
      which is 82.5% per step against an 86% pitch. The 3.5% shortfall
      accumulates and leaves the outgoing panel standing inside the frame at
      every stop — measured slivers of 46, 102, 157 and 213px at 1440×900, each
-     showing the clipped tail of the previous stage's annotation.
+     showing the clipped tail of the previous stage's annotation. 14% of spacer
+     makes the travel a whole number of pitches and removes that.
 
-     A spacer of exactly the peek width makes the travel a whole number of
-     pitches, so the arithmetic in `traverse.ts` and the geometry in this file
-     finally describe the same thing. */
+     *Where* that 14% sits then decides whether anything is ever centred. All of
+     it behind the last panel put panel 0's centre half a peek right of the
+     frame's centre at zero translation — measured closest approach 94.6px, and
+     the last world settled 94px past centre for the same reason. Split into
+     two halves, stop `i` is centred at exactly −`i` × pitch. */
 
-  it('closes the track with a spacer exactly one peek wide', async () => {
+  it('opens and closes the track with a spacer of half a peek each', async () => {
     const css = await readStylesheet();
-    expect(css).toMatch(/\.tw\[data-traverse='true'\] \.tw-track::after\s*\{[^}]*content:\s*''/);
-    expect(css).toContain('flex: 0 0 calc(100% - var(--tw-panel-pitch));');
+    // Both, and equal. One alone is the defect: the same total width, all of it
+    // on one side, offsets every panel by half a peek.
+    expect(css).toMatch(
+      /\.tw\[data-traverse='true'\] \.tw-track::before,\s*\n\s*\.tw\[data-traverse='true'\] \.tw-track::after\s*\{[^}]*content:\s*''/,
+    );
+    expect(css).toContain('flex: 0 0 var(--tw-peek);');
+    expect(css).toContain('--tw-peek: calc((100% - var(--tw-panel-pitch)) / 2);');
+    // The pair still adds up to one whole peek, which is what keeps the travel
+    // a whole number of pitches.
+    expect(css).not.toMatch(/\.tw-track::(before|after)[^}]*flex:\s*0 0 calc\(100% - var\(--tw-panel-pitch\)\)/);
   });
 
-  it('derives the panel width and the spacer from one number', async () => {
+  it('derives the panel width, the spacers and the mask from one number', async () => {
     const css = await readStylesheet();
     // The bug was two rules that were allowed to disagree. A literal `86%` on
     // the panel would let them disagree again.
@@ -1121,12 +1249,114 @@ describe('the band stylesheet', () => {
     expect(panelRule.slice(0, panelRule.indexOf('}'))).not.toMatch(/flex:[^;]*\d+%/);
   });
 
-  it('generates the spacer only while the traverse is engaged', async () => {
+  it('generates the spacers only while the traverse is engaged', async () => {
     const css = await readStylesheet();
-    // Stacked, `.tw-track` is a grid: an unconditional `::after` would add an
-    // empty row and a row-gap below the last domain.
-    const spacer = css.indexOf('.tw-track::after');
-    expect(spacer).toBeGreaterThan(0);
-    expect(css.slice(0, spacer)).toMatch(/\.tw\[data-traverse='true'\] $/);
+    // Stacked, `.tw-track` is a grid: unconditional pseudo-elements would add
+    // empty rows and row-gaps around the domains.
+    for (const pseudo of ['.tw-track::before', '.tw-track::after']) {
+      const spacer = css.indexOf(pseudo);
+      expect(spacer).toBeGreaterThan(0);
+      expect(css.slice(0, spacer)).toMatch(/\.tw\[data-traverse='true'\] $/);
+    }
+  });
+
+  /* ── The edge mask ──────────────────────────────────────────────────────
+     Measured on the deployed build: for 83% of the pinned scroll some
+     neighbouring heading or paragraph was crossing the frame's clip boundary
+     and being chopped mid-word, with nothing to say it was a frame edge. */
+
+  /** The pinned viewport's own declaration block. No nested braces in it. */
+  const traverseViewportRule = (css: string) =>
+    /\.tw\[data-traverse='true'\] \.tw-viewport \{([^}]*)\}/.exec(css)?.[1] ?? '';
+
+  it('fades the frame’s edges instead of chopping them', async () => {
+    const css = await readStylesheet();
+    const body = traverseViewportRule(css);
+    expect(body).toContain('overflow: hidden');
+    // Both spellings: without the prefixed one, WebKit renders no mask at all
+    // and the defect is back for a large share of the traffic.
+    expect(body).toMatch(/(?<!-webkit-)mask-image: linear-gradient\(/);
+    expect(body).toContain('-webkit-mask-image: linear-gradient(');
+  });
+
+  it('keeps the fade clear of the centred panel’s own text', async () => {
+    const css = await readStylesheet();
+    // The active panel starts one whole peek in from each edge. A fade derived
+    // from a fraction of that peek can never reach it — which is the property
+    // that makes this a fix rather than a different way of losing words. A
+    // literal here could exceed the peek on a narrow window and wash out the
+    // heading of the world the band is supposed to be showing.
+    expect(traverseViewportRule(css)).toMatch(/--tw-fade:\s*min\(64px, calc\(var\(--tw-peek\) \* 0\.68\)\)/);
+  });
+
+  it('applies the mask only while the traverse is engaged', async () => {
+    const css = await readStylesheet();
+    // Stacked there is no horizontal clip, so a mask would fade the left and
+    // right edges of readable prose for no reason at all. Every mask
+    // declaration in the file must therefore be inside the pinned rule.
+    const total = (css.match(/mask-image:/g) ?? []).length;
+    const pinned = (traverseViewportRule(css).match(/mask-image:/g) ?? []).length;
+    expect(pinned).toBe(2);
+    expect(total).toBe(pinned);
+  });
+
+  /* ── The ambient clock ──────────────────────────────────────────────────
+     Every ambient animation used to sit behind `--tw-settle: 800ms`, and the
+     ones with long periods needed another 3–7.5s after that before their
+     meaningful phase arrived — routinely longer than a world stayed on screen,
+     so the settled state was described and never shown. */
+
+  it('starts ambient before the arrival has finished', async () => {
+    const css = await readStylesheet();
+    const settle = /--tw-settle:\s*(\d+)ms/.exec(css);
+    const lag = /--tw-arrive-lag:\s*(\d+)ms/.exec(css);
+    expect(settle).not.toBeNull();
+    expect(lag).not.toBeNull();
+    const settleMs = Number(settle?.[1]);
+    const lagMs = Number(lag?.[1]);
+    // `--tw-arrive` is `--duration-deliberate`, 720ms, so the arrival ends at
+    // lag + 720. Ambient has to be running by then, not starting after it.
+    expect(settleMs).toBeLessThan(lagMs + 720);
+    // And still a whole number of FPGA clock ticks, which is what keeps the
+    // fabric's register blink in phase with its own 0.4s clock.
+    expect(settleMs % 400).toBe(0);
+  });
+
+  it('arrives mid-cycle rather than at keyframe 0', async () => {
+    const css = await readStylesheet();
+    // A commit removed every negative `animation-delay` on this band except the
+    // ripple's, and the ripple is the one stage that still read as continuous.
+    // These are the groups that got theirs back — counted in both the forms
+    // they take, a literal negative and an offset from the chain's own negative
+    // phase, so moving one group between the two cannot quietly reduce the
+    // count.
+    //
+    // Quantum is deliberately not in this population any more. Its ambient loop
+    // was the interference ripple, and the Bloch sphere that replaced it has no
+    // loop at all: its motion is the reader's own scroll, so there is no cycle
+    // for it to start part-way through. Seven is the whole of what is left, and
+    // every one of the seven is real.
+    const literal = css.match(/animation-delay:\s*-\d/g) ?? [];
+    const phased = css.match(/animation-delay:\s*calc\(var\(--tw-chain-phase\)/g) ?? [];
+    expect(literal.length + phased.length).toBeGreaterThanOrEqual(7);
+    expect(css).toContain('--tw-chain-phase: -0.9s;');
+  });
+
+  it('completes an ambient cycle inside a world’s dwell', async () => {
+    const css = await readStylesheet();
+    // 7.5s for the travelling wave was longer than a whole world's ownership
+    // window. Nothing ambient on this band may run slower than the chain's
+    // own period by more than half again.
+    //
+    // The floor is a guard against the regex matching nothing and passing
+    // vacuously, not a target. It moved 6 -> 5 when the forecast stage was
+    // replaced: the forecast ran two ambient keyframes (`tw-fc-roll` and
+    // `tw-fc-resolve`), the decision landscape that replaced it runs one
+    // (`tw-dl-scan`). Five is the whole remaining population, listed here so
+    // the next person to see this number knows what it is counting:
+    // tw-energise, tw-dl-scan, tw-wave-travel, tw-pulse-travel, tw-clock-tick.
+    const periods = [...css.matchAll(/animation:\s*tw-[a-z-]+\s+([\d.]+)s/g)].map((m) => Number(m[1]));
+    expect(periods.length).toBeGreaterThanOrEqual(5);
+    for (const period of periods) expect(period).toBeLessThanOrEqual(3.6);
   });
 });

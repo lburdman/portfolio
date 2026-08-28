@@ -1,4 +1,4 @@
-import type { ReactNode, RefObject } from 'react';
+import { type ReactNode, type RefObject } from 'react';
 import { domainOrdinal, type Domain } from '../../../config/domains';
 import { STAGE_HEIGHT, STAGE_INSET, STAGE_WIDTH } from './stage-geometry';
 
@@ -36,9 +36,23 @@ const TICK = 12;
  *
  * `data-domain` rather than an inline `style` is what carries the accent: the
  * site ships a hash-based CSP with no `'unsafe-inline'` and no
- * `'unsafe-hashes'`, under which every inline `style=""` attribute is blocked.
- * `--tw-accent` is therefore resolved from a stylesheet rule keyed on this
- * attribute. Nothing in this island writes an inline style.
+ * `'unsafe-hashes'`, under which every inline `style=""` *attribute* is
+ * blocked. `--tw-accent` is therefore resolved from a stylesheet rule keyed on
+ * this attribute. Nothing in this island renders a `style=""` attribute.
+ *
+ * ## Scroll progress is a number, not a custom property
+ *
+ * This frame publishes nothing per frame, and that is a deliberate removal
+ * rather than an omission. It used to write `--tw-progress` through CSSOM on
+ * every traverse tick, for all five stages — five `toFixed(4)` allocations and
+ * five CSSOM writes per frame on the scroll path. Nothing ever read it: no
+ * `var(--tw-progress)` existed in this repository, and both scroll-driven
+ * stages subscribe to `traverse.ts`'s numeric registry directly, because a
+ * stage that has to compute a path needs the number and not a string.
+ *
+ * A stage that wants scroll progress calls `subscribeStageProgress`. If a CSS
+ * channel is ever genuinely wanted, add it in the same change as its first
+ * consumer — a channel with no reader is a per-frame cost with no output.
  */
 export function StageFrame({ domain, active, frameRef, children }: StageFrameProps) {
   const right = STAGE_WIDTH - STAGE_INSET;

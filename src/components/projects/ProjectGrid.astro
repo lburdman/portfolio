@@ -63,7 +63,7 @@ const priorityIndex = Math.max(
   projects.length === 0 ? (
     <p class="grid__empty">{t.projects.empty}</p>
   ) : (
-    <ul class="grid">
+    <ul class="grid" data-card-field>
       {projects.map((project, position) => {
         const isLead = lead && position === 0;
         // Not `isLead`: emphasis is an editorial decision this listing may
@@ -130,3 +130,270 @@ const priorityIndex = Math.max(
     color: var(--color-slate);
   }
 </style>
+
+<script>
+  /**
+   * THE RAKING LIGHT — the pointer half of the card interaction.
+   *
+   * `ProjectCard.astro` renders a hovered card as a sheet of paper lifted under
+   * a light positioned at `var(--card-x) var(--card-y)`. Those two properties
+   * have a complete resting value in the stylesheet, so this file is a pure
+   * enhancement: everything it does is move a light that is already lit.
+   * Delete it and the card still lifts, still casts, still arms its link — the
+   * light simply stops following the cursor.
+   *
+   * ── Why this is CSSOM and not an inline style ─────────────────────────────
+   * `element.style.setProperty()` writes through the CSSOM, which the site's
+   * hash-based CSP permits. A `style=""` **attribute** in served HTML is
+   * dropped: `security.csp` emits `style-src` with hashes and no
+   * `style-src-attr` and no `'unsafe-hashes'`, and a hash authorises a
+   * `<style>` element, never an attribute. That failure is silent and it is
+   * invisible in `astro dev`, which serves no policy at all. The rule that
+   * *consumes* these properties is static, in the bundled stylesheet.
+   *
+   * ── The cost model ────────────────────────────────────────────────────────
+   * A listing renders four cards, a case study renders up to four more, and the
+   * hottest event on the page is `pointermove`. So:
+   *
+   *   · ONE `pointermove` listener per grid — not one per card, and not one on
+   *     `window`. A grid is the smallest element that contains every card it
+   *     owns, so a pointer that is not over a listing costs nothing at all.
+   *   · ZERO `getBoundingClientRect()` calls per event. Boxes are measured once
+   *     per card, in one batched read, and cached in **page** coordinates —
+   *     see `CardBox` in `src/lib/motion/card-light.ts` for why the document
+   *     origin rather than the viewport is what makes scrolling free.
+   *   · ONE `requestAnimationFrame` in flight, ever. Events coalesce into it,
+   *     so a 1000 Hz mouse still produces one write per frame.
+   *   · `window.scrollX` / `scrollY` are read inside that frame, once —
+   *     they are layout-dependent, and reading one per event is a forced
+   *     synchronous layout on the worst possible event.
+   *   · An `IntersectionObserver` holds the measured set, so a card scrolled
+   *     out of view is not measured, not tested and not written to.
+   *
+   * ── Gates ─────────────────────────────────────────────────────────────────
+   * Under `prefers-reduced-motion: reduce` or a coarse pointer NOTHING is
+   * attached — no observers, no listeners, no frame. Both are watched, so
+   * toggling the OS motion setting or moving the window to a touch screen takes
+   * effect without a reload (docs/MOTION_SYSTEM.md §6).
+   */
+  import { FINE_POINTER_QUERY, matchesMedia, REDUCED_MOTION_QUERY, watchMedia } from '../../lib/motion/media';
+  import { lightPosition, pickBox, type CardBox } from '../../lib/motion/card-light';
+  import { bindPageLifecycle } from '../../lib/motion/page-lifecycle';
+
+  const fields = Array.from(document.querySelectorAll<HTMLElement>('[data-card-field]'));
+  const observable = 'IntersectionObserver' in window && 'ResizeObserver' in window;
+
+  if (fields.length > 0 && observable) {
+    /** Cards currently intersecting the viewport, and their boxes, in step. */
+    const cards: HTMLElement[] = [];
+    const boxes: CardBox[] = [];
+
+    /** The card the light is currently on, so leaving one can reset it. */
+    let lit: HTMLElement | null = null;
+    /**
+     * Whether the cursor is inside a listing at all.
+     *
+     * Frames are scheduled by two unrelated things — a pointer moving, and
+     * layout going stale — and only the first of them has any business moving a
+     * light. Without this flag an `IntersectionObserver` callback fired by an
+     * unrelated scroll re-runs the positioning arithmetic against the *last*
+     * pointer coordinates and re-lights a card the cursor left long ago. That
+     * was observed: tabbing through the listing scrolled the page, the observer
+     * fired, and the card under the keyboard's focus lit up from the stale
+     * position of a mouse that had been parked in the corner since.
+     */
+    let inside = false;
+    /** The in-flight `requestAnimationFrame` handle, or 0 for none. */
+    let frame = 0;
+    /** Set when layout may have changed; consumed by the next frame. */
+    let stale = false;
+    let clientX = 0;
+    let clientY = 0;
+
+    let intersection: IntersectionObserver | null = null;
+    let resize: ResizeObserver | null = null;
+    let listening = false;
+
+    /**
+     * Re-reads every visible card's box in one pass.
+     *
+     * One batched read phase, never interleaved with the writes below: mixing
+     * them is what turns four cards into four forced layouts.
+     */
+    function measure(): void {
+      const scrollLeft = window.scrollX;
+      const scrollTop = window.scrollY;
+      boxes.length = 0;
+      for (const card of cards) {
+        const rect = card.getBoundingClientRect();
+        boxes.push({
+          x: rect.left + scrollLeft,
+          y: rect.top + scrollTop,
+          width: rect.width,
+          height: rect.height,
+        });
+      }
+    }
+
+    /** Hands a card back to the stylesheet's resting light. */
+    function reset(card: HTMLElement): void {
+      card.style.removeProperty('--card-x');
+      card.style.removeProperty('--card-y');
+    }
+
+    function paint(): void {
+      frame = 0;
+      if (stale) {
+        measure();
+        stale = false;
+      }
+      if (!inside) return;
+
+      const pageX = clientX + window.scrollX;
+      const pageY = clientY + window.scrollY;
+      const index = pickBox(boxes, pageX, pageY);
+      const card = index === -1 ? null : (cards[index] ?? null);
+
+      if (card !== lit) {
+        if (lit) reset(lit);
+        lit = card;
+      }
+      if (!card) return;
+
+      const box = boxes[index];
+      if (!box) return;
+
+      const light = lightPosition(box, pageX, pageY);
+      card.style.setProperty('--card-x', `${light.x}%`);
+      card.style.setProperty('--card-y', `${light.y}%`);
+    }
+
+    function schedule(): void {
+      if (frame === 0) frame = window.requestAnimationFrame(paint);
+    }
+
+    function onPointerMove(event: PointerEvent): void {
+      inside = true;
+      clientX = event.clientX;
+      clientY = event.clientY;
+      schedule();
+    }
+
+    /**
+     * The pointer has left a listing entirely.
+     *
+     * Without this the light would stay frozen wherever it was when the cursor
+     * left, and the next hover of the same card would start from a stale
+     * position instead of from the resting one.
+     */
+    function onPointerLeave(): void {
+      // The pending frame is cancelled first, and that ordering is the whole
+      // point. `pointerleave` arrives after the last `pointermove`, so a frame
+      // scheduled by that move is still queued with coordinates that are still
+      // inside the card — it would re-light the card one frame after the cursor
+      // had gone, and leave it lit until the next hover. Observed, in exactly
+      // that form, before this line existed.
+      inside = false;
+      if (frame !== 0) {
+        window.cancelAnimationFrame(frame);
+        frame = 0;
+      }
+      if (lit) reset(lit);
+      lit = null;
+    }
+
+    function invalidate(): void {
+      stale = true;
+      schedule();
+    }
+
+    function attach(): void {
+      if (listening) return;
+      if (matchesMedia(REDUCED_MOTION_QUERY) || !matchesMedia(FINE_POINTER_QUERY)) return;
+      listening = true;
+
+      intersection = new IntersectionObserver(
+        (entries) => {
+          for (const entry of entries) {
+            const card = entry.target;
+            if (!(card instanceof HTMLElement)) continue;
+            const at = cards.indexOf(card);
+            if (entry.isIntersecting) {
+              if (at === -1) cards.push(card);
+            } else if (at !== -1) {
+              cards.splice(at, 1);
+              if (lit === card) {
+                reset(card);
+                lit = null;
+              }
+            }
+          }
+          invalidate();
+        },
+        // A card that is one pixel from the viewport can be under the cursor by
+        // the next frame, so the observed region is slightly larger than the
+        // viewport. Cards further away than that are genuinely unreachable.
+        { rootMargin: '96px' },
+      );
+
+      resize = new ResizeObserver(invalidate);
+
+      for (const field of fields) {
+        field.addEventListener('pointermove', onPointerMove, { passive: true });
+        field.addEventListener('pointerleave', onPointerLeave, { passive: true });
+        resize.observe(field);
+        for (const card of field.querySelectorAll('[data-card-light]')) intersection.observe(card);
+      }
+    }
+
+    function detach(): void {
+      if (!listening) return;
+      listening = false;
+
+      for (const field of fields) {
+        field.removeEventListener('pointermove', onPointerMove);
+        field.removeEventListener('pointerleave', onPointerLeave);
+      }
+
+      intersection?.disconnect();
+      intersection = null;
+      resize?.disconnect();
+      resize = null;
+
+      if (frame !== 0) {
+        window.cancelAnimationFrame(frame);
+        frame = 0;
+      }
+
+      for (const card of cards) reset(card);
+      cards.length = 0;
+      boxes.length = 0;
+      lit = null;
+      inside = false;
+      stale = false;
+    }
+
+    function reevaluate(): void {
+      detach();
+      attach();
+    }
+
+    watchMedia(REDUCED_MOTION_QUERY, reevaluate);
+    watchMedia(FINE_POINTER_QUERY, reevaluate);
+
+    // Navigation here is cross-document, so the whole context is discarded and
+    // nothing can outlive the page. This exists for the back/forward cache,
+    // where the document is frozen rather than destroyed: a pending frame that
+    // resumed on restore would paint against boxes measured before the page was
+    // ever hidden.
+    //
+    // The light has no one-way teardown — `detach()` is complete and `attach()`
+    // undoes it — so both endings map onto it. The branching itself, and the
+    // reason it matters, is in `src/lib/motion/page-lifecycle.ts`: the hero
+    // shipped the other half of this contract wrong for months because the two
+    // files each had to remember it separately.
+    bindPageLifecycle(window, { start: attach, stop: detach, destroy: detach });
+
+    attach();
+  }
+</script>

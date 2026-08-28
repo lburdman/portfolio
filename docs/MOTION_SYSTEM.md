@@ -70,10 +70,10 @@ appears once and is never repeated (brief §5).
 At most **one** expensive visual is rendering at any moment. This is enforced,
 not hoped for.
 
-| Stage             | Technology              | Lifecycle                                                                      |
-| ----------------- | ----------------------- | ------------------------------------------------------------------------------ |
-| Hero signal field | Canvas 2D, no framework | Starts after first paint. **Stops** when Technical Worlds enters the viewport. |
-| Domain stage      | SVG / DOM               | Only the active domain animates. The other four are static.                    |
+| Stage             | Technology                                           | Lifecycle                                                                                                                                                                    |
+| ----------------- | ---------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Hero magnet field | DOM spans + CSS `transform`, no framework, no canvas | Attaches after first paint, and only when a fine pointer is present and motion is not reduced. **Stops** when the hero leaves the viewport and when Technical Worlds enters. |
+| Domain stage      | SVG / DOM                                            | Only the active domain animates. The other four are static.                                                                                                                  |
 
 Every stage must:
 
@@ -85,6 +85,80 @@ Every stage must:
 **No WebGL anywhere.** No Three.js, no shaders. Every visual in this design is
 achievable in Canvas 2D, SVG or DOM at a fraction of the cost, and the brief's
 performance contract (§30) forbids a GPU dependency for meaningful content.
+
+### Two rendering traps, both of which shipped
+
+Neither is visible in source review and neither raises a console error. Both were
+found in pass 3 by measuring the rendered output, and both had been live.
+
+**1. A presentation attribute loses to a CSS rule.** Any property a stage writes
+per frame through `setAttribute` must **not** also be set for that element in the
+stylesheet. If it is, the CSS wins and the writes silently do nothing.
+
+The Bloch sphere hit this in reverse and it is worth stating both ways: its
+arrival animated `opacity: 0 → 1` on a group whose glass veil rested at
+`opacity: 0.1`, and the animation replaced the resting value rather than
+multiplying it, leaving an opaque disc over the whole sphere. The fix was to move
+the resting value to a `fill-opacity` attribute so the two compose.
+
+Practical rule: for anything animated by CSS **and** written by script, keep the
+two on different properties — one on the element as an attribute, one in the
+rule — and add a guard test.
+
+**2. `pathLength` and `vector-effect: non-scaling-stroke` must never meet on one
+element.** `pathLength="100"` normalises the path's length in _user_ space, so a
+dash value of `100` resolves to `userLength / 100` user units. `non-scaling-stroke`
+moves the whole stroke — width, dash array and dash offset — into _screen_ space,
+where the same path is `scale × userLength` long. Under both, the dash is
+authored against one length and painted against another, and the two disagree by
+exactly the viewport scale. `tw-draw`'s finished `stroke-dasharray: 100 100` —
+the definition of "solid" everywhere this band draws a line — then paints
+`1 / scale` of its path.
+
+An earlier pass diagnosed this as a property of the audio stage's _element_
+transform and fixed only that. It is not: the stage SVGs are
+`viewBox="0 0 320 200"` rendered at `min(100%, 34rem)`, so the plain viewport
+scale — no group transform anywhere near it — is enough. Measured on the
+production build, 800 samples per path, browser hit-testing:
+
+| viewport | stage width | scale | painted |
+| -------- | ----------- | ----- | ------- |
+| 1440×900 | 544px       | 1.700 | 58.6 %  |
+| 1280×800 | 507px       | 1.584 | 63.2 %  |
+| 1040×800 | 300px       | 0.939 | 100.0 % |
+
+Six elements shipped this way. The Bloch rim was a broken circle, the FPGA route
+stopped short of the block it routes to, all five chain traces were cut off, and
+both travelling pulses appeared twice because their 100-unit pattern tiled 1.7
+times along the path. The last row of that table is why this is a rule and not a
+number: below `scale = 1` the defect is invisible, so a fixture at one window
+size proves nothing about any other.
+
+**Which one to drop.** Keep `pathLength` and let the stroke scale wherever the
+element's _length_ carries meaning — an accent line, a signal, a pulse, anything
+drawn with `tw-draw` or `tw-energise`. That is exact rather than tuned: with both
+quantities in user space, `100 100` over `pathLength="100"` is the whole path by
+definition at every scale, and `17 83` is one sixth of a six-cell route rather
+than 1.7 tilings of a pattern meant to appear once. The ground — grid, rules,
+ticks, cell and block outlines, the frame — keeps its constant pen.
+
+Keep `non-scaling-stroke` only where the element is genuinely under an
+anisotropic transform, and then never dash it. `.tw-wave` is the one such path:
+the excitation scales it horizontally between 1× and 2.6×, so without the effect
+the hairline goes elliptical. It declares no `pathLength`, is never dashed, and
+arrives on a clip wipe instead.
+
+**The related, simpler defect in the same family:** every user of a
+`pathLength`-normalised dash keyframe must itself declare `pathLength`. The FPGA
+route did not. Its real length was 290 units, so the shared keyframe's finished
+`100 100` rendered 100 on / 100 off / 90 on — a third of the net invisible, and
+its two ends reading as unconnected. It had shipped that way.
+
+`tests/stroke-space.test.ts` enforces the rule structurally: it reads the built
+stylesheet, resolves every `non-scaling-stroke` selector against the rendered
+markup of all five stages in both `active` states, and fails if any element
+carrying `pathLength` is reached by one. Its selector matcher throws rather than
+returning "no match" for a selector it cannot parse.
 
 ---
 
@@ -113,8 +187,9 @@ same visual quality, less movement.
 
 - Long pinned and parallax sequences: **removed**. Technical Worlds becomes a
   vertical stack of five domain panels, fully readable, in document order.
-- Continuous decorative animation: **stopped**. The hero signal field renders
-  **one static frame** and never starts its loop — not a blank canvas.
+- Continuous decorative animation: **stopped**. The hero magnet field stands at
+  its resting rake and attaches no listener at all — a deliberate static hatch,
+  not a degraded one, and not an empty box.
 - Entrance animations: content is visible immediately.
 - `scroll-behavior: smooth`: off.
 - Navigation, focus order and every interactive affordance: unchanged.
@@ -127,8 +202,8 @@ was meant to help. The fix is structural: the hidden state lives **inside** the
 keyframe, so no animation ⇒ visible. Never reintroduce a resting `opacity: 0`.
 
 Query it in JavaScript too, not only CSS — a `matchMedia` check gates whether
-the GSAP timeline and the canvas loop are ever created, and it listens for
-changes so toggling the OS setting takes effect without a reload.
+the GSAP timeline and the hero field's pointer loop are ever created, and it
+listens for changes so toggling the OS setting takes effect without a reload.
 
 ---
 
@@ -140,8 +215,8 @@ Mobile is a deliberate composition, not a squeezed desktop (brief §33).
   tablet breakpoint; the domains stack.
 - No hover dependency anywhere. Anything a pointer reveals must also be
   reachable by tap and by keyboard — if information is hover-only, it is a bug.
-- The hero signal field runs at reduced density, or renders a single static
-  frame on low-end devices. Prefer static over janky.
+- The hero magnet field ships fewer lines at narrower breakpoints, and renders
+  as a static hatch wherever the pointer is coarse. Prefer static over janky.
 - Project cards get stronger, not weaker: the card itself is the affordance.
 
 ---
@@ -155,31 +230,50 @@ visitors download three different amounts. A single ceiling would either be so
 loose it permits a bloated critical path, or so tight it forbids the one
 animation the design is built around.
 
-| Path                              | What loads it                            | Limit    | Measured |
-| --------------------------------- | ---------------------------------------- | -------- | -------- |
-| **Critical**                      | Every visitor, before first paint        | **0 KB** | **0 KB** |
-| **Stack**                         | Mobile, reduced motion, narrow window    | ≤ 70 KB  | 65.6 KB  |
-| **Desktop traverse**              | Desktop pointer user with motion enabled | ≤ 115 KB | 109 KB   |
-| CSS, gzipped                      | Every visitor                            | < 15 KB  | 11.5 KB  |
-| Blocking third-party requests     | —                                        | **0**    | **0**    |
-| Preloader / loading screen        | —                                        | **none** | none     |
-| WebGL contexts                    | —                                        | **0**    | **0**    |
-| Simultaneously animating canvases | —                                        | **1**    | 1        |
+| Path                              | What loads it                            | Limit    | Measured  |
+| --------------------------------- | ---------------------------------------- | -------- | --------- |
+| **Critical**                      | Every visitor, before first paint        | **0 KB** | **0 KB**  |
+| **Stack**                         | Mobile, reduced motion, narrow window    | ≤ 4 KB   | 1.88 KB   |
+| **Desktop traverse**              | Desktop pointer user with motion enabled | ≤ 120 KB | 117.68 KB |
+| — of which **framework**          | React + GSAP + ScrollTrigger             | fixed    | 102.02 KB |
+| — of which **the island**         | Everything this repo actually writes     | ≤ 18 KB  | 15.66 KB  |
+| CSS, gzipped                      | The heaviest page, not a convenient one  | < 15 KB  | 13.57 KB  |
+| Blocking third-party requests     | —                                        | **0**    | **0**     |
+| Preloader / loading screen        | —                                        | **none** | none      |
+| WebGL contexts                    | —                                        | **0**    | **0**     |
+| Simultaneously animating canvases | —                                        | **1**    | **0**     |
 
-**Justification for the desktop traverse ceiling.** This document originally set
-a flat 90 KB. The Technical Worlds island measured 109 KB on the desktop motion
-path — React and ReactDOM at 60 KB, the island itself at 7 KB, and GSAP with
-ScrollTrigger at 44 KB. That is a real 19 KB overrun against the old number and
-it is accepted deliberately, on four grounds:
+**Why the ceiling is split in two (pass 3).** The old row was a single ≤ 115 KB,
+which was "109 measured, rounded up". It had the same defect as the pinned
+band's old page-share target: it measured a total the authors mostly do not
+control, so the only lever it ever pulled was against the work. 102 KB of that
+number is React plus GSAP plus ScrollTrigger — a fixed floor that no amount of
+care in this repo moves. The ~14 KB of island is the part that is actually
+authored, and it is the part a budget should govern.
+
+So the traverse ceiling is now ≤ 120 KB with an explicit **≤ 18 KB island
+allowance** inside it. Adding a signature visual is charged against the number
+it genuinely affects, and shaving the framework floor stops counting as a win
+that was never available. The total moved 109 → 116.28 KB across this pass, and
+what bought it was a mathematically correct Bloch sphere (+2.0 KB) and a baked
+decision landscape (+3.0 KB of data) replacing two visuals that did less — while
+the hero went **down** 0.64 KB by replacing a canvas with DOM and CSS.
+
+**Justification for the framework floor.** This document originally set a flat
+90 KB. React and ReactDOM are 58.7 KB, GSAP with ScrollTrigger 43.4 KB. That is
+a real overrun against the old number and it is accepted deliberately, on four
+grounds:
 
 1. **The critical path is 0 KB and stays 0 KB.** No `<script src>`, no
    modulepreload, no render-blocking JavaScript. The semantic hero never waits
    on any of this. That is the number the brief's performance contract (§30) is
    actually protecting, and it is not merely met but at zero.
-2. **The users most likely to be constrained never download it.** Mobile,
-   reduced-motion and short-window visitors get the stack path at 65.6 KB —
-   inside the original budget. GSAP is dynamically imported and loads only when
-   a desktop user with motion enabled engages the traverse.
+2. **The users most likely to be constrained never download it.** The island is
+   `client:media`, so mobile, reduced-motion and short-window visitors fetch
+   none of it: their whole JavaScript payload is the hero controller, **1.88 KB**
+   — not the 65.6 KB this line used to claim, which predated the hydration gate.
+   GSAP is dynamically imported and loads only when a desktop user with motion
+   enabled engages the traverse.
 3. **GSAP's cost is irreducible here.** Importing `gsap/gsap-core` plus
    CSSPlugin explicitly rather than the full bundle saves 27 bytes. There is no
    cheaper configuration of this dependency.

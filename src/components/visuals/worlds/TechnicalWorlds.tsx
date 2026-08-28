@@ -5,13 +5,14 @@ import { DomainStage } from './stages/DomainStage';
 import {
   activeIndexFromProgress,
   clampIndex,
-  FINALE_DWELL,
+  HOLD_HEIGHTS,
+  MOVE_HEIGHTS,
   nextIndexForKey,
   pinnedScrollLength,
+  publishTraverseProgress,
+  resetTraverseProgress,
   scrollTargetForIndex,
-  SCROLL_PER_STEP,
-  TRAVEL_SHARE,
-  travelProgress,
+  snapProgress,
   TRAVERSE_LENGTH,
   TRAVERSE_SEQUENCE,
 } from './traverse';
@@ -56,10 +57,13 @@ import { REDUCED_MOTION_QUERY, TRAVERSE_QUERY, useMediaQuery } from './useMediaQ
  * The site ships a hash-based CSP with no `'unsafe-inline'` and — because Astro
  * emits no `style-src-attr` — no `'unsafe-hashes'` either. Under that policy
  * every inline `style=""` attribute is dropped, hashed or not. Nothing in this
- * island writes one: accents come from `[data-domain]` rules, animation
+ * island *renders* one: accents come from `[data-domain]` rules, animation
  * staggers from `:nth-child()`, and dash geometry from SVG `pathLength` and
- * presentation attributes. GSAP's own CSSOM writes are unaffected, and this
- * island injects no `<script>` or `<style>` element at runtime.
+ * presentation attributes. What the policy governs is the authored attribute,
+ * not scripted mutation of a `CSSStyleDeclaration` — which is why GSAP's own
+ * transform writes work, and why the teardown below may call `removeProperty`
+ * on the track. This island injects no `<script>` or `<style>` element at
+ * runtime.
  *
  * ── PROGRESSIVE ENHANCEMENT ────────────────────────────────────────────────
  * The first render — the one Astro runs at build time and the one React
@@ -106,9 +110,25 @@ export default function TechnicalWorlds({ t }: TechnicalWorldsProps) {
   const wideEnough = useMediaQuery(TRAVERSE_QUERY);
 
   const [engaged, setEngaged] = useState(false);
-  const [activeIndex, setActiveIndex] = useState(0);
+  /* `-1`, not `0`. The traverse has not engaged at page load, and treating the
+     first world as active before the pin exists is what fired its arrival
+     animation ~1900px above the fold, where nobody saw it and from where it
+     could never fire again. Nothing is current until the pin says so. */
+  const [activeIndex, setActiveIndex] = useState(-1);
   const [stackIndex, setStackIndex] = useState(-1);
   const [tabVisible, setTabVisible] = useState(true);
+  /* The same value as `activeIndex`, readable synchronously inside the
+     ScrollTrigger callback. It is what makes the setState conditional: without
+     it the callback would re-render five panels and five stages on every
+     scroll tick of the pin, to write the number it already held. */
+  const activeIndexRef = useRef(-1);
+
+  /** The one writer of `activeIndex`, and the only place the re-render is decided. */
+  const applyIndex = useCallback((next: number) => {
+    if (activeIndexRef.current === next) return;
+    activeIndexRef.current = next;
+    setActiveIndex(next);
+  }, []);
 
   /* ── Tab visibility ─────────────────────────────────────────────────────
      MOTION_SYSTEM §8: offscreen and background animation is *paused*, not
@@ -156,11 +176,17 @@ export default function TechnicalWorlds({ t }: TechnicalWorldsProps) {
     let cancelled = false;
     let handle: StageHandle | null = null;
 
-    /* How far the track travels. The `.tw-track::after` spacer makes this
-       exactly `(TRAVERSE_LENGTH - 1)` panel pitches rather than the ~3.5%-per-
-       step short measure it used to be — see the long note beside that rule in
-       `home/TechnicalWorlds.astro` for what that mis-registration produced. */
+    /* How far the track travels. The symmetric `.tw-track::before/::after`
+       spacers make this exactly `(TRAVERSE_LENGTH - 1)` panel pitches — see the
+       long note beside those rules in `home/TechnicalWorlds.astro`. */
     const distance = () => Math.max(0, track.scrollWidth - viewport.clientWidth);
+
+    /* One panel pitch in pixels, and therefore the x each stop parks at:
+       stop `i` is centred at exactly `-i × pitch`. Derived from the measured
+       travel rather than from the panel's own box, so it stays true to whatever
+       the stylesheet does as long as the spacers keep the travel a whole number
+       of pitches — which is the property the spacers exist to guarantee. */
+    const pitch = () => (TRAVERSE_LENGTH > 1 ? distance() / (TRAVERSE_LENGTH - 1) : 0);
 
     /* How much scrolling that travel costs, which is now a separate question
        (see the budget block in `traverse.ts`). `window.innerHeight` rather
@@ -183,18 +209,25 @@ export default function TechnicalWorlds({ t }: TechnicalWorldsProps) {
 
       gsap.registerPlugin(ScrollTrigger);
 
-      /* A timeline rather than a single tween, because the pinned range now has
-         two parts and only the first of them moves.
+      /* An alternating timeline, not one slope:
 
-           [ travel: the track slides (TRAVERSE_LENGTH - 1) panels ][ hold ]
+           hold(0) move(0→1) hold(1) move(1→2) … move(n-2→n-1) hold(n-1)
 
-         The hold is an empty tween on a throwaway object — GSAP's own idiom for
-         reserving time — and with `scrub: true` reserving timeline time is
-         reserving *scroll distance*. So the last world stays parked at the
-         viewport's left edge for `FINALE_DWELL` screens of scrolling before the
-         pin lets go, instead of arriving on the frame the pin released.
+         Five holds and four moves. A hold is an empty tween on a throwaway
+         object — GSAP's own idiom for reserving time — and with `scrub: true`
+         reserving timeline time is reserving *scroll distance*, so it is a real
+         dwell with the panel at the exact centre of the frame. A move is one
+         panel pitch on an ease, decelerating into the centre and accelerating
+         out of it.
 
-         The two durations are in the same units as the budget in `traverse.ts`
+         What this replaces is a single `ease: 'none'` tween followed by an
+         empty tween. That shape had no plateau anywhere — each world was within
+         60px of centre for 50px of scroll — and its tail was 350px of pinned
+         scroll during which the transform did not change at all. The last hold
+         below IS the finale's dwell, and it is the same length as everyone
+         else's; there is nothing appended after it.
+
+         Every duration is in the same unit as the budget in `traverse.ts`
          (viewport heights), so the timeline's shape and the scroll length it is
          mapped onto are derived from one pair of numbers. */
       const timeline = gsap.timeline({
@@ -212,26 +245,89 @@ export default function TechnicalWorlds({ t }: TechnicalWorldsProps) {
           // brief forbids; `true` locks the traverse to the scrollbar 1:1.
           scrub: true,
           invalidateOnRefresh: true,
+          /* Letting go halfway between two worlds settles onto the nearer one.
+             `snapProgress` answers the progress it was given whenever the
+             reader is already resting inside a hold, so this can never tug a
+             hand that has come to rest on a centred world — and the delay means
+             it never fires during a gesture. Short and eased out: it finishes a
+             movement the reader started, it does not perform one of its own.
+             The scrollbar and the trackpad stay native throughout. */
+          snap: {
+            snapTo: (value) => snapProgress(value, TRAVERSE_LENGTH),
+            // Scaled by distance: a nudge from just outside a hold is almost
+            // instant, and the longest possible settle — half a move, ~380px
+            // at 1440×900 — gets long enough not to read as a jump.
+            duration: { min: 0.15, max: 0.45 },
+            // Long enough that a trackpad's own deceleration has finished
+            // before this looks at anything, so it completes a gesture rather
+            // than interrupting one.
+            delay: 0.12,
+            ease: 'power2.out',
+            // Nearest, not "the next one in the direction of travel". A
+            // directional snap carries the reader forward past the world they
+            // were slowing down on, which is the opposite of settling.
+            directional: false,
+            /* Off, and this one is load-bearing. ScrollTrigger's default is to
+               snap from where it *projects* the scroll would land given its
+               velocity — which is momentum simulation, the thing the brief
+               (§4) forbids, and which measurably ran away here: a fast jump
+               into the middle of the traverse projected past the end of the
+               range and the band snapped to its last world. Snapping from the
+               position the reader actually stopped at is both the honest
+               behaviour and the correct one. */
+            inertia: false,
+          },
           onRefresh: (self) => {
             rangeRef.current = { start: self.start, end: self.end };
           },
+          // Above the band nothing is current — which is what stops the first
+          // world's arrival animation firing at page load, ~1900px above the
+          // fold, where nobody sees it and from where it can never fire again.
+          onLeaveBack: () => applyIndex(-1),
+          // Past the end the pin has released with the last world centred and
+          // the band still on screen, so that is the one wearing the accent.
+          // Without this, a single scroll gesture large enough to clear the
+          // whole pin left the *previous* world marked current while the last
+          // one was the one being looked at.
+          onLeave: () => applyIndex(TRAVERSE_LENGTH - 1),
+          onEnter: (self) => applyIndex(activeIndexFromProgress(self.progress, TRAVERSE_LENGTH)),
+          onEnterBack: (self) => applyIndex(activeIndexFromProgress(self.progress, TRAVERSE_LENGTH)),
           onUpdate: (self) => {
             rangeRef.current = { start: self.start, end: self.end };
-            // Through `travelProgress` first: during the hold, scroll progress
-            // keeps advancing and the track does not, so raw progress would
-            // report a sixth stop that does not exist.
-            setActiveIndex(activeIndexFromProgress(travelProgress(self.progress), TRAVERSE_LENGTH));
+            // The continuous channel, every tick, through CSSOM rather than
+            // React state — see the registry note in `traverse.ts`.
+            publishTraverseProgress(self.progress, TRAVERSE_LENGTH);
+            /* Only while the pin is actually engaged. ScrollTrigger also calls
+               this during a refresh — a resize, a font load, the pin spacer
+               being re-measured — and a refresh walks progress back through 0
+               to take its measurements. Acting on those readings made the band
+               flick through the first two worlds while parked past the end of
+               it, restarting two arrival animations nobody was looking at. */
+            if (!self.isActive) return;
+            // A pure function of progress, never an accumulation, so no scroll
+            // delta is large enough to step over a world.
+            applyIndex(activeIndexFromProgress(self.progress, TRAVERSE_LENGTH));
           },
         },
       });
 
-      timeline
-        .to(track, {
-          x: () => -distance(),
-          ease: 'none',
-          duration: (TRAVERSE_LENGTH - 1) * SCROLL_PER_STEP,
-        })
-        .to({}, { duration: FINALE_DWELL });
+      for (let index = 0; index < TRAVERSE_LENGTH - 1; index += 1) {
+        const from = index;
+        timeline.to({}, { duration: HOLD_HEIGHTS });
+        timeline.fromTo(
+          track,
+          { x: () => -from * pitch() },
+          {
+            x: () => -(from + 1) * pitch(),
+            // Never `none` for a move: the deceleration into the centre is what
+            // makes the hold read as an arrival rather than as a stall.
+            ease: 'power2.inOut',
+            duration: MOVE_HEIGHTS,
+            immediateRender: false,
+          },
+        );
+      }
+      timeline.to({}, { duration: HOLD_HEIGHTS });
 
       const trigger = timeline.scrollTrigger;
       if (trigger) rangeRef.current = { start: trigger.start, end: trigger.end };
@@ -254,10 +350,15 @@ export default function TechnicalWorlds({ t }: TechnicalWorldsProps) {
       // stacked layout would inherit a leftover horizontal offset.
       track.style.removeProperty('transform');
       track.style.removeProperty('translate');
+      // And the progress registry, for the same reason: without this every
+      // subscribed stage would keep drawing whatever progress the timeline
+      // happened to hold when the traverse was torn down. `null` is the signal
+      // to go back to the resting picture.
+      resetTraverseProgress();
       setEngaged(false);
-      setActiveIndex(0);
+      applyIndex(-1);
     };
-  }, [wideEnough, reducedMotion]);
+  }, [wideEnough, reducedMotion, applyIndex]);
 
   /* ── Stacked composition: which panel is on screen ──────────────────────
      Mobile, and any desktop window too small to pin, still honours "one stage
@@ -304,15 +405,18 @@ export default function TechnicalWorlds({ t }: TechnicalWorldsProps) {
      *document scroll position*, which is the same thing the pointer does — so
      the keyboard and the scrollbar drive one mechanism rather than two, and
      the two can never disagree about where the traverse is. */
-  const goTo = useCallback((index: number) => {
-    const { start, end } = rangeRef.current;
-    // `TRAVEL_SHARE` because the stops all live in the travelling part of the
-    // range. Without it, End would land in the middle of the finale's hold and
-    // Home would still be correct, which is the worst kind of half-right.
-    const target = scrollTargetForIndex(index, TRAVERSE_LENGTH, start, end, TRAVEL_SHARE);
-    window.scrollTo({ top: target, behavior: 'smooth' });
-    setActiveIndex(clampIndex(index, TRAVERSE_LENGTH));
-  }, []);
+  const goTo = useCallback(
+    (index: number) => {
+      const { start, end } = rangeRef.current;
+      // The centre of the target world's hold, which is where the traverse
+      // rests. There is no travel-share correction any more because there is no
+      // appended hold left to correct for: the dwells are inside the timeline.
+      const target = scrollTargetForIndex(index, TRAVERSE_LENGTH, start, end);
+      window.scrollTo({ top: target, behavior: 'smooth' });
+      applyIndex(clampIndex(index, TRAVERSE_LENGTH));
+    },
+    [applyIndex],
+  );
 
   const handleKeyDown = useCallback(
     (event: KeyboardEvent<HTMLDivElement>) => {

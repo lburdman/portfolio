@@ -1,11 +1,12 @@
 import { useMemo, type ReactNode } from 'react';
+import { CHAIN_STAGES, segmentPath } from '../../../../lib/worlds/signal-chain';
 import { StageFrame, type StageProps } from '../StageFrame';
 import { manhattanLength, manhattanPath, STAGE_HEIGHT, STAGE_WIDTH, type Point } from '../stage-geometry';
 import { usePointerField } from '../usePointerField';
 
 /**
  * Electronics — the sensor-to-processor chain, drawn the way a block diagram
- * on a datasheet is drawn.
+ * on a datasheet is drawn, with the signal it carries drawn underneath it.
  *
  * The chain is the brief's own conceptual example (§6): source → filter →
  * conversion → processing → output. It is rendered as *glyphs* rather than as
@@ -15,23 +16,79 @@ import { usePointerField } from '../usePointerField';
  * quantiser staircase and a pinned die say the same thing in both locales, and
  * say it the way the documentation this is imitating says it.
  *
- * Pointer or focus selects a block; the signal path is then drawn in the
- * domain accent *up to that point*, which is how far the signal has got.
+ * ── WHAT PASS 3 REPAIRED ───────────────────────────────────────────────────
+ *
+ * 1. **The signal did not change.** This is the defect the whole rework is
+ *    for. Five blocks each carried a static icon of a *function*, and the only
+ *    thing that moved was one dash sliding along the trace, identical at every
+ *    point of it. So the picture asserted that a chain transforms a signal and
+ *    then showed the signal not being transformed — the same failure that
+ *    retired the AI stage's forecast, in a different costume. The strip below
+ *    the chain is the fix: five traces, each **computed from the one before
+ *    it** in `src/lib/worlds/signal-chain.ts`, so the noise really is gone
+ *    after the filter, the curve really is a staircase after the converter,
+ *    and the gate at the end really is two-valued. Reading left to right the
+ *    five say: measure, clean, digitise, extract, act.
+ *
+ * 2. **The jogs were three-unit spikes.** The trace stepped ±15 units between
+ *    blocks to read as a routed board. With a 61-unit pitch and 34-unit
+ *    blocks, and 12 units of clearance demanded either side, the horizontal
+ *    run at the offset level was *three units long* — so what rendered was not
+ *    a dog-leg but a bare vertical stub hanging off the trace at each gap,
+ *    four times. They are gone. A straight run with a pad at each block
+ *    boundary is what a block diagram actually looks like, and it stops the
+ *    stage spending its only ornament on an artefact.
+ *
+ * 3. **Two thirds of the frame was empty.** The chain sat across the middle
+ *    with nothing above or below it. The signal strip now occupies that space
+ *    with the one thing the stage was missing.
+ *
+ * ── WHY THIS STAGE DOES NOT READ THE SCROLL ────────────────────────────────
+ * The local progress channel carries the Quantum and AI stages because in both
+ * the reader's descent is a real parameter of the subject. Here the subject is
+ * a *comparison* — what each of five stages does to the same signal — and a
+ * comparison is made by looking across, not by scrolling. Binding the energised
+ * prefix to progress would mean that at the centred dwell, where the reader
+ * actually stops, exactly half the chain is ever lit; the complete chain, which
+ * is the whole claim, would never be on screen while the world was being looked
+ * at. The pointer already owns "inspect one stage" and the arrival already owns
+ * "one signal, end to end", and between them nothing is left for the scroll to
+ * say that is true.
  *
  * Technology: SVG over CSS dash animation. No canvas.
  */
 
-const CENTRE_Y = 82;
+const CENTRE_Y = 58;
 const BLOCK_WIDTH = 34;
 const BLOCK_HEIGHT = 30;
 const BLOCK_COUNT = 5;
 const FIRST_CENTRE = 39;
 const BLOCK_PITCH = 61;
-const JOG = 15;
 const LEAD_IN = 14;
 const LEAD_OUT = STAGE_WIDTH - 14;
 
 const BLOCK_CENTRES = Array.from({ length: BLOCK_COUNT }, (_, index) => FIRST_CENTRE + index * BLOCK_PITCH);
+
+/* ── The signal strip ───────────────────────────────────────────────────────
+   One segment under each block, showing what leaves it. Segments are inset
+   from the pitch so two neighbours never touch: the gap is what makes them
+   five readings rather than one long trace. */
+const SEGMENT_MID = 128;
+const SEGMENT_AMPLITUDE = 21;
+const SEGMENT_WIDTH = BLOCK_PITCH - 12;
+const SEGMENTS = CHAIN_STAGES.map((stage, index) => {
+  const centre = BLOCK_CENTRES[index] ?? FIRST_CENTRE;
+  return {
+    stage,
+    x: centre - SEGMENT_WIDTH / 2,
+    d: segmentPath(stage, {
+      x: centre - SEGMENT_WIDTH / 2,
+      mid: SEGMENT_MID,
+      width: SEGMENT_WIDTH,
+      amplitude: SEGMENT_AMPLITUDE,
+    }),
+  };
+});
 
 /**
  * The routed trace, plus the waypoint index at which each block's output is
@@ -42,17 +99,10 @@ const TRACE = ((): { waypoints: Point[]; outputAt: number[] } => {
   const waypoints: Point[] = [{ x: LEAD_IN, y: CENTRE_Y }];
   const outputAt: number[] = [];
 
-  BLOCK_CENTRES.forEach((centre, index) => {
+  BLOCK_CENTRES.forEach((centre) => {
     waypoints.push({ x: centre - BLOCK_WIDTH / 2, y: CENTRE_Y });
     waypoints.push({ x: centre + BLOCK_WIDTH / 2, y: CENTRE_Y });
     outputAt.push(waypoints.length);
-
-    const next = BLOCK_CENTRES[index + 1];
-    if (next === undefined) return;
-    const jog = index % 2 === 0 ? JOG : -JOG;
-    waypoints.push({ x: centre + BLOCK_WIDTH / 2 + 12, y: CENTRE_Y });
-    waypoints.push({ x: next - BLOCK_WIDTH / 2 - 12, y: CENTRE_Y + jog });
-    waypoints.push({ x: next - BLOCK_WIDTH / 2, y: CENTRE_Y });
   });
 
   waypoints.push({ x: LEAD_OUT, y: CENTRE_Y });
@@ -66,7 +116,7 @@ const PREFIX_PERCENTS = TRACE.outputAt.map((index) =>
   Number(((manhattanLength(TRACE.waypoints.slice(0, index)) / TRACE_LENGTH) * 100).toFixed(2)),
 );
 
-/** Bend points get a via dot, exactly as they would on a real board. */
+/** A pad where the trace meets a block, exactly as it would on a real board. */
 const VIAS = TRACE.waypoints.filter((_, index) => index > 0 && index < TRACE.waypoints.length - 1);
 
 function BlockGlyph({ index }: { readonly index: number }): ReactNode {
@@ -143,9 +193,6 @@ export function SignalPathStage({ domain, active }: StageProps) {
             <g className="tw-block-glyph" transform={`translate(${centre} ${CENTRE_Y})`}>
               <BlockGlyph index={index} />
             </g>
-            <text className="tw-annot" x={centre} y={CENTRE_Y + 34} textAnchor="middle">
-              {String(index + 1).padStart(2, '0')}
-            </text>
           </g>
         ))}
       </g>
@@ -159,11 +206,40 @@ export function SignalPathStage({ domain, active }: StageProps) {
       <g className="tw-probe" transform={`translate(${selectedCentre} 0)`}>
         <path
           d={
-            `M${-BLOCK_WIDTH / 2} ${CENTRE_Y - 24} L${-BLOCK_WIDTH / 2} ${CENTRE_Y - 30} ` +
-            `L${BLOCK_WIDTH / 2} ${CENTRE_Y - 30} L${BLOCK_WIDTH / 2} ${CENTRE_Y - 24}`
+            `M${-BLOCK_WIDTH / 2} ${CENTRE_Y - 22} L${-BLOCK_WIDTH / 2} ${CENTRE_Y - 28} ` +
+            `L${BLOCK_WIDTH / 2} ${CENTRE_Y - 28} L${BLOCK_WIDTH / 2} ${CENTRE_Y - 22}`
           }
         />
-        <line x1={0} y1={CENTRE_Y - 30} x2={0} y2={CENTRE_Y - 38} />
+        <line x1={0} y1={CENTRE_Y - 28} x2={0} y2={CENTRE_Y - 35} />
+      </g>
+
+      {/* The signal itself, one segment per stage.
+
+          The zero lines are drawn per segment rather than as one rule across
+          the strip: five separate readings, five separate references. The
+          selected segment takes the accent, so pointing at a block and reading
+          what leaves it are the same gesture. */}
+      <g className="tw-chain-strip">
+        {SEGMENTS.map((segment, index) => (
+          <g key={segment.stage} data-selected={index === selected ? 'true' : 'false'}>
+            <line
+              className="tw-chain-zero"
+              x1={segment.x}
+              y1={SEGMENT_MID}
+              x2={segment.x + SEGMENT_WIDTH}
+              y2={SEGMENT_MID}
+            />
+            <path className="tw-chain-signal" d={segment.d} pathLength={100} />
+            <text
+              className="tw-annot"
+              x={segment.x + SEGMENT_WIDTH / 2}
+              y={SEGMENT_MID + SEGMENT_AMPLITUDE + 17}
+              textAnchor="middle"
+            >
+              {String(index + 1).padStart(2, '0')}
+            </text>
+          </g>
+        ))}
       </g>
 
       <line className="tw-rule" x1={22} y1={STAGE_HEIGHT - 24} x2={STAGE_WIDTH - 22} y2={STAGE_HEIGHT - 24} />

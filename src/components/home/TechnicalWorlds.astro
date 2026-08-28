@@ -188,10 +188,16 @@ const SECTION = 'worlds' as const;
        stop. The remaining 14% is the peek of the next domain, which is what
        tells the reader the band continues sideways.
 
-       It is a custom property because two rules have to agree on it — the
-       panel's flex basis and the track's trailing spacer — and they were
-       silently allowed to disagree before. See the spacer rule below. */
+       It is a custom property because three rules have to agree on it — the
+       panel's flex basis, the track's two spacers and the viewport's edge
+       mask — and the first two were silently allowed to disagree before. See
+       the spacer rule below. */
     --tw-panel-pitch: 86%;
+
+    /* Half the peek, which is also the distance from the frame's edge to the
+       centred panel's own edge. Everything that has to stay clear of the
+       active panel is expressed against this rather than against a literal. */
+    --tw-peek: calc((100% - var(--tw-panel-pitch)) / 2);
   }
 
   /* The pinned composition. `data-traverse` is set imperatively by the island
@@ -259,9 +265,42 @@ const SECTION = 'worlds' as const;
     row-gap: var(--spacing-section);
   }
 
+  /* The frame clips at 100% of its width, and for most of the traverse a
+     neighbouring `h3` or `p` is crossing that boundary — measured on the
+     deployed build, some text fragment was hard-cut for 83% of the pinned
+     scroll, chopped mid-word ("Computac", "clási") with nothing to say it was
+     a frame edge rather than the end of the sentence.
+
+     The gradient mask makes the boundary a fade instead of a guillotine. Its
+     width is derived from `--tw-peek`, so it can never reach the centred
+     panel's own text: the active panel starts one full peek in from each edge,
+     and the fade is at most 68% of that. The `min()` caps it on very wide
+     windows, where a peek is large enough that a proportional fade would start
+     washing out the neighbour's whole approach rather than just its edge.
+
+     `black`/`transparent` are alpha, not colour — the mask carries no hue and
+     names none, so tokens.css remains the only place a colour is chosen. Both
+     spellings are declared: without the prefixed one WebKit renders no mask at
+     all, which is the defect back for a large share of the traffic. */
   .tw[data-traverse='true'] .tw-viewport {
+    --tw-fade: min(64px, calc(var(--tw-peek) * 0.68));
+
     height: 100%;
     overflow: hidden;
+    -webkit-mask-image: linear-gradient(
+      to right,
+      transparent 0,
+      black var(--tw-fade),
+      black calc(100% - var(--tw-fade)),
+      transparent 100%
+    );
+    mask-image: linear-gradient(
+      to right,
+      transparent 0,
+      black var(--tw-fade),
+      black calc(100% - var(--tw-fade)),
+      transparent 100%
+    );
   }
 
   .tw[data-traverse='true'] .tw-track {
@@ -272,42 +311,50 @@ const SECTION = 'worlds' as const;
     will-change: transform;
   }
 
-  /* --- The trailing spacer, and the bug it fixes -------------------------
-     This is the single rule that removes the orphaned text fragments recorded
-     in docs/REDESIGN_DECISIONS.md #15, and it is worth stating the arithmetic
-     because the defect was pure geometry rather than anything visual.
+  /* --- The spacers, and the two bugs they fix ---------------------------
+     These two rules are what make the traverse's geometry come out whole, and
+     the arithmetic is worth stating because both defects were pure layout
+     rather than anything visual.
 
-     Five panels at 86% make a track 430% of the viewport wide, so the track
-     travels 430% − 100% = 330%. The traverse has four steps between five
-     stops, so each step moves 330 / 4 = 82.5% — while the panels are pitched
-     86% apart. The 3.5% shortfall accumulates: at stop *i* the outgoing panel
-     is left standing 3.5×*i* percent inside the frame.
+     **Whole-pitch registration** (docs/REDESIGN_DECISIONS.md #15). Five panels
+     at 86% make a track 430% of the viewport wide, so a bare track travels
+     430% − 100% = 330%. The traverse has four steps between five stops, so
+     each step moves 330 / 4 = 82.5% — while the panels are pitched 86% apart.
+     The 3.5% shortfall accumulates: at stop *i* the outgoing panel is left
+     standing 3.5×*i* percent inside the frame. Measured at 1440×900, viewport
+     box 1344px: slivers of 46, 102, 157 and 213px at the four stops after the
+     first, each showing the clipped tail of the previous stage's annotation.
+     They were not a transient — they were where the traverse came to rest.
 
-     Measured on the built site at 1440×900, viewport box 1344px: slivers of
-     46, 102, 157 and 213px at the four stops after the first, each showing the
-     right-hand end of the previous stage's clipped annotation — the "ing" and
-     "tas/das" fragments in the review, which are the tails of `.tw-stage__meta`
-     labels. They persisted 700ms after scrolling stopped because they were not
-     a transient at all: they were where the traverse comes to rest.
+     Adding 14% of spacer fixes that, because it makes the travel a whole
+     number of pitches:
 
-     Hiding them would have been treating a layout error as a paint artefact.
-     The real fix is to make the travel distance equal a whole number of panel
-     pitches, and a flex spacer of exactly the peek width does that:
+       track = 14% + 5 × 86% = 444%   travel = 444% − 100% = 344% = 4 × 86%
 
-       track = 5 × 86% + 14% = 444%   travel = 444% − 100% = 344% = 4 × 86%
+     **Centring.** That 14% used to be one trailing spacer, and *where* it sat
+     decided where the panels sat. With all of it after the last panel, panel
+     0's centre was half a peek — 94px at 1440×900 — right of the frame's
+     centre at zero translation, and it only moved further away from there. The
+     first world therefore never reached the middle of the frame at all
+     (measured closest approach: 94.6px), and the last one passed through the
+     centre and settled 94px past it. Neither is a taste question: the pinned
+     composition's whole claim is that one domain is being *shown*.
 
-     Now every stop lands a panel flush against the left edge of the frame with
-     the previous one entirely outside it, and at the last stop the spacer —
-     not a stranded neighbour — fills the peek. The island's `distance()` picks
-     this up for free, because it measures `scrollWidth`.
+     Splitting the same 14% into a leading and a trailing half moves every
+     panel half a peek left and makes the arithmetic exact — stop *i* is
+     centred at a translation of exactly −*i* × pitch, and the last stop's
+     translation is exactly the full travel. Neither the track width nor the
+     travel distance changes by a pixel; the island's `distance()` and `pitch()`
+     pick it up for free, because they measure `scrollWidth`.
 
-     A pseudo-element rather than a real element: it is a spacer, it carries no
-     content, and it must not exist in the stacked composition, where the track
-     is a grid and an empty child would add a row and a row-gap. Declaring it
-     only here means it is never generated there. */
+     Pseudo-elements rather than real ones: they are spacers, they carry no
+     content, and they must not exist in the stacked composition, where the
+     track is a grid and empty children would add rows and row-gaps. Declaring
+     them only here means they are never generated there. */
+  .tw[data-traverse='true'] .tw-track::before,
   .tw[data-traverse='true'] .tw-track::after {
     content: '';
-    flex: 0 0 calc(100% - var(--tw-panel-pitch));
+    flex: 0 0 var(--tw-peek);
   }
 
   .tw-viewport:focus-visible {
@@ -470,9 +517,35 @@ const SECTION = 'worlds' as const;
        See the ACTIVATION GRAMMAR block below. */
     --tw-arrive: var(--duration-deliberate);
     --tw-arrive-lag: 240ms;
-    /* Past the 720ms arrival, and a whole number of FPGA clock ticks (0.4s) so
-       the fabric's register blink stays in phase with its own clock. */
-    --tw-settle: 800ms;
+    /* Ambient must be *visibly running* by the time the arrival finishes, not
+       starting after it. The arrival ends at `--tw-arrive-lag + --tw-arrive` =
+       960ms; at the old 800ms the first ambient cycle only became meaningful
+       3–7.5s in, which was routinely longer than a world stayed on screen, so
+       the settled state was a thing the reader was told about and never shown.
+
+       400ms overlaps the second half of the arrival and is still a whole
+       number of FPGA clock ticks (0.4s), which is what keeps the fabric's
+       register blink in phase with its own clock. The ambient animations that
+       do not have to phase-lock to anything skip this and start mid-cycle
+       instead — see the negative delays below. */
+    --tw-settle: 400ms;
+
+    /* There is deliberately no `--tw-progress` here. It was declared as a
+       resting 0.5 and rewritten through CSSOM on every traverse tick for all
+       five stages, and no rule in this file — or anywhere else — ever read it.
+       Scroll progress reaches the two stages that need it as a number, through
+       `traverse.ts`'s registry. If a CSS channel is wanted later, declare it
+       with its first `var()` consumer and not before. */
+
+    /* The electronics chain's clock, and the phase it starts at. Its pulse and
+       its five block glyphs are two readings of one event, so they are driven
+       off one period with one shared offset — change either here and the
+       causal link between them survives. The offset is negative for the same
+       reason the ripple's is: the signal is already in flight when the world
+       arrives, instead of the reader watching an empty trace until it sets
+       off. */
+    --tw-chain: 2.4s;
+    --tw-chain-phase: -0.9s;
   }
 
   .tw-stage__meta {
@@ -501,6 +574,58 @@ const SECTION = 'worlds' as const;
     height: auto;
     overflow: visible;
   }
+
+  /* ===========================================================================
+     THE ONE RULE ABOUT DASHED STROKES
+     `pathLength` and `vector-effect: non-scaling-stroke` are MUTUALLY
+     EXCLUSIVE. Never put both on one element.
+
+     `pathLength="100"` rescales the path's length in USER space: a dash value
+     of `100` means "one hundred hundredths of this path", which the UA resolves
+     to `userLength / 100` user units per dash unit. `non-scaling-stroke` moves
+     the whole stroke — width, dash and offset — into SCREEN space, where the
+     path is `scale × userLength` long. Under both, the dash is authored against
+     one length and painted against another, and the two disagree by exactly the
+     viewport scale. A finished `stroke-dasharray: 100 100`, which is the
+     definition of "solid" everywhere this file uses `tw-draw`, then paints
+     `1 / scale` of its path.
+
+     That is not a rounding error and it is not fixable by choosing a bigger
+     number, because the scale is a continuous function of the window: the stage
+     SVG is `viewBox="0 0 320 200"` rendered at `min(100%, 34rem)`, so it is
+     drawn at anything from about 0.9× to 1.70×. Measured on the production
+     build before this rule existed — 800 samples per path, browser hit-testing,
+     shipped frame against the same frame with `stroke-dasharray` removed:
+
+       viewport   stage width   scale    painted
+       1440×900       544px     1.700     58.6 %   ← the Bloch rim was a broken circle
+       1280×800       507px     1.584     63.2 %   ← the FPGA route stopped short
+       1040×800       300px     0.939    100.0 %   ← correct only by accident
+
+     Dropping `pathLength` instead does not help: without it the dash is authored
+     in screen pixels against a screen length nothing in CSS can know. Dropping
+     `non-scaling-stroke` does, and it is exact rather than tuned — dash and path
+     are then both in user space, so `100 100` over `pathLength="100"` is the
+     whole path *by definition*, at every scale, and `17 83` is one sixth of a
+     six-cell route rather than 1.7 tilings of a pattern that was meant to appear
+     once.
+
+     What it costs, stated plainly: those strokes now scale with the drawing
+     instead of holding a fixed pixel weight. The split that falls out of it is
+     the right one anyway — the GROUND (grid, rules, ticks, cell and block
+     outlines, the frame) keeps its constant pen, and the SUBJECT (the accent
+     lines, the signals, the pulses, everything whose *length* is the meaning)
+     is drawn in the plate's own units, the same units its geometry and its
+     annotations are already in.
+
+     `.tw-wave` is the one path that must keep `non-scaling-stroke` and it is
+     also the one that declares no `pathLength`: it lives under a group the
+     scroll scales anisotropically, so the pen would go elliptical without it.
+     It is never dashed, and its arrival is a clip wipe. See its own note below.
+
+     `tests/worlds.test.ts` fails if any element in the built markup ever
+     carries both again.
+     ======================================================================== */
 
   /* Shared drawing vocabulary. */
   .tw-stage__svg .tw-rule {
@@ -537,8 +662,8 @@ const SECTION = 'worlds' as const;
      One grammar, five verbs — same flag, same tokens, a different primitive per
      domain, because the primitive is the thing each domain is *about*:
 
-       ai           the forecast fan opens from the `now` rule
-       quantum      wavefronts expand once from each emitter
+       ai           the decision boundary draws itself out of nothing
+       quantum      the sphere draws itself, then the state vector arrives
        fpga         the selected route draws, its cells latching as it resolves
        electronics  the trace energises left to right through the chain
        audio        the waveform sweeps in, the spectrum rises to meet it
@@ -585,33 +710,86 @@ const SECTION = 'worlds' as const;
     transition: opacity var(--duration-fast) var(--ease-exit);
   }
 
-  /* ai — the fan opens from the `now` rule.
+  /* ai — the partition resolves.
 
-     A widening clip rather than a `scaleX`, and not for taste: scaling a ribbon
-     whose height varies along its length compresses those variations into
-     vertical spikes at the origin, which is a picture of nothing. A clip
-     reveals the geometry as it really is. It also means CSS never needs the
-     rule's x coordinate: `inset()` percentages resolve against the element's
-     own bounding box, whose left edge IS the rule, so `FORECAST_NOW_X` stays a
-     single definition in `stages/ForecastStage.tsx` with no copy to drift. */
-  .tw-stage[data-active='true'] .tw-fc-history {
+     `tw-draw` over a `pathLength="100"` boundary, so the three subpaths draw
+     out of nothing in sequence: the model deciding where the classes divide.
+     The confidence corridor settles in behind it, and the misclassification
+     flags come up last — a flag means nothing until there is a boundary for
+     its point to be on the wrong side of.
+
+     The flags' arrival is a `transform`, never an opacity. Their opacity is a
+     presentation attribute written on every scroll tick, and a CSS animation
+     over it would win permanently and freeze all nine. */
+  .tw-stage[data-active='true'] .tw-dl-boundary {
     animation: tw-draw var(--tw-arrive) var(--ease-instrument) both;
   }
 
-  .tw-stage[data-active='true'] .tw-fc-open {
-    animation: tw-fan-open var(--tw-arrive) var(--ease-entrance) var(--tw-arrive-lag) both;
+  .tw-stage[data-active='true'] .tw-dl-contour {
+    animation: tw-dl-settle 520ms var(--ease-entrance) 180ms both;
   }
 
-  /* quantum — one expansion from each emitter. `fill-box` puts the origin at
-     the centre of the ring group's own bounding box, which is the emitter, so
-     both wavefronts expand from their own source rather than from the frame. */
-  .tw-ripple {
-    transform-box: fill-box;
-    transform-origin: center;
+  .tw-stage[data-active='true'] .tw-dl-flag {
+    animation: tw-dl-acquire 300ms var(--ease-instrument) 440ms both;
   }
 
-  .tw-stage[data-active='true'] .tw-ripple {
-    animation: tw-expand var(--tw-arrive) var(--ease-entrance) both;
+  /* quantum — the instrument assembles, outside in, and the state arrives last.
+     860ms end to end: the silhouette traces itself, then the graticule, the
+     axes and the latitude ring fade up in that order, then the labels and the
+     readout, and only then the vector.
+
+     Two rules govern this and both are load-bearing.
+
+     1. **The animation may only touch `opacity` and `stroke-dashoffset`.**
+        Nothing here writes a coordinate, so there is no moment where a
+        keyframe and the scroll are both authoring the same attribute. That is
+        what makes "no jump at activation" structural rather than tuned: the
+        vector's geometry is already correct on frame zero, the arrival only
+        reveals it.
+     2. **No `transition` may ever be declared on `.tw-bl-shaft`'s `d`,
+        `.tw-bl-head`'s `transform` or `.tw-bl-lat`'s `d`.** A transition there
+        would smear the 1:1 scroll contract and fight reverse scroll, which is
+        the whole point of the piece. `tests/bloch.test.ts` fails if one
+        appears in this file.
+
+     This world has no ambient loop, and that is the correct answer for it
+     rather than an omission. Its motion is the reader's own scroll: θ tracks
+     the traverse continuously, so through the whole centred dwell the state
+     sweeps roughly 47° and the probability bars move with it. An idling
+     animation on top of that would be a second, unrelated clock ticking over a
+     value the reader is already driving. */
+  .tw-stage[data-active='true'] .tw-bl-limb {
+    animation: tw-draw 300ms var(--ease-instrument) both;
+  }
+
+  .tw-stage[data-active='true'] .tw-bl-veil,
+  .tw-stage[data-active='true'] .tw-bl-arc,
+  .tw-stage[data-active='true'] .tw-bl-axis,
+  .tw-stage[data-active='true'] .tw-bl-lat,
+  .tw-stage[data-active='true'] .tw-bl-labels,
+  .tw-stage[data-active='true'] .tw-bl-readout,
+  .tw-stage[data-active='true'] .tw-bl-vector {
+    animation: tw-bl-in 300ms var(--ease-entrance) both;
+  }
+
+  .tw-stage[data-active='true'] .tw-bl-arc[data-arc='equator'] {
+    animation-delay: 90ms;
+  }
+  .tw-stage[data-active='true'] .tw-bl-arc[data-arc='meridian'] {
+    animation-delay: 150ms;
+  }
+  .tw-stage[data-active='true'] .tw-bl-axis {
+    animation-delay: 210ms;
+  }
+  .tw-stage[data-active='true'] .tw-bl-lat {
+    animation-delay: 260ms;
+  }
+  .tw-stage[data-active='true'] .tw-bl-labels,
+  .tw-stage[data-active='true'] .tw-bl-readout {
+    animation-delay: 420ms;
+  }
+  .tw-stage[data-active='true'] .tw-bl-vector {
+    animation-delay: 560ms;
   }
 
   /* fpga — the selected route resolves, and its cells latch left to right.
@@ -636,54 +814,81 @@ const SECTION = 'worlds' as const;
     animation-delay: 40ms, var(--tw-settle);
   }
   .tw-stage[data-active='true'] .tw-cell[data-claimed='true']:nth-child(8n + 2) {
-    animation-delay: 110ms, var(--tw-settle);
+    animation-delay: 100ms, var(--tw-settle);
   }
   .tw-stage[data-active='true'] .tw-cell[data-claimed='true']:nth-child(8n + 3) {
-    animation-delay: 180ms, var(--tw-settle);
+    animation-delay: 160ms, var(--tw-settle);
   }
   .tw-stage[data-active='true'] .tw-cell[data-claimed='true']:nth-child(8n + 4) {
-    animation-delay: 250ms, var(--tw-settle);
+    animation-delay: 220ms, var(--tw-settle);
   }
   .tw-stage[data-active='true'] .tw-cell[data-claimed='true']:nth-child(8n + 5) {
-    animation-delay: 320ms, var(--tw-settle);
+    animation-delay: 280ms, var(--tw-settle);
   }
   .tw-stage[data-active='true'] .tw-cell[data-claimed='true']:nth-child(8n + 6) {
-    animation-delay: 390ms, var(--tw-settle);
+    animation-delay: 340ms, var(--tw-settle);
   }
   .tw-stage[data-active='true'] .tw-cell[data-claimed='true']:nth-child(8n + 7) {
-    animation-delay: 460ms, var(--tw-settle);
+    animation-delay: 400ms, var(--tw-settle);
   }
   .tw-stage[data-active='true'] .tw-cell[data-claimed='true']:nth-child(8n + 8) {
-    animation-delay: 530ms, var(--tw-settle);
+    animation-delay: 460ms, var(--tw-settle);
   }
 
   /* electronics — the chain energises left to right, once. The overlay fades
      out at the end of its own keyframe, leaving the pointer-driven
      `.tw-trace-live` prefix as the resting picture. */
   .tw-stage[data-active='true'] .tw-trace-arrive {
-    animation: tw-energise 1s var(--ease-instrument) both;
+    animation: tw-energise 880ms var(--ease-instrument) both;
   }
 
   /* And the blocks come up behind it, in order. The trace alone is a hairline:
      what makes the arrival legible is the five stages of the chain lighting in
      the direction the signal travels. */
   .tw-stage[data-active='true'] .tw-blocks g[data-energised='true'] .tw-block {
-    animation: tw-latch 520ms var(--ease-instrument) both;
+    animation: tw-latch 300ms var(--ease-instrument) both;
   }
   .tw-stage[data-active='true'] .tw-blocks g:nth-child(1) .tw-block {
-    animation-delay: 60ms;
+    animation-delay: 70ms;
   }
   .tw-stage[data-active='true'] .tw-blocks g:nth-child(2) .tw-block {
-    animation-delay: 190ms;
+    animation-delay: 200ms;
   }
   .tw-stage[data-active='true'] .tw-blocks g:nth-child(3) .tw-block {
-    animation-delay: 320ms;
+    animation-delay: 330ms;
   }
   .tw-stage[data-active='true'] .tw-blocks g:nth-child(4) .tw-block {
-    animation-delay: 450ms;
+    animation-delay: 460ms;
   }
   .tw-stage[data-active='true'] .tw-blocks g:nth-child(5) .tw-block {
-    animation-delay: 580ms;
+    animation-delay: 590ms;
+  }
+
+  /* And the signal each block puts out, drawn as the sweep clears it. The
+     staggers track `tw-energise`'s own progress — that keyframe reaches
+     dashoffset 0 at 72% of 880ms, so the sweep passes the five blocks about
+     130ms apart — which is what makes each trace look *produced* by the block
+     above it rather than merely appearing near it. The last one finishes at
+     900ms, and so does the block latch above and the sweep itself: this whole
+     stage arrives inside MOTION_SYSTEM §3's 400–1000ms window rather than the
+     1.1s the block stagger used to run to. */
+  .tw-stage[data-active='true'] .tw-chain-signal {
+    animation: tw-draw 280ms var(--ease-instrument) both;
+  }
+  .tw-stage[data-active='true'] .tw-chain-strip g:nth-child(1) .tw-chain-signal {
+    animation-delay: 100ms;
+  }
+  .tw-stage[data-active='true'] .tw-chain-strip g:nth-child(2) .tw-chain-signal {
+    animation-delay: 230ms;
+  }
+  .tw-stage[data-active='true'] .tw-chain-strip g:nth-child(3) .tw-chain-signal {
+    animation-delay: 360ms;
+  }
+  .tw-stage[data-active='true'] .tw-chain-strip g:nth-child(4) .tw-chain-signal {
+    animation-delay: 490ms;
+  }
+  .tw-stage[data-active='true'] .tw-chain-strip g:nth-child(5) .tw-chain-signal {
+    animation-delay: 620ms;
   }
 
   /* audio — the waveform sweeps in and the spectrum rises to meet it.
@@ -694,200 +899,293 @@ const SECTION = 'worlds' as const;
     transform-origin: 50% 100%;
   }
 
-  .tw-stage[data-active='true'] .tw-wave {
-    animation: tw-draw var(--tw-arrive) var(--ease-instrument) both;
+  /* The sweep wipes in from the left — and it is a **clip**, not the shared
+     dash draw every other line on this band arrives with. That is a repair,
+     not a preference.
+
+     `.tw-wave` is the one path on this band that genuinely cannot give up
+     `vector-effect: non-scaling-stroke`. It lives under a group the scroll
+     scales *anisotropically* — the excitation frequency is a horizontal scale
+     between 1 and 2.6 written onto `.tw-wave-scale` every tick — and without
+     the effect that scale flattens the hairline into an elliptical pen.
+
+     Every other dashed path resolved the conflict the other way, by dropping
+     the `vector-effect` and keeping `pathLength` (see THE ONE RULE ABOUT DASHED
+     STROKES above). This one cannot, so it drops the dash instead: it declares
+     no `pathLength`, is never dashed, and arrives on a clip wipe. Either way
+     the invariant is the same one — never both.
+
+     The `320px` is `STAGE_WIDTH` — the wipe has to travel the frame, and a
+     keyframe cannot read a module constant. `tests/worlds.test.ts` asserts the
+     two agree, exactly as it does for the FPGA's `steps(6)`. */
+  .tw-stage[data-active='true'] .tw-wave-reveal {
+    animation: tw-sweep-in var(--tw-arrive) var(--ease-instrument) both;
   }
 
   .tw-stage[data-active='true'] .tw-spectrum {
-    animation: tw-rise var(--tw-arrive) var(--ease-entrance) var(--tw-arrive-lag) both;
+    animation: tw-rise 560ms var(--ease-entrance) var(--tw-arrive-lag) both;
   }
 
-  /* --- ai / forecast -----------------------------------------------------
-     A series, a `now` rule, and a calibrated prediction interval opening
-     rightward. One band plus one nested inner band, both derived from a single
-     widening half-width — never a family of separately-shaped quantile curves,
-     because the work this draws calibrates by split conformal prediction and
-     the picture must not assert a method the repository does not use. See the
-     header of `stages/ForecastStage.tsx`. ------------------------------- */
+  /* --- ai / decision landscape -------------------------------------------
+     A three-class partition, the confidence corridor either side of it, the
+     points it gets wrong, and a meter reading how much of the data it has
+     accounted for. Scroll progress drives the boundary's shape — the stage
+     subscribes to `traverse.ts`'s registry and rewrites `d` per frame — so this
+     is the one stage on the band whose subject is literally the scroll.
 
-  .tw-fc-grid line,
-  .tw-fc-ticks line {
+     Two rules hold the colour scheme together. There is **exactly one accent
+     object** — the boundary; and everything the reader is asked to read as
+     *wrong* is `--color-on-ink`, never the accent, so error and partition are
+     never competing for the same signal.
+
+     Nothing here declares `opacity` on `.tw-dl-flag`, or `d` on any driven
+     path. Those are written per frame as presentation attributes, and a CSS
+     declaration outranks a presentation attribute — the writes would silently
+     do nothing. See the header of `stages/LandscapeStage.tsx`. ----------- */
+
+  .tw-dl-grid line,
+  .tw-dl-ticks line {
     stroke: var(--color-ink-rule);
     stroke-width: 1;
-    opacity: 0.45;
+    opacity: 0.32;
     vector-effect: non-scaling-stroke;
   }
 
-  .tw-fc-band {
-    fill: var(--tw-accent);
-    stroke: none;
-    opacity: 0.15;
-  }
-
-  .tw-fc-band[data-level='inner'] {
-    opacity: 0.28;
-  }
-
-  /* The point forecast. Dashed, because it is the only line in the frame that
-     never happened. */
-  .tw-fc-median {
+  /* The margin iso-contours: how far you can move before the model changes its
+     mind. Ground, not subject — thin, muted, and the wider level fainter and
+     dashed so the two read as one field sampled twice rather than as two
+     outlines. */
+  .tw-dl-contour {
     fill: none;
-    stroke: var(--tw-accent);
-    stroke-width: 1.3;
-    stroke-dasharray: 3.5 3.5;
-    opacity: 0.9;
+    stroke: var(--color-on-ink-muted);
+    stroke-width: 1;
+    opacity: 0.4;
     vector-effect: non-scaling-stroke;
   }
 
-  .tw-fc-history {
+  .tw-dl-contour[data-level='outer'] {
+    opacity: 0.24;
+    stroke-dasharray: 2 3;
+  }
+
+  .tw-dl-glyph {
+    vector-effect: non-scaling-stroke;
+  }
+
+  /* Solid, hollow, linear. Three marks that differ in kind, because at the true
+     320px frame three radii of one circle do not differ at all — they collapse
+     into one grey speck and the picture becomes dots either side of a curve. */
+  .tw-dl-glyph[data-class='0'] {
+    fill: var(--color-on-ink-muted);
+  }
+
+  .tw-dl-glyph[data-class='1'] {
+    fill: none;
+    stroke: var(--color-on-ink-muted);
+    stroke-width: 1.2;
+  }
+
+  .tw-dl-glyph[data-class='2'] {
+    fill: none;
+    stroke: var(--color-on-ink-muted);
+    stroke-width: 1.3;
+    stroke-linecap: round;
+  }
+
+  /* A misclassified point, bracketed the way the stage frame brackets its own
+     corners — which is the point: it is the same instrument marking something
+     out. Deliberately not a ring, because class 1's glyph *is* a ring and a
+     ring around a ring reads as a fourth kind of mark. */
+  .tw-dl-flag {
+    fill: none;
+    stroke: var(--color-on-ink);
+    stroke-width: 1.1;
+    stroke-linecap: round;
+    vector-effect: non-scaling-stroke;
+    transform-box: fill-box;
+    transform-origin: center;
+  }
+
+  /* The one accent object in the frame.
+
+     No `vector-effect`: it declares `pathLength="100"` and arrives on `tw-draw`.
+     See THE ONE RULE ABOUT DASHED STROKES above. */
+  .tw-dl-boundary {
     fill: none;
     stroke: var(--tw-accent);
     stroke-width: 1.8;
     stroke-linecap: round;
     stroke-linejoin: round;
-    vector-effect: non-scaling-stroke;
   }
 
-  /* The observations the forecast is scored against — drawn *through* the band
-     rather than stopping at the rule. That is rolling-origin validation without
-     a caption. */
-  .tw-fc-realised {
-    fill: none;
-    stroke: var(--color-on-ink-muted);
-    stroke-width: 1.1;
-    stroke-linejoin: round;
-    opacity: 0.5;
-    vector-effect: non-scaling-stroke;
-  }
+  /* The ambient pass. Its dash geometry is declared here rather than only in
+     the keyframe, so with `animation: none` it resolves to one short highlight
+     on the partition instead of a solid white stroke laid over the accent.
 
-  .tw-fc-scan {
+     `11 100` is eleven hundredths of the partition, and it is one highlight —
+     both of which are only true in the `pathLength="100"` user space this now
+     stays in. Under `non-scaling-stroke` the 111-unit pattern tiled 1.7 times
+     along the path and the single pass was measured arriving as three. */
+  .tw-dl-scan {
     fill: none;
     stroke: var(--color-on-ink);
-    stroke-width: 2.1;
+    stroke-width: 2.2;
     stroke-linecap: round;
-    opacity: 0.85;
+    stroke-dasharray: 11 100;
+    opacity: 0.62;
+  }
+
+  .tw-dl-margin,
+  .tw-dl-cross {
+    fill: none;
+    stroke: var(--color-on-ink);
+    stroke-width: 1.1;
     vector-effect: non-scaling-stroke;
   }
 
-  /* The band behind the rolling origin, washed in as it is scored. Both this
-     and `.tw-fc-scan` are rendered by the island only while the stage is
-     active, and both carry a visible resting value — the animation moves them,
-     it is not the reason either is on screen. */
-  .tw-fc-resolved {
-    fill: var(--tw-accent);
-    stroke: none;
-    opacity: 0.18;
+  .tw-dl-margin {
+    opacity: 0.75;
   }
 
-  .tw-fc-now {
+  .tw-dl-query {
+    fill: var(--color-on-ink);
+  }
+
+  /* The fit meter. Not `non-scaling-stroke`: it is a bar with a length, and a
+     bar that stays 3px while its scale grows stops reading as one. */
+  .tw-dl-fit-track {
+    stroke: var(--color-ink-rule);
+    stroke-width: 3;
+    opacity: 0.35;
+  }
+
+  .tw-dl-fit-origin {
     stroke: var(--color-on-ink-muted);
     stroke-width: 1;
-    stroke-dasharray: 2 3;
-    opacity: 0.9;
     vector-effect: non-scaling-stroke;
   }
 
-  .tw-fc-horizon line {
-    stroke: var(--color-ink-rule);
-    stroke-width: 1;
-    vector-effect: non-scaling-stroke;
-  }
-
-  /* The interval's width at the horizon, read off as a length. This is the
-     whole statement: move it right and the bracket visibly grows. */
-  .tw-fc-horizon path {
+  .tw-dl-fit {
     fill: none;
     stroke: var(--tw-accent);
-    stroke-width: 1.4;
+    stroke-width: 3;
+  }
+
+  /* --- quantum / Bloch sphere ---------------------------------------------
+     A state, not a diagram of one. `src/lib/visuals/bloch.ts` holds every
+     coordinate; this block holds every colour, because the site's CSP forbids
+     the inline `style` a canvas-based version would have needed to read a
+     token back out of JavaScript.
+
+     THE ONE RULE THAT IS NOT TASTE: `stroke-opacity` and `fill-opacity` must
+     never appear below. Presentation attributes lose to CSS rules, so a single
+     `stroke-opacity` declaration here would silently outrank the crossfade the
+     component writes onto `.tw-bl-vector` and the arrow would stop passing
+     behind the sphere. Only `fill`, `stroke`, `stroke-width`, `stroke-linecap`
+     and dash geometry belong in this block. ------------------------------- */
+
+  /* The graticule: equator, meridian, latitude ring. Hairlines, because the
+     sphere is the frame of reference and not the subject. */
+  .tw-bl-arc,
+  .tw-bl-lat,
+  .tw-bl-axis {
+    fill: none;
+    stroke: var(--color-ink-rule);
+    stroke-width: 0.9;
     vector-effect: non-scaling-stroke;
   }
 
-  .tw-fc-horizon circle {
-    fill: var(--tw-accent);
+  /* The silhouette is listed apart from the graticule for one reason: it
+     declares `pathLength="100"` so the shared `tw-draw` keyframe can trace a
+     circle, and no element may carry that and `non-scaling-stroke` at once.
+     With both, the rim painted 58.6% of its circumference at 1440×900 and the
+     sphere shipped as a broken circle with its top-right quadrant missing. */
+  .tw-bl-limb {
+    fill: none;
+    stroke: var(--color-ink-rule);
+    stroke-width: 0.9;
   }
 
-  /* --- quantum / interference -------------------------------------------- */
+  .tw-bl-axis,
+  .tw-bl-lat {
+    stroke-width: 0.8;
+  }
 
-  .tw-ripple circle {
+  /* Behind the sphere, dashed. Depth read as a line style rather than as a
+     second colour, which is what a drafting convention would do and what keeps
+     the accent reserved for the one thing that is actually the state. */
+  .tw-bl-arc[data-face='back'],
+  .tw-bl-lat[data-face='back'] {
+    stroke-dasharray: 2.2 2.2;
+  }
+
+  .tw-bl-axis[data-face='back'] {
+    stroke-dasharray: 1.6 2.4;
+  }
+
+  /* The glass — a wash the back half is seen *through*.
+
+     Its 10% lives on the element as a `fill-opacity` attribute, NOT as an
+     `opacity` declaration here, and the difference is not cosmetic: the arrival
+     animates `opacity` from 0 to 1 with `both`, which would end by *replacing*
+     a resting `opacity: 0.1` with 1 and leave an opaque grey disc over the
+     whole sphere. It was drawn that way once. Animated opacity may only ever
+     multiply a paint-level opacity, never stand in for one. */
+  .tw-bl-veil {
+    fill: var(--color-ink-rule);
+    stroke: none;
+  }
+
+  /* The state vector. The only accented thing in the frame, in both copies. */
+  .tw-bl-shaft {
     fill: none;
     stroke: var(--tw-accent);
-    stroke-width: 1;
-    opacity: 0.3;
+    stroke-width: 1.75;
+    stroke-linecap: round;
     vector-effect: non-scaling-stroke;
   }
 
-  .tw-emitter {
+  .tw-bl-head {
     fill: var(--tw-accent);
+    stroke: none;
   }
 
-  .tw-dimension line {
-    stroke: var(--color-ink-rule);
-    stroke-width: 1;
-    vector-effect: non-scaling-stroke;
-  }
-
-  .tw-histogram rect {
+  .tw-bl-label {
     fill: var(--color-on-ink-muted);
-    opacity: 0.45;
+    font-family: var(--font-mono);
+    font-size: 9px;
+    letter-spacing: 0.04em;
   }
 
-  .tw-histogram rect[data-peak='true'] {
+  /* The label the state has actually reached. A basis state is a fact about
+     the picture, so it is stated in the picture. */
+  .tw-bl-label[data-hit='true'] {
     fill: var(--tw-accent);
-    opacity: 1;
   }
 
-  /* A wavefront travelling outward, made of nothing but staggered opacity over
-     rings at fixed radii. No transform, no animated geometry, no rAF.
-
-     The delays count *down* with radius (ring 1 is the innermost and starts
-     latest in the cycle), which is what makes the bright front move outward
-     rather than collapse inward. */
-  .tw-stage[data-active='true'] .tw-ripple circle {
-    animation: tw-ripple 3.2s linear infinite;
-  }
-  .tw-stage[data-active='true'] .tw-ripple circle:nth-child(1) {
-    animation-delay: -2.4s;
-  }
-  .tw-stage[data-active='true'] .tw-ripple circle:nth-child(2) {
-    animation-delay: -2s;
-  }
-  .tw-stage[data-active='true'] .tw-ripple circle:nth-child(3) {
-    animation-delay: -1.6s;
-  }
-  .tw-stage[data-active='true'] .tw-ripple circle:nth-child(4) {
-    animation-delay: -1.2s;
-  }
-  .tw-stage[data-active='true'] .tw-ripple circle:nth-child(5) {
-    animation-delay: -0.8s;
-  }
-  .tw-stage[data-active='true'] .tw-ripple circle:nth-child(6) {
-    animation-delay: -0.4s;
-  }
-  .tw-stage[data-active='true'] .tw-ripple circle:nth-child(7) {
-    animation-delay: 0s;
+  .tw-bl-track {
+    fill: var(--color-ink-rule);
+    opacity: 0.22;
   }
 
-  /* The causal link the live review found missing: the rings and the histogram
-     were two pictures stacked in one box. Ring 7 is the outermost, its radius
-     is exactly the emitter-to-screen distance, and it carries delay `0s` — so
-     a crest lands on the detection line at the top of every 3.2s cycle. The
-     constructive bins brighten on that same beat, phased to rise as it
-     arrives. Dark fringes stay dark, which is the other half of the statement. */
-  .tw-stage[data-active='true'] .tw-histogram rect[data-peak='true'] {
-    animation: tw-fringe 3.2s var(--ease-instrument) infinite;
+  .tw-bl-bar {
+    fill: var(--tw-accent);
   }
 
-  /* ai ambient — the origin rolls forward. Each pass re-walks the realised path
-     out from the rule: one observation arriving after another, which is what
-     the faint line through the band is for. It rides on an element the island
-     renders only while the stage is active, so nothing here has a resting
-     state that depends on an animation running. */
-  .tw-stage[data-active='true'] .tw-fc-scan {
-    animation: tw-fc-roll 3.6s var(--ease-instrument) var(--tw-settle) infinite;
-  }
+  /* ai ambient — one pass along the partition the model has settled on.
 
-  .tw-stage[data-active='true'] .tw-fc-resolved {
-    animation: tw-fc-resolve 3.6s var(--ease-instrument) var(--tw-settle) infinite;
+     The delay is negative on purpose: `--tw-settle` is 400ms against a 2.6s
+     cycle, so `calc(var(--tw-settle) - 1.9s)` starts the pass 1.5s in. The
+     world therefore arrives with a sweep already in flight rather than with a
+     curve nothing has touched yet. Expressed against the same settle token
+     every other stage is phased on, rather than as a bare negative constant,
+     so retuning the settle moves this with it.
+
+     It rides on an element the island renders only while the stage is active,
+     so nothing here has a resting state that depends on an animation running
+     (MOTION_SYSTEM §6). */
+  .tw-stage[data-active='true'] .tw-dl-scan {
+    animation: tw-dl-scan 2.6s linear calc(var(--tw-settle) - 1.9s) infinite;
   }
 
   /* --- fpga / routing ---------------------------------------------------- */
@@ -916,12 +1214,28 @@ const SECTION = 'worlds' as const;
     stroke: var(--tw-accent);
   }
 
+  /* A candidate placement that was considered and not taken. Dashed, because
+     that is the drawing convention for a track that is not there — solid at
+     the channels' own weight, which is what this was, made three of the four
+     nets read as more grid rather than as three rejected decisions.
+
+     The dash is written in the `pathLength="100"` space every route declares,
+     so all four candidates dash at the same visual rate whatever their real
+     length. It is overridden — back to a solid stroke — on the selected one
+     below, and then again by `tw-draw`'s finished state, which is the same
+     `100 100` in the same normalised space.
+
+     Which is why there is no `vector-effect` here. That claim held only in
+     source: with `non-scaling-stroke` the normalised dash was resolved in user
+     space and painted in screen space, so the selected route's finished
+     `100 100` covered 58.8% of it at 1440×900 and the accent stopped short of
+     the block it routes to. See THE ONE RULE ABOUT DASHED STROKES above. */
   .tw-route {
     fill: none;
     stroke: var(--color-ink-rule);
     stroke-width: 1.2;
-    opacity: 0.5;
-    vector-effect: non-scaling-stroke;
+    stroke-dasharray: 1.6 2.6;
+    opacity: 0.42;
     transition:
       stroke var(--duration-fast) var(--ease-standard),
       opacity var(--duration-fast) var(--ease-standard);
@@ -930,7 +1244,32 @@ const SECTION = 'worlds' as const;
   .tw-route[data-selected='true'] {
     stroke: var(--tw-accent);
     stroke-width: 1.6;
+    stroke-dasharray: 100 100;
     opacity: 1;
+  }
+
+  /* The timing strip. Muted and always present: the clock is the fabric's
+     ground truth, not an event, and nothing here may depend on an animation to
+     be visible (MOTION_SYSTEM §6). The accent segment that rides it is a
+     separate element the island mounts only while the stage is active. */
+  .tw-clock-wave {
+    fill: none;
+    stroke: var(--color-ink-rule);
+    stroke-width: 1.2;
+    stroke-linejoin: miter;
+    opacity: 0.55;
+    vector-effect: non-scaling-stroke;
+  }
+
+  /* `pathLength="100"`, so no `vector-effect`: the marker is one whole clock
+     period and there is one of it. Under `non-scaling-stroke` its 100-unit
+     pattern tiled 1.7 times along the strip, which put a second lit segment on
+     a clock that has exactly one edge to mark. */
+  .tw-clock-edge {
+    fill: none;
+    stroke: var(--tw-accent);
+    stroke-width: 2;
+    stroke-linejoin: miter;
   }
 
   /* --- electronics / signal path ----------------------------------------- */
@@ -946,12 +1285,17 @@ const SECTION = 'worlds' as const;
      normalised 0–100 space, so it cannot be transitioned — attributes are not
      animatable properties. That is the deliberate trade for a CSP-safe island,
      and an instant response to a pointer is the more instrument-like reading
-     anyway. */
+     anyway.
+
+     And therefore no `vector-effect`: the prefix means "the fraction of the
+     chain the pointer has energised", which is only that fraction while the
+     dash and the path share a space. With `non-scaling-stroke` a fully
+     energised trace was measured painting 57.6% of itself — the pointer could
+     not reach the end of the chain at all. */
   .tw-trace-live {
     fill: none;
     stroke: var(--tw-accent);
     stroke-width: 1.6;
-    vector-effect: non-scaling-stroke;
   }
 
   .tw-vias circle {
@@ -994,6 +1338,45 @@ const SECTION = 'worlds' as const;
     vector-effect: non-scaling-stroke;
   }
 
+  /* The signal strip: what leaves each block, drawn under it.
+
+     Deliberately **not** animated. The trace's pulse and the block glyphs
+     already carry "the signal is passing through"; these five traces are the
+     reference the reader compares against, and a reference that breathes is a
+     reference nobody can read. The Bloch stage's readout is static for the
+     same reason.
+
+     One zero line per segment rather than one rule across the strip: these are
+     five separate measurements, and a shared axis would invite the eye to read
+     them as one waveform crossing the frame — which is exactly the reading the
+     rework exists to end. */
+  .tw-chain-zero {
+    stroke: var(--color-ink-rule);
+    stroke-width: 1;
+    opacity: 0.4;
+    vector-effect: non-scaling-stroke;
+  }
+
+  /* `pathLength="100"` and `tw-draw`, so no `vector-effect`: all five were
+     measured resting at 58.9–59.6% drawn, each with a ~41% gap where the tail
+     of the trace should be. */
+  .tw-chain-signal {
+    fill: none;
+    stroke: var(--color-on-ink-muted);
+    stroke-width: 1.3;
+    stroke-linejoin: round;
+    stroke-linecap: round;
+    opacity: 0.62;
+    transition:
+      stroke var(--duration-fast) var(--ease-standard),
+      opacity var(--duration-fast) var(--ease-standard);
+  }
+
+  .tw-chain-strip g[data-selected='true'] .tw-chain-signal {
+    stroke: var(--tw-accent);
+    opacity: 1;
+  }
+
   /* --- audio / waveform -------------------------------------------------- */
 
   .tw-graticule line {
@@ -1013,33 +1396,84 @@ const SECTION = 'worlds' as const;
 
   /* Declared explicitly so `translateX(-100%)` in the travel keyframe resolves
      against the view box (one frame width) rather than this group's own
-     bounding box, which is two tiles wide. */
+     bounding box, which is two tiles wide.
+
+     Note which element this is. The sweep's horizontal scale is a `transform`
+     *presentation attribute* on `.tw-wave-scale`, the group **outside** this
+     one, rewritten on every scroll tick. Nothing here may declare `transform`
+     on that class: a CSS declaration outranks a presentation attribute, so the
+     rule would win permanently and the sweep would stop — silently, and in
+     production only. Keeping the animated transform on a different element is
+     what makes that structural rather than remembered. */
   .tw-wave-travel {
     transform-box: view-box;
     transform-origin: 0 0;
   }
 
-  .tw-spectrum rect {
+  /* The spectrum is two paths, not twenty-six rects: one for the bars the
+     excitation is not standing on and one for the bar it is. Two `d` writes a
+     frame instead of fifty-two attribute writes, and the accent stays on
+     exactly one object.
+
+     Neither may have `d` declared here, for the precedence reason above. */
+  .tw-spectrum-body {
     fill: var(--color-on-ink-muted);
     opacity: 0.5;
   }
 
-  .tw-spectrum rect[data-peak='true'] {
+  .tw-spectrum-lit {
     fill: var(--tw-accent);
     opacity: 1;
+  }
+
+  /* The excitation cursor: where on the response curve the reader's scroll has
+     currently put the tone. The one element that ties the two halves of the
+     frame together, so it is drawn at the accent and reaches past the bars at
+     both ends. */
+  .tw-cursor {
+    fill: none;
+    stroke: var(--tw-accent);
+    stroke-width: 1.2;
+    stroke-dasharray: 3 3;
+    opacity: 0.85;
+    vector-effect: non-scaling-stroke;
+  }
+
+  .tw-axis-ticks line {
+    stroke: var(--color-ink-rule);
+    stroke-width: 1;
+    opacity: 0.55;
+    vector-effect: non-scaling-stroke;
   }
 
   /* Audio ambient is the travelling wave alone. The per-bar opacity breathe
      that used to sit on top of it was decoration: the spectrum's meaning is
      its *shape*, which the pointer already changes, and blinking the bars said
      nothing the wave was not already saying (REDESIGN_DECISIONS P2, Audio). */
+  /* 3.6s, and starting a third of the way in.
+
+     At 7.5s behind an 800ms settle this was the worst offender on the band: a
+     world's whole dwell could pass before the wave had crossed a fifth of a
+     tile, so the one thing this stage says — that a waveform *travels* — was
+     never actually shown. The negative delay is the same device the FPGA
+     fabric's register blink already uses successfully: the wave is already moving
+     the instant the world arrives, rather than starting from a standstill at
+     keyframe 0 with nothing having happened yet. There is no phase to protect
+     here — the second tile makes the loop seamless from any offset. */
   .tw-stage[data-active='true'] .tw-wave-travel {
-    animation: tw-wave-travel 7.5s linear var(--tw-settle) infinite;
+    animation: tw-wave-travel 3.6s linear infinite;
+    animation-delay: -1.2s;
   }
 
   /* --- Signal pulses -----------------------------------------------------
      Rendered by the island only while a stage is active, so there is no
-     resting element with `opacity: 0` anywhere in this section. --------- */
+     resting element with `opacity: 0` anywhere in this section.
+
+     All three declare `pathLength="100"` and all three are dashed, so none of
+     them may carry `non-scaling-stroke`. Each of their dash patterns sums to
+     exactly 100 because the point of each is that ONE pulse travels the path;
+     that only holds while the pattern and the path are measured in the same
+     space. --------------------------------------------------------------- */
 
   .tw-route-pulse,
   .tw-trace-arrive,
@@ -1047,7 +1481,6 @@ const SECTION = 'worlds' as const;
     fill: none;
     stroke: var(--tw-accent);
     stroke-linecap: round;
-    vector-effect: non-scaling-stroke;
   }
 
   /* FPGA: **one cell advanced per clock tick.** `steps(6)` over a
@@ -1056,10 +1489,15 @@ const SECTION = 'worlds' as const;
      `tests/worlds.test.ts`, since a timing function cannot read a module
      constant. The linear offset this replaced read as *flow*, which is the
      wrong physics: a fabric latches on an edge, it does not trickle. */
+  /* The negative delay is exactly two clock ticks, so the pulse is already two
+     cells along when the world arrives and is still on the same 0.4s edge as
+     `.tw-clock-active` below. A pulse that starts from cell zero every time a
+     world is entered reads as the fabric booting; a fabric is always clocking. */
   .tw-route-pulse {
     stroke-width: 3.6;
     stroke-dasharray: 17 83;
     animation: tw-pulse-travel 2.4s steps(6, end) infinite;
+    animation-delay: -0.8s;
   }
 
   /* The clock those ticks are counted against: 2.4s / 6 = one blink per
@@ -1069,11 +1507,34 @@ const SECTION = 'worlds' as const;
     animation: tw-clock-tick 0.4s steps(2, jump-none) infinite;
   }
 
+  /* And the same advance, drawn on the clock itself. Identical keyframe,
+     period, step count and negative delay as `.tw-route-pulse` above, so the
+     segment on the timing strip and the pulse crossing the fabric move on the
+     same edge — by construction, not by two numbers that happen to agree
+     today. The dash is one period exactly, so the lit segment is one whole
+     clock period and never straddles two.
+
+     `clockPath` gives every period the same arc length, which is the property
+     that makes `steps(6)` land on period boundaries rather than drifting
+     across them; `tests/worlds.test.ts` asserts it. */
+  .tw-stage[data-active='true'] .tw-clock-edge {
+    /* Exactly one sixth on, five sixths off, and the two summing to the whole
+       normalised length. That is not rounding: `stroke-dasharray` tiles the
+       pattern infinitely in both directions, so a sum even slightly under 100
+       leaves a sliver of the *previous* repetition lying on the start of the
+       path at the last step — which renders as a stray two-pixel mark in the
+       bottom-left corner of the frame, on every sixth tick, forever. */
+    stroke-dasharray: 16.6667 83.3333;
+    animation: tw-pulse-travel 2.4s steps(6, end) infinite;
+    animation-delay: -0.8s;
+  }
+
   /* Electronics stays smooth, because that domain genuinely is continuous. */
   .tw-trace-pulse {
     stroke-width: 3;
     stroke-dasharray: 22 78;
-    animation: tw-pulse-travel 3s linear var(--tw-settle) infinite;
+    animation: tw-pulse-travel var(--tw-chain) linear infinite;
+    animation-delay: var(--tw-chain-phase);
   }
 
   .tw-trace-arrive {
@@ -1084,27 +1545,29 @@ const SECTION = 'worlds' as const;
      order, so the signal is visibly passing through the stages rather than the
      trace merely glowing.
 
-     Its period is the pulse's own 3s and its stagger is a fifth of that, so a
-     block brightens as the pulse reaches it. Same idea as the quantum fringe:
-     the response has to be caused by the thing arriving, or the two halves of
-     the picture are just sharing a box. */
+     Its period is the pulse's own `--tw-chain` and its stagger is a fifth of
+     that (0.48s), so a block brightens as the pulse reaches it. Same idea as
+     the quantum fringe: the response has to be caused by the thing arriving, or
+     the two halves of the picture are just sharing a box. Both are offset by
+     `--tw-chain-phase`, which is what keeps them in step now that the pulse
+     starts mid-flight rather than after a settle. */
   .tw-stage[data-active='true'] .tw-blocks g[data-energised='true'] .tw-block-glyph {
-    animation: tw-block-step 3s var(--ease-instrument) infinite;
+    animation: tw-block-step var(--tw-chain) var(--ease-instrument) infinite;
   }
   .tw-stage[data-active='true'] .tw-blocks g:nth-child(1) .tw-block-glyph {
-    animation-delay: calc(var(--tw-settle) + 0.15s);
+    animation-delay: calc(var(--tw-chain-phase) + 0.12s);
   }
   .tw-stage[data-active='true'] .tw-blocks g:nth-child(2) .tw-block-glyph {
-    animation-delay: calc(var(--tw-settle) + 0.75s);
+    animation-delay: calc(var(--tw-chain-phase) + 0.6s);
   }
   .tw-stage[data-active='true'] .tw-blocks g:nth-child(3) .tw-block-glyph {
-    animation-delay: calc(var(--tw-settle) + 1.35s);
+    animation-delay: calc(var(--tw-chain-phase) + 1.08s);
   }
   .tw-stage[data-active='true'] .tw-blocks g:nth-child(4) .tw-block-glyph {
-    animation-delay: calc(var(--tw-settle) + 1.95s);
+    animation-delay: calc(var(--tw-chain-phase) + 1.56s);
   }
   .tw-stage[data-active='true'] .tw-blocks g:nth-child(5) .tw-block-glyph {
-    animation-delay: calc(var(--tw-settle) + 2.55s);
+    animation-delay: calc(var(--tw-chain-phase) + 2.04s);
   }
 
   /* ===========================================================================
@@ -1132,28 +1595,14 @@ const SECTION = 'worlds' as const;
     }
   }
 
-  /* ai: the interval opens rightward out of the `now` rule. The `to` stop is
-     an outset inset — a clip larger than the box — so the finished state clips
-     nothing at all and no stroke is shaved at the edges. */
-  @keyframes tw-fan-open {
+  /* quantum: one element of the instrument coming up. Opacity only — the Bloch
+     stage's geometry belongs to the scroll from frame zero, and a keyframe that
+     also wrote a coordinate would be a second author of the same attribute. */
+  @keyframes tw-bl-in {
     from {
-      clip-path: inset(-30% 100% -30% -2%);
-      opacity: 0.2;
+      opacity: 0;
     }
     to {
-      clip-path: inset(-30% -30% -30% -2%);
-      opacity: 1;
-    }
-  }
-
-  /* quantum: one wavefront expansion from each emitter. */
-  @keyframes tw-expand {
-    from {
-      transform: scale(0.05);
-      opacity: 0.25;
-    }
-    to {
-      transform: scale(1);
       opacity: 1;
     }
   }
@@ -1192,6 +1641,24 @@ const SECTION = 'worlds' as const;
     }
   }
 
+  /* audio: the sweep wipes in from the left.
+
+     Lengths, not percentages: the group this runs on has no transform, so a
+     `px` here is one root user unit and `320px` is exactly the frame. A
+     percentage would resolve against the group's own fill box, which is two
+     scaled waveform tiles and roughly six times too wide — the wipe would
+     spend most of its run outside the frame. The `to` stop is an *outset*
+     inset, so the finished state clips nothing and no stroke is shaved at the
+     edges. With `animation: none` there is no clip at all. */
+  @keyframes tw-sweep-in {
+    from {
+      clip-path: inset(-20px 320px -20px 0);
+    }
+    to {
+      clip-path: inset(-20px -20px -20px 0);
+    }
+  }
+
   /* audio: the spectrum rises off the baseline to meet the swept-in wave. */
   @keyframes tw-rise {
     from {
@@ -1204,69 +1671,39 @@ const SECTION = 'worlds' as const;
 
   /* ── Ambient ─────────────────────────────────────────────────────────── */
 
-  @keyframes tw-ripple {
+  /* ai: a pass travelling the length of the decision boundary. Written in the
+     normalised `pathLength="100"` space, so one set of offsets serves a
+     partition whose real length changes on every scroll tick. */
+  @keyframes tw-dl-scan {
     from {
-      opacity: 0.72;
+      stroke-dashoffset: 11;
     }
     to {
-      opacity: 0.06;
+      stroke-dashoffset: -100;
     }
   }
 
-  /* A constructive fringe answering the crest that just landed on it: a fast
-     rise as the front arrives, a slow decay while the next one crosses. Same
-     3.2s period as `tw-ripple`, and in phase with the outermost ring. */
-  @keyframes tw-fringe {
-    0% {
-      opacity: 1;
-    }
-    58% {
-      opacity: 0.32;
-    }
-    90% {
-      opacity: 0.36;
-    }
-    100% {
-      opacity: 1;
+  /* ai: the confidence corridor settling either side of the resolved boundary.
+
+     Deliberately a `from` with no `to`. The implicit 100% keyframe is the
+     element's own underlying value, so each contour lands on the opacity its
+     own rule gives it — 0.3 for the inner level, 0.16 for the outer — without
+     this keyframe having to restate either number, or having to exist twice. */
+  @keyframes tw-dl-settle {
+    from {
+      opacity: 0;
+      stroke-width: 3;
     }
   }
 
-  /* ai: the forecast origin rolling forward over the realised path. */
-  @keyframes tw-fc-roll {
-    0% {
-      stroke-dasharray: 0 100;
-      opacity: 0;
+  /* ai: a flag closing onto the point it marks. Transform only: the flags'
+     opacity is a per-frame presentation attribute and must stay writable. */
+  @keyframes tw-dl-acquire {
+    from {
+      transform: scale(2.4);
     }
-    12% {
-      opacity: 0.9;
-    }
-    68% {
-      stroke-dasharray: 100 100;
-      opacity: 0.9;
-    }
-    100% {
-      stroke-dasharray: 100 100;
-      opacity: 0;
-    }
-  }
-
-  /* ai: the interval behind that origin, resolved. Same period as the roll,
-     because they are two readings of one event. */
-  @keyframes tw-fc-resolve {
-    0% {
-      clip-path: inset(-30% 100% -30% 0%);
-      opacity: 0;
-    }
-    12% {
-      opacity: 0.26;
-    }
-    68% {
-      clip-path: inset(-30% -30% -30% 0%);
-      opacity: 0.26;
-    }
-    100% {
-      clip-path: inset(-30% -30% -30% 0%);
-      opacity: 0;
+    to {
+      transform: scale(1);
     }
   }
 

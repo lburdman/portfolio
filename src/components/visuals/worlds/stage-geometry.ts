@@ -43,119 +43,6 @@ export function createRandom(seed: number): () => number {
   };
 }
 
-/* ===========================================================================
-   FORECAST GEOMETRY — the AI / ML stage
-
-   The stage this replaced drew projected points joined to their nearest
-   neighbours. The objection that retired it was not the cliché: *adjacency is
-   a property of any point set, so nothing had been learned and nothing was
-   being shown.* What is drawn now is a forecast and its calibrated prediction
-   interval — the one relationship an ML picture can state without a caption
-   and without lying: **uncertainty grows with horizon.**
-   ======================================================================== */
-
-/**
- * The realised series the AI stage draws, as a deterministic function of
- * normalised time.
- *
- * Three sinusoids over a slow carrier. Not noise, and not a single sine: a
- * forecastable series has to carry structure a model could plausibly have
- * learned, or a band drawn over it means nothing. Amplitude stays inside
- * roughly `±0.8` so the caller maps it with one constant.
- */
-export function forecastSignal(t: number): number {
-  const x = Number.isFinite(t) ? t : 0;
-  const tau = Math.PI * 2;
-  return (
-    0.3 * Math.sin(tau * 2.15 * x + 1.05) +
-    0.16 * Math.sin(tau * 4.6 * x + 2.7) +
-    0.07 * Math.sin(tau * 8.3 * x + 0.4) -
-    0.22 * Math.cos(tau * 0.85 * x)
-  );
-}
-
-/**
- * Half-width of a prediction interval at a given forecast horizon:
- * `base + span · horizon^exponent`.
- *
- * With `exponent < 1` the interval is already non-zero at the origin and
- * widens *concavely*. That is what a calibrated interval actually looks like —
- * residuals are not zero one step ahead, and their spread grows sublinearly
- * rather than fanning out as a straight cone.
- *
- * It says nothing about how the interval was obtained, and that is deliberate.
- * `energy-demand-forecast` calibrates by **split conformal prediction**, not by
- * fitting one model per quantile (quantile regression is Future Work in that
- * repository, and the case study was corrected for claiming otherwise). A
- * single band that widens with horizon is true of either method; a *family* of
- * per-quantile curves would assert the one that is false.
- */
-export function bandHalfWidth(horizon: number, base: number, span: number, exponent: number): number {
-  const h = Number.isFinite(horizon) ? Math.min(1, Math.max(0, horizon)) : 0;
-  const power = Number.isFinite(exponent) && exponent > 0 ? exponent : 1;
-  return base + span * Math.pow(h, power);
-}
-
-/** A sampled series as an SVG polyline. */
-export function polylinePath(points: readonly Point[]): string {
-  return points
-    .map((point, index) => `${index === 0 ? 'M' : 'L'}${point.x.toFixed(2)} ${point.y.toFixed(2)}`)
-    .join(' ');
-}
-
-/**
- * A closed ribbon between an upper and a lower edge — the filled area of a
- * prediction interval. Out along the top, back along the bottom, closed.
- */
-export function ribbonPath(upper: readonly Point[], lower: readonly Point[]): string {
-  if (upper.length === 0 || lower.length === 0) return '';
-  const back = lower
-    .slice()
-    .reverse()
-    .map((point) => `L${point.x.toFixed(2)} ${point.y.toFixed(2)}`);
-  return `${polylinePath(upper)} ${back.join(' ')} Z`;
-}
-
-/**
- * Linear interpolation into a fixed sample table, `t` in `0 → 1`.
- *
- * Lets a short table of residuals stand in for a continuous noise process. The
- * table is generated once from {@link createRandom}, so the realised series is
- * byte-identical on the server and after hydration.
- */
-export function interpolateAt(values: readonly number[], t: number): number {
-  if (values.length === 0) return 0;
-  const first = values[0] ?? 0;
-  if (values.length === 1) return first;
-  const clamped = Number.isFinite(t) ? Math.min(1, Math.max(0, t)) : 0;
-  const position = clamped * (values.length - 1);
-  const index = Math.min(values.length - 2, Math.floor(position));
-  const a = values[index] ?? 0;
-  const b = values[index + 1] ?? 0;
-  return a + (b - a) * (position - index);
-}
-
-/**
- * Two-source interference intensity across a detection screen, normalised to
- * `0 → 1`.
- *
- * `I = cos²(π · d · u / λ)` for a screen coordinate `u ∈ [-1, 1]`. The centre
- * sample is always fully constructive; widening `separation` packs more fringes
- * into the same screen, which is the whole point being demonstrated.
- */
-export function interferenceProfile(samples: number, separation: number, wavelength: number): number[] {
-  const count = Math.max(1, Math.trunc(samples));
-  const lambda = Math.max(Math.abs(wavelength), 1e-6);
-  const out: number[] = [];
-
-  for (let i = 0; i < count; i += 1) {
-    const u = count === 1 ? 0 : (i / (count - 1)) * 2 - 1;
-    out.push(Math.cos((Math.PI * separation * u) / lambda) ** 2);
-  }
-
-  return out;
-}
-
 /**
  * A sampled sine, as an SVG path.
  *
@@ -190,26 +77,43 @@ export function wavePath(
   return parts.join(' ');
 }
 
+/* `spectrumBars` used to live here: a resonance envelope sampled into an array
+   of normalised heights, for the audio stage's spectrum. It is now
+   `response()` in `src/lib/worlds/resonance.ts`, written as a *continuous*
+   function of frequency rather than as a sampled array, because that stage now
+   needs the same number in three places at once — every bar's height, the
+   waveform's amplitude and the numeric readout. Three samplings of a shape
+   that were tuned to agree would be three things to keep in step; one function
+   evaluated three times cannot disagree with itself. The tests moved with it,
+   to `tests/resonance.test.ts`. */
+
 /**
- * A resonance envelope: one peak at `peak` with skirts, sampled into `bars`
- * normalised heights. Used as the audio stage's spectrum.
+ * A square-wave clock, as an SVG path: `periods` cycles across `width`,
+ * starting **on a rising edge** at `x` and ending low.
+ *
+ * Every period contributes exactly the same arc length — two vertical edges of
+ * `height` plus two horizontal runs of `width / periods / 2` — which is what
+ * lets a `pathLength="100"` dash walk it in `steps(periods)` and land on one
+ * whole clock period per step. The FPGA stage depends on that: the marker
+ * riding this wave and the pulse crossing the fabric advance together, so the
+ * two are visibly one event rather than two things sharing a frame.
  */
-export function spectrumBars(bars: number, peak: number, sharpness: number): number[] {
-  const count = Math.max(1, Math.trunc(bars));
-  const out: number[] = [];
+export function clockPath(x: number, y: number, width: number, height: number, periods: number): string {
+  const count = Math.max(1, Math.trunc(periods));
+  const step = width / count;
+  const half = step / 2;
+  const low = y + height;
+  const parts = [`M${x.toFixed(2)} ${low.toFixed(2)}`];
 
   for (let i = 0; i < count; i += 1) {
-    const t = count === 1 ? 0 : i / (count - 1);
-    const delta = (t - peak) * sharpness;
-    const fundamental = 1 / (1 + delta * delta);
-    // A second, quieter formant an octave up keeps it reading as sound rather
-    // than as a single bell curve.
-    const overtoneDelta = (t - Math.min(peak * 2 + 0.08, 1)) * sharpness * 1.6;
-    const overtone = 0.42 / (1 + overtoneDelta * overtoneDelta);
-    out.push(Math.min(1, fundamental + overtone));
+    const rise = x + i * step;
+    parts.push(`L${rise.toFixed(2)} ${y.toFixed(2)}`);
+    parts.push(`L${(rise + half).toFixed(2)} ${y.toFixed(2)}`);
+    parts.push(`L${(rise + half).toFixed(2)} ${low.toFixed(2)}`);
+    parts.push(`L${(rise + step).toFixed(2)} ${low.toFixed(2)}`);
   }
 
-  return out;
+  return parts.join(' ');
 }
 
 /** Centre of a cell in a uniform `columns × rows` lattice inside `bounds`. */
