@@ -157,7 +157,7 @@ const RESTING_PATHS = {
   margin: marginPath(RESTING_QUERY.x, RESTING_QUERY.y, RESTING_LANDSCAPE.boundary),
 } as const;
 
-export function ForecastStage({ domain, active }: StageProps) {
+export function LandscapeStage({ domain, active }: StageProps) {
   const rootRef = useRef<HTMLDivElement | null>(null);
   const boundaryRef = useRef<SVGPathElement | null>(null);
   const scanRef = useRef<SVGPathElement | null>(null);

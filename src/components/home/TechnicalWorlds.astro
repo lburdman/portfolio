@@ -611,7 +611,7 @@ const SECTION = 'worlds' as const;
      One grammar, five verbs — same flag, same tokens, a different primitive per
      domain, because the primitive is the thing each domain is *about*:
 
-       ai           the forecast fan opens from the `now` rule
+       ai           the decision boundary draws itself out of nothing
        quantum      the sphere draws itself, then the state vector arrives
        fpga         the selected route draws, its cells latching as it resolves
        electronics  the trace energises left to right through the chain
@@ -843,7 +843,7 @@ const SECTION = 'worlds' as const;
      Nothing here declares `opacity` on `.tw-dl-flag`, or `d` on any driven
      path. Those are written per frame as presentation attributes, and a CSS
      declaration outranks a presentation attribute — the writes would silently
-     do nothing. See the header of `stages/ForecastStage.tsx`. ----------- */
+     do nothing. See the header of `stages/LandscapeStage.tsx`. ----------- */
 
   .tw-dl-grid line,
   .tw-dl-ticks line {
@@ -1332,20 +1332,6 @@ const SECTION = 'worlds' as const;
     to {
       stroke-dasharray: 100 100;
       stroke-dashoffset: 0;
-    }
-  }
-
-  /* ai: the interval opens rightward out of the `now` rule. The `to` stop is
-     an outset inset — a clip larger than the box — so the finished state clips
-     nothing at all and no stroke is shaved at the edges. */
-  @keyframes tw-fan-open {
-    from {
-      clip-path: inset(-30% 100% -30% -2%);
-      opacity: 0.2;
-    }
-    to {
-      clip-path: inset(-30% -30% -30% -2%);
-      opacity: 1;
     }
   }
 

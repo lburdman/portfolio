@@ -649,7 +649,7 @@ describe('the traverse sequence', () => {
     vi.doMock('../src/config/domains', () => ({
       DOMAIN_IDS: ['alpha', 'beta', 'gamma'],
       DOMAINS: [
-        { id: 'alpha', layerIndex: 0, accentVar: '--color-domain-alpha', stage: 'forecast' },
+        { id: 'alpha', layerIndex: 0, accentVar: '--color-domain-alpha', stage: 'landscape' },
         { id: 'beta', layerIndex: 1, accentVar: '--color-domain-beta', stage: 'waveform' },
         { id: 'gamma', layerIndex: 2, accentVar: '--color-domain-gamma', stage: 'routing' },
       ],
