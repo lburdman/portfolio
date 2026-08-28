@@ -105,15 +105,48 @@ Practical rule: for anything animated by CSS **and** written by script, keep the
 two on different properties — one on the element as an attribute, one in the
 rule — and add a guard test.
 
-**2. A dashed stroke under a scaled group, carrying `vector-effect:
-non-scaling-stroke`, is not solid at its finished state.** Under both, the dash
-pattern and `pathLength`'s normalisation are measured in _different_ spaces, so
-`tw-draw`'s finished `stroke-dasharray: 100 100` leaves the path partly
-unpainted. The audio waveform shipped this way, with a third to a half of the
-wave missing at rest.
+**2. `pathLength` and `vector-effect: non-scaling-stroke` must never meet on one
+element.** `pathLength="100"` normalises the path's length in _user_ space, so a
+dash value of `100` resolves to `userLength / 100` user units. `non-scaling-stroke`
+moves the whole stroke — width, dash array and dash offset — into _screen_ space,
+where the same path is `scale × userLength` long. Under both, the dash is
+authored against one length and painted against another, and the two disagree by
+exactly the viewport scale. `tw-draw`'s finished `stroke-dasharray: 100 100` —
+the definition of "solid" everywhere this band draws a line — then paints
+`1 / scale` of its path.
 
-Isolated: `vector-effect: none` renders solid, `stroke-dasharray: none` renders
-solid, both together do not.
+An earlier pass diagnosed this as a property of the audio stage's _element_
+transform and fixed only that. It is not: the stage SVGs are
+`viewBox="0 0 320 200"` rendered at `min(100%, 34rem)`, so the plain viewport
+scale — no group transform anywhere near it — is enough. Measured on the
+production build, 800 samples per path, browser hit-testing:
+
+| viewport | stage width | scale | painted |
+| -------- | ----------- | ----- | ------- |
+| 1440×900 | 544px       | 1.700 | 58.6 %  |
+| 1280×800 | 507px       | 1.584 | 63.2 %  |
+| 1040×800 | 300px       | 0.939 | 100.0 % |
+
+Six elements shipped this way. The Bloch rim was a broken circle, the FPGA route
+stopped short of the block it routes to, all five chain traces were cut off, and
+both travelling pulses appeared twice because their 100-unit pattern tiled 1.7
+times along the path. The last row of that table is why this is a rule and not a
+number: below `scale = 1` the defect is invisible, so a fixture at one window
+size proves nothing about any other.
+
+**Which one to drop.** Keep `pathLength` and let the stroke scale wherever the
+element's _length_ carries meaning — an accent line, a signal, a pulse, anything
+drawn with `tw-draw` or `tw-energise`. That is exact rather than tuned: with both
+quantities in user space, `100 100` over `pathLength="100"` is the whole path by
+definition at every scale, and `17 83` is one sixth of a six-cell route rather
+than 1.7 tilings of a pattern meant to appear once. The ground — grid, rules,
+ticks, cell and block outlines, the frame — keeps its constant pen.
+
+Keep `non-scaling-stroke` only where the element is genuinely under an
+anisotropic transform, and then never dash it. `.tw-wave` is the one such path:
+the excitation scales it horizontally between 1× and 2.6×, so without the effect
+the hairline goes elliptical. It declares no `pathLength`, is never dashed, and
+arrives on a clip wipe instead.
 
 **The related, simpler defect in the same family:** every user of a
 `pathLength`-normalised dash keyframe must itself declare `pathLength`. The FPGA
@@ -121,9 +154,11 @@ route did not. Its real length was 290 units, so the shared keyframe's finished
 `100 100` rendered 100 on / 100 off / 90 on — a third of the net invisible, and
 its two ends reading as unconnected. It had shipped that way.
 
-Before adding any `stroke-dasharray` animation, check all three: does the element
-declare `pathLength`? Is it under a scaled group? Does it carry
-`non-scaling-stroke`?
+`tests/stroke-space.test.ts` enforces the rule structurally: it reads the built
+stylesheet, resolves every `non-scaling-stroke` selector against the rendered
+markup of all five stages in both `active` states, and fails if any element
+carrying `pathLength` is reached by one. Its selector matcher throws rather than
+returning "no match" for a selector it cannot parse.
 
 ---
 

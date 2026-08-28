@@ -576,6 +576,58 @@ const SECTION = 'worlds' as const;
     overflow: visible;
   }
 
+  /* ===========================================================================
+     THE ONE RULE ABOUT DASHED STROKES
+     `pathLength` and `vector-effect: non-scaling-stroke` are MUTUALLY
+     EXCLUSIVE. Never put both on one element.
+
+     `pathLength="100"` rescales the path's length in USER space: a dash value
+     of `100` means "one hundred hundredths of this path", which the UA resolves
+     to `userLength / 100` user units per dash unit. `non-scaling-stroke` moves
+     the whole stroke — width, dash and offset — into SCREEN space, where the
+     path is `scale × userLength` long. Under both, the dash is authored against
+     one length and painted against another, and the two disagree by exactly the
+     viewport scale. A finished `stroke-dasharray: 100 100`, which is the
+     definition of "solid" everywhere this file uses `tw-draw`, then paints
+     `1 / scale` of its path.
+
+     That is not a rounding error and it is not fixable by choosing a bigger
+     number, because the scale is a continuous function of the window: the stage
+     SVG is `viewBox="0 0 320 200"` rendered at `min(100%, 34rem)`, so it is
+     drawn at anything from about 0.9× to 1.70×. Measured on the production
+     build before this rule existed — 800 samples per path, browser hit-testing,
+     shipped frame against the same frame with `stroke-dasharray` removed:
+
+       viewport   stage width   scale    painted
+       1440×900       544px     1.700     58.6 %   ← the Bloch rim was a broken circle
+       1280×800       507px     1.584     63.2 %   ← the FPGA route stopped short
+       1040×800       300px     0.939    100.0 %   ← correct only by accident
+
+     Dropping `pathLength` instead does not help: without it the dash is authored
+     in screen pixels against a screen length nothing in CSS can know. Dropping
+     `non-scaling-stroke` does, and it is exact rather than tuned — dash and path
+     are then both in user space, so `100 100` over `pathLength="100"` is the
+     whole path *by definition*, at every scale, and `17 83` is one sixth of a
+     six-cell route rather than 1.7 tilings of a pattern that was meant to appear
+     once.
+
+     What it costs, stated plainly: those strokes now scale with the drawing
+     instead of holding a fixed pixel weight. The split that falls out of it is
+     the right one anyway — the GROUND (grid, rules, ticks, cell and block
+     outlines, the frame) keeps its constant pen, and the SUBJECT (the accent
+     lines, the signals, the pulses, everything whose *length* is the meaning)
+     is drawn in the plate's own units, the same units its geometry and its
+     annotations are already in.
+
+     `.tw-wave` is the one path that must keep `non-scaling-stroke` and it is
+     also the one that declares no `pathLength`: it lives under a group the
+     scroll scales anisotropically, so the pen would go elliptical without it.
+     It is never dashed, and its arrival is a clip wipe. See its own note below.
+
+     `tests/worlds.test.ts` fails if any element in the built markup ever
+     carries both again.
+     ======================================================================== */
+
   /* Shared drawing vocabulary. */
   .tw-stage__svg .tw-rule {
     fill: none;
@@ -852,25 +904,21 @@ const SECTION = 'worlds' as const;
      dash draw every other line on this band arrives with. That is a repair,
      not a preference.
 
-     `.tw-wave` is the only stroked path in this section that lives under a
-     *scaled* group: the excitation frequency is a horizontal scale between 1
-     and 2.6 written onto `.tw-wave-scale` every scroll tick. It also carries
-     `vector-effect: non-scaling-stroke`, without which that scale would flatten
-     the hairline into an uneven pen. Under those two together the dash pattern
-     is measured in the *unscaled stroke* space while `pathLength="100"`
-     normalises the path in *user* space, and the two spaces do not agree — so
-     `tw-draw`'s finished `stroke-dasharray: 100 100`, which is a solid stroke
-     everywhere else on the band, left this trace with a third to a half of it
-     simply missing. That is what it shipped as: a browser check of the
-     production build found the waveform starting a third of the way across the
-     frame, at rest, with the arrival long finished. Dropping the
-     `vector-effect` fixes the dash and ruins the stroke; dropping the dash
-     fixes both.
+     `.tw-wave` is the one path on this band that genuinely cannot give up
+     `vector-effect: non-scaling-stroke`. It lives under a group the scroll
+     scales *anisotropically* — the excitation frequency is a horizontal scale
+     between 1 and 2.6 written onto `.tw-wave-scale` every tick — and without
+     the effect that scale flattens the hairline into an elliptical pen.
 
-     So the wave is never dashed and declares no `pathLength`, and the arrival
-     clips instead. The `320px` is `STAGE_WIDTH` — the wipe has to travel the
-     frame, and a keyframe cannot read a module constant. `tests/worlds.test.ts`
-     asserts the two agree, exactly as it does for the FPGA's `steps(6)`. */
+     Every other dashed path resolved the conflict the other way, by dropping
+     the `vector-effect` and keeping `pathLength` (see THE ONE RULE ABOUT DASHED
+     STROKES above). This one cannot, so it drops the dash instead: it declares
+     no `pathLength`, is never dashed, and arrives on a clip wipe. Either way
+     the invariant is the same one — never both.
+
+     The `320px` is `STAGE_WIDTH` — the wipe has to travel the frame, and a
+     keyframe cannot read a module constant. `tests/worlds.test.ts` asserts the
+     two agree, exactly as it does for the FPGA's `steps(6)`. */
   .tw-stage[data-active='true'] .tw-wave-reveal {
     animation: tw-sweep-in var(--tw-arrive) var(--ease-instrument) both;
   }
@@ -958,19 +1006,26 @@ const SECTION = 'worlds' as const;
     transform-origin: center;
   }
 
-  /* The one accent object in the frame. */
+  /* The one accent object in the frame.
+
+     No `vector-effect`: it declares `pathLength="100"` and arrives on `tw-draw`.
+     See THE ONE RULE ABOUT DASHED STROKES above. */
   .tw-dl-boundary {
     fill: none;
     stroke: var(--tw-accent);
     stroke-width: 1.8;
     stroke-linecap: round;
     stroke-linejoin: round;
-    vector-effect: non-scaling-stroke;
   }
 
   /* The ambient pass. Its dash geometry is declared here rather than only in
      the keyframe, so with `animation: none` it resolves to one short highlight
-     on the partition instead of a solid white stroke laid over the accent. */
+     on the partition instead of a solid white stroke laid over the accent.
+
+     `11 100` is eleven hundredths of the partition, and it is one highlight —
+     both of which are only true in the `pathLength="100"` user space this now
+     stays in. Under `non-scaling-stroke` the 111-unit pattern tiled 1.7 times
+     along the path and the single pass was measured arriving as three. */
   .tw-dl-scan {
     fill: none;
     stroke: var(--color-on-ink);
@@ -978,7 +1033,6 @@ const SECTION = 'worlds' as const;
     stroke-linecap: round;
     stroke-dasharray: 11 100;
     opacity: 0.62;
-    vector-effect: non-scaling-stroke;
   }
 
   .tw-dl-margin,
@@ -1034,12 +1088,22 @@ const SECTION = 'worlds' as const;
      sphere is the frame of reference and not the subject. */
   .tw-bl-arc,
   .tw-bl-lat,
-  .tw-bl-axis,
-  .tw-bl-limb {
+  .tw-bl-axis {
     fill: none;
     stroke: var(--color-ink-rule);
     stroke-width: 0.9;
     vector-effect: non-scaling-stroke;
+  }
+
+  /* The silhouette is listed apart from the graticule for one reason: it
+     declares `pathLength="100"` so the shared `tw-draw` keyframe can trace a
+     circle, and no element may carry that and `non-scaling-stroke` at once.
+     With both, the rim painted 58.6% of its circumference at 1440×900 and the
+     sphere shipped as a broken circle with its top-right quadrant missing. */
+  .tw-bl-limb {
+    fill: none;
+    stroke: var(--color-ink-rule);
+    stroke-width: 0.9;
   }
 
   .tw-bl-axis,
@@ -1159,14 +1223,19 @@ const SECTION = 'worlds' as const;
      so all four candidates dash at the same visual rate whatever their real
      length. It is overridden — back to a solid stroke — on the selected one
      below, and then again by `tw-draw`'s finished state, which is the same
-     `100 100` in the same normalised space. */
+     `100 100` in the same normalised space.
+
+     Which is why there is no `vector-effect` here. That claim held only in
+     source: with `non-scaling-stroke` the normalised dash was resolved in user
+     space and painted in screen space, so the selected route's finished
+     `100 100` covered 58.8% of it at 1440×900 and the accent stopped short of
+     the block it routes to. See THE ONE RULE ABOUT DASHED STROKES above. */
   .tw-route {
     fill: none;
     stroke: var(--color-ink-rule);
     stroke-width: 1.2;
     stroke-dasharray: 1.6 2.6;
     opacity: 0.42;
-    vector-effect: non-scaling-stroke;
     transition:
       stroke var(--duration-fast) var(--ease-standard),
       opacity var(--duration-fast) var(--ease-standard);
@@ -1192,12 +1261,15 @@ const SECTION = 'worlds' as const;
     vector-effect: non-scaling-stroke;
   }
 
+  /* `pathLength="100"`, so no `vector-effect`: the marker is one whole clock
+     period and there is one of it. Under `non-scaling-stroke` its 100-unit
+     pattern tiled 1.7 times along the strip, which put a second lit segment on
+     a clock that has exactly one edge to mark. */
   .tw-clock-edge {
     fill: none;
     stroke: var(--tw-accent);
     stroke-width: 2;
     stroke-linejoin: miter;
-    vector-effect: non-scaling-stroke;
   }
 
   /* --- electronics / signal path ----------------------------------------- */
@@ -1213,12 +1285,17 @@ const SECTION = 'worlds' as const;
      normalised 0–100 space, so it cannot be transitioned — attributes are not
      animatable properties. That is the deliberate trade for a CSP-safe island,
      and an instant response to a pointer is the more instrument-like reading
-     anyway. */
+     anyway.
+
+     And therefore no `vector-effect`: the prefix means "the fraction of the
+     chain the pointer has energised", which is only that fraction while the
+     dash and the path share a space. With `non-scaling-stroke` a fully
+     energised trace was measured painting 57.6% of itself — the pointer could
+     not reach the end of the chain at all. */
   .tw-trace-live {
     fill: none;
     stroke: var(--tw-accent);
     stroke-width: 1.6;
-    vector-effect: non-scaling-stroke;
   }
 
   .tw-vias circle {
@@ -1280,6 +1357,9 @@ const SECTION = 'worlds' as const;
     vector-effect: non-scaling-stroke;
   }
 
+  /* `pathLength="100"` and `tw-draw`, so no `vector-effect`: all five were
+     measured resting at 58.9–59.6% drawn, each with a ~41% gap where the tail
+     of the trace should be. */
   .tw-chain-signal {
     fill: none;
     stroke: var(--color-on-ink-muted);
@@ -1287,7 +1367,6 @@ const SECTION = 'worlds' as const;
     stroke-linejoin: round;
     stroke-linecap: round;
     opacity: 0.62;
-    vector-effect: non-scaling-stroke;
     transition:
       stroke var(--duration-fast) var(--ease-standard),
       opacity var(--duration-fast) var(--ease-standard);
@@ -1388,7 +1467,13 @@ const SECTION = 'worlds' as const;
 
   /* --- Signal pulses -----------------------------------------------------
      Rendered by the island only while a stage is active, so there is no
-     resting element with `opacity: 0` anywhere in this section. --------- */
+     resting element with `opacity: 0` anywhere in this section.
+
+     All three declare `pathLength="100"` and all three are dashed, so none of
+     them may carry `non-scaling-stroke`. Each of their dash patterns sums to
+     exactly 100 because the point of each is that ONE pulse travels the path;
+     that only holds while the pattern and the path are measured in the same
+     space. --------------------------------------------------------------- */
 
   .tw-route-pulse,
   .tw-trace-arrive,
@@ -1396,7 +1481,6 @@ const SECTION = 'worlds' as const;
     fill: none;
     stroke: var(--tw-accent);
     stroke-linecap: round;
-    vector-effect: non-scaling-stroke;
   }
 
   /* FPGA: **one cell advanced per clock tick.** `steps(6)` over a
