@@ -659,21 +659,27 @@ const SECTION = 'worlds' as const;
     transition: opacity var(--duration-fast) var(--ease-exit);
   }
 
-  /* ai — the fan opens from the `now` rule.
+  /* ai — the partition resolves.
 
-     A widening clip rather than a `scaleX`, and not for taste: scaling a ribbon
-     whose height varies along its length compresses those variations into
-     vertical spikes at the origin, which is a picture of nothing. A clip
-     reveals the geometry as it really is. It also means CSS never needs the
-     rule's x coordinate: `inset()` percentages resolve against the element's
-     own bounding box, whose left edge IS the rule, so `FORECAST_NOW_X` stays a
-     single definition in `stages/ForecastStage.tsx` with no copy to drift. */
-  .tw-stage[data-active='true'] .tw-fc-history {
+     `tw-draw` over a `pathLength="100"` boundary, so the three subpaths draw
+     out of nothing in sequence: the model deciding where the classes divide.
+     The confidence corridor settles in behind it, and the misclassification
+     flags come up last — a flag means nothing until there is a boundary for
+     its point to be on the wrong side of.
+
+     The flags' arrival is a `transform`, never an opacity. Their opacity is a
+     presentation attribute written on every scroll tick, and a CSS animation
+     over it would win permanently and freeze all nine. */
+  .tw-stage[data-active='true'] .tw-dl-boundary {
     animation: tw-draw var(--tw-arrive) var(--ease-instrument) both;
   }
 
-  .tw-stage[data-active='true'] .tw-fc-open {
-    animation: tw-fan-open var(--tw-arrive) var(--ease-entrance) var(--tw-arrive-lag) both;
+  .tw-stage[data-active='true'] .tw-dl-contour {
+    animation: tw-dl-settle 520ms var(--ease-entrance) 180ms both;
+  }
+
+  .tw-stage[data-active='true'] .tw-dl-flag {
+    animation: tw-dl-acquire 300ms var(--ease-instrument) 440ms both;
   }
 
   /* quantum — the instrument assembles, outside in, and the state arrives last.
@@ -823,44 +829,87 @@ const SECTION = 'worlds' as const;
     animation: tw-rise var(--tw-arrive) var(--ease-entrance) var(--tw-arrive-lag) both;
   }
 
-  /* --- ai / forecast -----------------------------------------------------
-     A series, a `now` rule, and a calibrated prediction interval opening
-     rightward. One band plus one nested inner band, both derived from a single
-     widening half-width — never a family of separately-shaped quantile curves,
-     because the work this draws calibrates by split conformal prediction and
-     the picture must not assert a method the repository does not use. See the
-     header of `stages/ForecastStage.tsx`. ------------------------------- */
+  /* --- ai / decision landscape -------------------------------------------
+     A three-class partition, the confidence corridor either side of it, the
+     points it gets wrong, and a meter reading how much of the data it has
+     accounted for. `--tw-progress` drives the boundary's shape, so this is the
+     one stage on the band whose subject is literally the scroll.
 
-  .tw-fc-grid line,
-  .tw-fc-ticks line {
+     Two rules hold the colour scheme together. There is **exactly one accent
+     object** — the boundary; and everything the reader is asked to read as
+     *wrong* is `--color-on-ink`, never the accent, so error and partition are
+     never competing for the same signal.
+
+     Nothing here declares `opacity` on `.tw-dl-flag`, or `d` on any driven
+     path. Those are written per frame as presentation attributes, and a CSS
+     declaration outranks a presentation attribute — the writes would silently
+     do nothing. See the header of `stages/ForecastStage.tsx`. ----------- */
+
+  .tw-dl-grid line,
+  .tw-dl-ticks line {
     stroke: var(--color-ink-rule);
     stroke-width: 1;
-    opacity: 0.45;
+    opacity: 0.32;
     vector-effect: non-scaling-stroke;
   }
 
-  .tw-fc-band {
-    fill: var(--tw-accent);
-    stroke: none;
-    opacity: 0.15;
-  }
-
-  .tw-fc-band[data-level='inner'] {
-    opacity: 0.28;
-  }
-
-  /* The point forecast. Dashed, because it is the only line in the frame that
-     never happened. */
-  .tw-fc-median {
+  /* The margin iso-contours: how far you can move before the model changes its
+     mind. Ground, not subject — thin, muted, and the wider level fainter and
+     dashed so the two read as one field sampled twice rather than as two
+     outlines. */
+  .tw-dl-contour {
     fill: none;
-    stroke: var(--tw-accent);
-    stroke-width: 1.3;
-    stroke-dasharray: 3.5 3.5;
-    opacity: 0.9;
+    stroke: var(--color-on-ink-muted);
+    stroke-width: 1;
+    opacity: 0.4;
     vector-effect: non-scaling-stroke;
   }
 
-  .tw-fc-history {
+  .tw-dl-contour[data-level='outer'] {
+    opacity: 0.24;
+    stroke-dasharray: 2 3;
+  }
+
+  .tw-dl-glyph {
+    vector-effect: non-scaling-stroke;
+  }
+
+  /* Solid, hollow, linear. Three marks that differ in kind, because at the true
+     320px frame three radii of one circle do not differ at all — they collapse
+     into one grey speck and the picture becomes dots either side of a curve. */
+  .tw-dl-glyph[data-class='0'] {
+    fill: var(--color-on-ink-muted);
+  }
+
+  .tw-dl-glyph[data-class='1'] {
+    fill: none;
+    stroke: var(--color-on-ink-muted);
+    stroke-width: 1.2;
+  }
+
+  .tw-dl-glyph[data-class='2'] {
+    fill: none;
+    stroke: var(--color-on-ink-muted);
+    stroke-width: 1.3;
+    stroke-linecap: round;
+  }
+
+  /* A misclassified point, bracketed the way the stage frame brackets its own
+     corners — which is the point: it is the same instrument marking something
+     out. Deliberately not a ring, because class 1's glyph *is* a ring and a
+     ring around a ring reads as a fourth kind of mark. */
+  .tw-dl-flag {
+    fill: none;
+    stroke: var(--color-on-ink);
+    stroke-width: 1.1;
+    stroke-linecap: round;
+    vector-effect: non-scaling-stroke;
+    transform-box: fill-box;
+    transform-origin: center;
+  }
+
+  /* The one accent object in the frame. */
+  .tw-dl-boundary {
     fill: none;
     stroke: var(--tw-accent);
     stroke-width: 1.8;
@@ -869,62 +918,53 @@ const SECTION = 'worlds' as const;
     vector-effect: non-scaling-stroke;
   }
 
-  /* The observations the forecast is scored against — drawn *through* the band
-     rather than stopping at the rule. That is rolling-origin validation without
-     a caption. */
-  .tw-fc-realised {
-    fill: none;
-    stroke: var(--color-on-ink-muted);
-    stroke-width: 1.1;
-    stroke-linejoin: round;
-    opacity: 0.5;
-    vector-effect: non-scaling-stroke;
-  }
-
-  .tw-fc-scan {
+  /* The ambient pass. Its dash geometry is declared here rather than only in
+     the keyframe, so with `animation: none` it resolves to one short highlight
+     on the partition instead of a solid white stroke laid over the accent. */
+  .tw-dl-scan {
     fill: none;
     stroke: var(--color-on-ink);
-    stroke-width: 2.1;
+    stroke-width: 2.2;
     stroke-linecap: round;
-    opacity: 0.85;
+    stroke-dasharray: 11 100;
+    opacity: 0.62;
     vector-effect: non-scaling-stroke;
   }
 
-  /* The band behind the rolling origin, washed in as it is scored. Both this
-     and `.tw-fc-scan` are rendered by the island only while the stage is
-     active, and both carry a visible resting value — the animation moves them,
-     it is not the reason either is on screen. */
-  .tw-fc-resolved {
-    fill: var(--tw-accent);
-    stroke: none;
-    opacity: 0.18;
+  .tw-dl-margin,
+  .tw-dl-cross {
+    fill: none;
+    stroke: var(--color-on-ink);
+    stroke-width: 1.1;
+    vector-effect: non-scaling-stroke;
   }
 
-  .tw-fc-now {
+  .tw-dl-margin {
+    opacity: 0.75;
+  }
+
+  .tw-dl-query {
+    fill: var(--color-on-ink);
+  }
+
+  /* The fit meter. Not `non-scaling-stroke`: it is a bar with a length, and a
+     bar that stays 3px while its scale grows stops reading as one. */
+  .tw-dl-fit-track {
+    stroke: var(--color-ink-rule);
+    stroke-width: 3;
+    opacity: 0.35;
+  }
+
+  .tw-dl-fit-origin {
     stroke: var(--color-on-ink-muted);
     stroke-width: 1;
-    stroke-dasharray: 2 3;
-    opacity: 0.9;
     vector-effect: non-scaling-stroke;
   }
 
-  .tw-fc-horizon line {
-    stroke: var(--color-ink-rule);
-    stroke-width: 1;
-    vector-effect: non-scaling-stroke;
-  }
-
-  /* The interval's width at the horizon, read off as a length. This is the
-     whole statement: move it right and the bracket visibly grows. */
-  .tw-fc-horizon path {
+  .tw-dl-fit {
     fill: none;
     stroke: var(--tw-accent);
-    stroke-width: 1.4;
-    vector-effect: non-scaling-stroke;
-  }
-
-  .tw-fc-horizon circle {
-    fill: var(--tw-accent);
+    stroke-width: 3;
   }
 
   /* --- quantum / Bloch sphere ---------------------------------------------
@@ -1018,23 +1058,20 @@ const SECTION = 'worlds' as const;
     fill: var(--tw-accent);
   }
 
-  /* ai ambient — the origin rolls forward. Each pass re-walks the realised path
-     out from the rule: one observation arriving after another, which is what
-     the faint line through the band is for. It rides on an element the island
-     renders only while the stage is active, so nothing here has a resting
-     state that depends on an animation running.
+  /* ai ambient — one pass along the partition the model has settled on.
 
-     2.4s rather than 3.6s: the roll's meaningful phase runs from 12% to 68% of
-     its period, so at 3.6s behind an 800ms settle the reader waited 1.2s for it
-     to become legible and 3.2s to see it complete. Behind a 400ms settle at
-     2.4s, it is legible at 690ms — while the arrival is still finishing — and
-     has closed a full pass by 2.0s, comfortably inside one world's dwell. */
-  .tw-stage[data-active='true'] .tw-fc-scan {
-    animation: tw-fc-roll 2.4s var(--ease-instrument) var(--tw-settle) infinite;
-  }
+     The delay is negative on purpose: `--tw-settle` is 400ms against a 2.6s
+     cycle, so `calc(var(--tw-settle) - 1.9s)` starts the pass 1.5s in. The
+     world therefore arrives with a sweep already in flight rather than with a
+     curve nothing has touched yet. Expressed against the same settle token
+     every other stage is phased on, rather than as a bare negative constant,
+     so retuning the settle moves this with it.
 
-  .tw-stage[data-active='true'] .tw-fc-resolved {
-    animation: tw-fc-resolve 2.4s var(--ease-instrument) var(--tw-settle) infinite;
+     It rides on an element the island renders only while the stage is active,
+     so nothing here has a resting state that depends on an animation running
+     (MOTION_SYSTEM §6). */
+  .tw-stage[data-active='true'] .tw-dl-scan {
+    animation: tw-dl-scan 2.6s linear calc(var(--tw-settle) - 1.9s) infinite;
   }
 
   /* --- fpga / routing ---------------------------------------------------- */
@@ -1370,42 +1407,39 @@ const SECTION = 'worlds' as const;
 
   /* ── Ambient ─────────────────────────────────────────────────────────── */
 
-  /* ai: the forecast origin rolling forward over the realised path. */
-  @keyframes tw-fc-roll {
-    0% {
-      stroke-dasharray: 0 100;
-      opacity: 0;
+  /* ai: a pass travelling the length of the decision boundary. Written in the
+     normalised `pathLength="100"` space, so one set of offsets serves a
+     partition whose real length changes on every scroll tick. */
+  @keyframes tw-dl-scan {
+    from {
+      stroke-dashoffset: 11;
     }
-    12% {
-      opacity: 0.9;
-    }
-    68% {
-      stroke-dasharray: 100 100;
-      opacity: 0.9;
-    }
-    100% {
-      stroke-dasharray: 100 100;
-      opacity: 0;
+    to {
+      stroke-dashoffset: -100;
     }
   }
 
-  /* ai: the interval behind that origin, resolved. Same period as the roll,
-     because they are two readings of one event. */
-  @keyframes tw-fc-resolve {
-    0% {
-      clip-path: inset(-30% 100% -30% 0%);
+  /* ai: the confidence corridor settling either side of the resolved boundary.
+
+     Deliberately a `from` with no `to`. The implicit 100% keyframe is the
+     element's own underlying value, so each contour lands on the opacity its
+     own rule gives it — 0.3 for the inner level, 0.16 for the outer — without
+     this keyframe having to restate either number, or having to exist twice. */
+  @keyframes tw-dl-settle {
+    from {
       opacity: 0;
+      stroke-width: 3;
     }
-    12% {
-      opacity: 0.26;
+  }
+
+  /* ai: a flag closing onto the point it marks. Transform only: the flags'
+     opacity is a per-frame presentation attribute and must stay writable. */
+  @keyframes tw-dl-acquire {
+    from {
+      transform: scale(2.4);
     }
-    68% {
-      clip-path: inset(-30% -30% -30% 0%);
-      opacity: 0.26;
-    }
-    100% {
-      clip-path: inset(-30% -30% -30% 0%);
-      opacity: 0;
+    to {
+      transform: scale(1);
     }
   }
 

@@ -20,6 +20,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
+    "landscape:gen": "node scripts/gen-decision-landscape.mjs",
     "project:new": "node scripts/project-new.mjs",
     "project:validate": "node scripts/project-validate.mjs",
     "project:validate:offline": "node scripts/project-validate.mjs --offline",

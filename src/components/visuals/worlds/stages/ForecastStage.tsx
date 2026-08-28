@@ -1,256 +1,373 @@
-import { useMemo } from 'react';
+import { useEffect, useRef } from 'react';
 import { StageFrame, type StageProps } from '../StageFrame';
+import { STAGE_HEIGHT, STAGE_WIDTH } from '../stage-geometry';
+import { subscribeStageProgress, traverseIndexOf } from '../traverse';
 import {
-  bandHalfWidth,
-  createRandom,
-  forecastSignal,
-  interpolateAt,
-  polylinePath,
-  ribbonPath,
-  STAGE_HEIGHT,
-  STAGE_WIDTH,
-  type Point,
-} from '../stage-geometry';
-import { usePointerField } from '../usePointerField';
+  boundaryPath,
+  capacityFor,
+  clampToPlot,
+  contourPath,
+  crosshairPath,
+  FIT_BAR_Y,
+  FIT_ORIGIN_X,
+  fitBarPath,
+  FOOT_AXIS_Y,
+  FOOT_TICK,
+  FOOT_TICK_COUNT,
+  GLYPHS,
+  landscapeAt,
+  type Landscape,
+  marginPath,
+  PLOT,
+  RESTING_QUERY,
+  flagLit,
+  FLAGGED,
+} from '../../../../lib/worlds/decision-landscape';
 
 /**
- * AI / Machine Learning — a forecast and the interval around it.
+ * AI / Machine Learning — a nonlinear decision landscape, fitted by scrolling.
  *
- * ── WHY THIS AND NOT THE PREVIOUS PICTURE ──────────────────────────────────
- * This stage used to draw points projected into a plane, joined to their
- * nearest neighbours. Two reviews rejected it, and the sharper reason was not
- * that the neural-net graph is a cliché: *adjacency is a property of any point
- * set.* Nothing had been learned, so nothing was being shown. A decision
- * boundary over two blobs was rejected for the neighbouring reason — it is the
- * scikit-learn illustration the brief forbids by name, and it depicts the most
- * generic task in the field.
+ * ── WHY THIS AND NOT THE PICTURE BEFORE IT ─────────────────────────────────
+ * Two earlier stages were retired here. The first drew points joined to their
+ * nearest neighbours: *adjacency is a property of any point set*, so nothing
+ * had been learned and nothing was being shown. The second drew a forecast and
+ * its prediction interval — a truer statement, but a measurement killed it.
+ * Its frames at local progress 0.15, 0.50 and 0.88 were **pixel-identical**:
+ * the stage read no scroll at all, so a reader who scrolled the dwell without
+ * moving a mouse saw a still image. It also read as "a chart with an
+ * envelope", which is as much econometrics as machine learning, and it would
+ * have made three of the five stages a horizontal line crossing the frame.
  *
- * What is drawn instead is the one relationship an ML picture can state
- * without a caption and without overclaiming: **uncertainty grows with
- * horizon.** A series runs left to right; at the `now` rule the solid line
- * stops and a calibrated interval opens rightward, widening as it goes. The
- * realised path keeps running faintly *through* that interval, which is
- * rolling-origin validation drawn rather than captioned — every point past the
- * rule is an observation the forecast was scored against after the fact.
+ * That earlier file carried a note recording that "a decision boundary over
+ * two blobs was rejected — it is the scikit-learn illustration the brief
+ * forbids." The rejection was right about what it described and does not reach
+ * this. What is drawn here is not a boundary over two blobs. It is a
+ * three-class partition whose **shape is driven by the scroll**: it opens as a
+ * piecewise-linear nearest-centroid partition with nine points flagged as
+ * misclassified, and as the reader descends it bends into a kernel boundary,
+ * the flags go out one at a time, and the fit meter at the foot fills from
+ * 85.0% to 100%.
  *
- * The pointer owns the horizon. Further right, visibly wider band, and the
- * bracket at the horizon is the interval's width read off as a length.
+ * **The scroll is the fit.** That is the strongest use the local progress
+ * channel gets anywhere on the band, and it is the whole reason this stage
+ * exists in this form.
  *
- * ── THE HONESTY CONSTRAINT ─────────────────────────────────────────────────
- * The work behind this picture is `energy-demand-forecast`, whose 14-day
- * actual-vs-forecast plot carries a **95% split-conformal** band. It is not
- * quantile regression — that is Future Work in the repository, and the case
- * study was corrected for claiming otherwise (REDESIGN_DECISIONS P0 #3). So
- * this stage draws ONE band and a nested inner one, both from a single
- * widening half-width, and never a family of per-quantile curves: a fan of
- * separately-shaped quantile lines would assert the method the repo does not
- * use. See {@link bandHalfWidth}.
+ * ── WHAT IS ON SCREEN ──────────────────────────────────────────────────────
+ *   - a feature graticule, for the glyphs to be positioned against;
+ *   - two margin iso-contours, the "confidence corridor" either side of the
+ *     partition — muted, never the accent;
+ *   - **exactly one accent object**: the decision boundary, in three subpaths,
+ *     one per class pair;
+ *   - sixty class glyphs, in three deliberately unalike marks;
+ *   - nine corner-bracket flags on the points the linear model gets wrong;
+ *   - a query crosshair and its margin — how far that point is from being
+ *     called something else;
+ *   - a foot axis and the fit meter.
  *
- * The stage also renders no words, in any language, for the reason the
- * electronics stage does not: a label here would be English hardcoded into a
- * decorative SVG, outside the dictionaries.
+ * The three glyph marks are a disc, an open ring and a cross, and they are
+ * that unalike on purpose. An earlier pass used a disc, a ring and a diamond
+ * separated only by radius; screenshotted at the true 320px frame those three
+ * collapse into "same grey speck", and the picture degrades into dots either
+ * side of a curve — which is exactly the scikit-learn illustration being
+ * avoided. Size ordering could not carry it, so the marks differ in kind:
+ * solid, hollow, linear.
+ *
+ * The stage renders no words in any language, for the reason the electronics
+ * stage does not: a label here would be English hardcoded into a decorative
+ * SVG, outside the dictionaries.
  *
  * ── TECHNOLOGY ─────────────────────────────────────────────────────────────
  * SVG, not canvas — the hero owns the one animating-canvas slot
- * (MOTION_SYSTEM §4). Every path below is computed once at module scope and
- * reused by every render: the fan's geometry does not depend on the pointer,
- * only how much of it is revealed does, and that is one `clipPath` rectangle
- * whose width is a plain SVG attribute. No path arithmetic per frame, no rAF.
- */
-
-/* ── The plotting frame ──────────────────────────────────────────────────── */
-
-const PLOT_LEFT = 30;
-const PLOT_RIGHT = 298;
-const MID_Y = 92;
-/** Value units → pixels. `forecastSignal` stays inside roughly ±0.8. */
-const AMP = 60;
-const AXIS_Y = 164;
-
-/**
- * The `now` rule, in the shared stage coordinate space — where the observed
- * series stops and the forecast begins.
+ * (MOTION_SYSTEM §4). The posterior is solved at build time by
+ * `scripts/gen-decision-landscape.mjs` into a typed constant module; nothing
+ * here evaluates a kernel. Per frame this writes about fifteen SVG
+ * **presentation attributes** through refs and never sets React state, so a
+ * scroll costs no render and no reconciliation.
  *
- * Defined here and nowhere else. The activation animation opens the fan *from
- * this rule*, but it does so with a widening `clip-path: inset()` whose
- * percentages resolve against the band's own bounding box — and that box
- * starts at this x. So the stylesheet never has to name the coordinate, and
- * there is no copy of it to drift. `tests/worlds.test.ts` asserts the rule, the
- * end of the history and the start of the band all land on the same x.
+ * Presentation attributes and not `style`: the site ships a hash-based CSP
+ * with no `'unsafe-inline'` and no `'unsafe-hashes'`, under which every inline
+ * `style=""` attribute is dropped — silently, and only in production, because
+ * `astro dev` serves no policy. Astro server-renders this island, and React's
+ * `renderToString` turns a `style` prop into exactly such an attribute. There
+ * is no `style` anywhere in this file, and `tests/worlds.test.ts` asserts it.
+ *
+ * The flags' `opacity` is written per frame, so the stylesheet must not also
+ * declare `opacity` on `.tw-dl-flag` — a CSS declaration outranks a
+ * presentation attribute, and the writes would silently do nothing.
  */
-export const FORECAST_NOW_X = 148;
 
-const SPAN = PLOT_RIGHT - PLOT_LEFT;
-const NOW_T = (FORECAST_NOW_X - PLOT_LEFT) / SPAN;
+/* ── The resting picture ─────────────────────────────────────────────────—
+   Capacity 1: fully fitted boundary, contours at their final offsets, no flag
+   lit, meter full, crosshair at rest.
 
-/* ── The interval ────────────────────────────────────────────────────────── */
+   This is what the server renders, what the first client frame renders (so
+   hydration matches), what a reader with JavaScript off sees, and what
+   reduced-motion and the stacked mobile composition get — none of those has a
+   traverse publishing progress. It is also what the stage returns to when the
+   traverse stands down and sends `null`, rather than freezing on whatever
+   half-fitted partition the last scroll left behind. ------------------- */
+const RESTING_CAPACITY = 1;
 
-/** Half-width at the origin: residuals are not zero one step ahead. */
-const BAND_BASE = 0.085;
-const BAND_SPAN = 0.44;
-/** Below 1, so the band widens concavely rather than as a straight cone. */
-const BAND_EXPONENT = 0.6;
-/** The inner band is the same calibration read at a lower coverage level. */
-const INNER_FRACTION = 0.42;
+const GRID_COLUMNS = 4;
+const GRID_ROWS = 3;
 
-const HISTORY_SAMPLES = 46;
-const FUTURE_SAMPLES = 38;
-const BAND_SAMPLES = 26;
+/** Corner brackets, at the same corner-tick idiom the stage frame itself uses. */
+const FLAG_REACH = 4.2;
+const FLAG_ARM = 2.9;
 
-/** Resting horizon, so an untouched stage already shows an open fan. */
-const RESTING_HORIZON = 0.62;
-/** A pointer at or left of the rule still leaves a readable sliver of fan. */
-const MIN_HORIZON = 0.06;
+function flagPath(x: number, y: number): string {
+  const l = x - FLAG_REACH;
+  const r = x + FLAG_REACH;
+  const t = y - FLAG_REACH;
+  const b = y + FLAG_REACH;
+  return (
+    `M${l} ${t + FLAG_ARM}L${l} ${t}L${l + FLAG_ARM} ${t}` +
+    `M${r - FLAG_ARM} ${t}L${r} ${t}L${r} ${t + FLAG_ARM}` +
+    `M${r} ${b - FLAG_ARM}L${r} ${b}L${r - FLAG_ARM} ${b}` +
+    `M${l + FLAG_ARM} ${b}L${l} ${b}L${l} ${b - FLAG_ARM}`
+  );
+}
 
-/* ── The realised series ─────────────────────────────────────────────────── */
+/** A filled disc, an open ring and a cross — solid, hollow, linear. */
+const DISC_R = 2.3;
+const RING_R = 3.2;
+const CROSS_ARM = 3.6;
 
-/**
- * Residuals, drawn once from a seeded LCG and interpolated. Fixed seed for the
- * reason every other stage has one: the island is server-rendered and then
- * hydrated, and a `Math.random()` here would make the two disagree.
- */
-const RESIDUALS = ((): number[] => {
-  const random = createRandom(20260827);
-  return Array.from({ length: 29 }, () => (random() - 0.5) * 2);
+/* Baked once at module scope: none of this depends on capacity, a pointer or a
+   frame. */
+const GRID_LINES = (() => {
+  const vertical = Array.from({ length: GRID_COLUMNS - 1 }, (_, i) => PLOT.x + (PLOT.width * (i + 1)) / GRID_COLUMNS);
+  const horizontal = Array.from({ length: GRID_ROWS - 1 }, (_, i) => PLOT.y + (PLOT.height * (i + 1)) / GRID_ROWS);
+  return { vertical, horizontal };
 })();
 
-const NOISE_SCALE = 0.062;
+const FOOT_TICKS = Array.from({ length: FOOT_TICK_COUNT }, (_, i) => PLOT.x + (PLOT.width * i) / (FOOT_TICK_COUNT - 1));
 
-const toX = (t: number): number => PLOT_LEFT + t * SPAN;
-const toY = (value: number): number => MID_Y - value * AMP;
+const FLAG_PATHS = FLAGGED.map((glyph) => flagPath(glyph.x, glyph.y));
 
-/** What the model predicts: the structure, without the residual. */
-const predicted = (t: number): number => forecastSignal(t);
-/** What actually happened: prediction plus the residual it did not capture. */
-const realised = (t: number): number => forecastSignal(t) + interpolateAt(RESIDUALS, t) * NOISE_SCALE;
+const RESTING_LANDSCAPE = landscapeAt(RESTING_CAPACITY);
 
-/** Horizon `0 → 1` across the forecast region, for a `t` past the rule. */
-const horizonAt = (t: number): number => (t - NOW_T) / (1 - NOW_T);
-
-function sample(from: number, to: number, count: number, valueAt: (t: number) => number): Point[] {
-  return Array.from({ length: count }, (_, index) => {
-    const t = from + ((to - from) * index) / (count - 1);
-    return { x: toX(t), y: toY(valueAt(t)) };
-  });
-}
-
-/* ── Baked paths ─────────────────────────────────────────────────────────—
-   Computed once, at module scope. Nothing below is recomputed by a render, a
-   pointer move or a frame. ------------------------------------------------ */
-
-const HISTORY_PATH = polylinePath(sample(0, NOW_T, HISTORY_SAMPLES, realised));
-const MEDIAN_PATH = polylinePath(sample(NOW_T, 1, FUTURE_SAMPLES, predicted));
-const REALISED_PATH = polylinePath(sample(NOW_T, 1, FUTURE_SAMPLES, realised));
-
-function bandEdges(fraction: number): { upper: Point[]; lower: Point[] } {
-  const upper: Point[] = [];
-  const lower: Point[] = [];
-  for (let index = 0; index < BAND_SAMPLES; index += 1) {
-    const t = NOW_T + ((1 - NOW_T) * index) / (BAND_SAMPLES - 1);
-    const centre = predicted(t);
-    const half = bandHalfWidth(horizonAt(t), BAND_BASE, BAND_SPAN, BAND_EXPONENT) * fraction;
-    upper.push({ x: toX(t), y: toY(centre + half) });
-    lower.push({ x: toX(t), y: toY(centre - half) });
-  }
-  return { upper, lower };
-}
-
-const OUTER = bandEdges(1);
-const INNER = bandEdges(INNER_FRACTION);
-const OUTER_PATH = ribbonPath(OUTER.upper, OUTER.lower);
-const INNER_PATH = ribbonPath(INNER.upper, INNER.lower);
-
-/** Time graticule: one tick per eighth, so the horizon has something to read against. */
-const TICKS = Array.from({ length: 9 }, (_, index) => PLOT_LEFT + (index * SPAN) / 8);
+/** The resting picture's six path strings, built once for every render of it. */
+const RESTING_PATHS = {
+  boundary: boundaryPath(RESTING_LANDSCAPE.boundary),
+  inner: contourPath(RESTING_LANDSCAPE.boundary, RESTING_LANDSCAPE.offsets, 0),
+  outer: contourPath(RESTING_LANDSCAPE.boundary, RESTING_LANDSCAPE.offsets, 1),
+  fit: fitBarPath(RESTING_CAPACITY),
+  cross: crosshairPath(RESTING_QUERY.x, RESTING_QUERY.y),
+  margin: marginPath(RESTING_QUERY.x, RESTING_QUERY.y, RESTING_LANDSCAPE.boundary),
+} as const;
 
 export function ForecastStage({ domain, active }: StageProps) {
-  const { ref, field } = usePointerField(active);
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  const boundaryRef = useRef<SVGPathElement | null>(null);
+  const scanRef = useRef<SVGPathElement | null>(null);
+  const innerRef = useRef<SVGPathElement | null>(null);
+  const outerRef = useRef<SVGPathElement | null>(null);
+  const fitRef = useRef<SVGPathElement | null>(null);
+  const marginRef = useRef<SVGPathElement | null>(null);
+  const crossRef = useRef<SVGPathElement | null>(null);
+  const queryRef = useRef<SVGCircleElement | null>(null);
+  const flagsRef = useRef<(SVGPathElement | null)[]>([]);
 
-  /* The pointer's x, converted into a forecast horizon. Left of the rule the
-     horizon bottoms out rather than inverting: there is no such thing as a
-     negative horizon, and clamping says so. */
-  const horizon = useMemo(() => {
-    if (!field.engaged) return RESTING_HORIZON;
-    // `field.x` is normalised over the stage element; the SVG preserves its
-    // aspect ratio, so scaling by the view box width lands in plot coordinates.
-    const t = (field.x * STAGE_WIDTH - PLOT_LEFT) / SPAN;
-    if (t <= NOW_T) return MIN_HORIZON;
-    return Math.max(MIN_HORIZON, Math.min(1, horizonAt(t)));
-  }, [field]);
+  /* The two things a frame reads. Refs rather than state on purpose: a scroll
+     tick must not re-render sixty glyphs to move one curve. */
+  const landscapeRef = useRef<Landscape>(RESTING_LANDSCAPE);
+  const queryPointRef = useRef<{ x: number; y: number }>({ ...RESTING_QUERY });
 
-  const horizonX = FORECAST_NOW_X + horizon * (PLOT_RIGHT - FORECAST_NOW_X);
-  const horizonT = NOW_T + horizon * (1 - NOW_T);
-  const half = bandHalfWidth(horizon, BAND_BASE, BAND_SPAN, BAND_EXPONENT) * AMP;
-  const centreY = toY(predicted(horizonT));
-  const upperY = centreY - half;
-  const lowerY = centreY + half;
+  /* ── The scroll channel ─────────────────────────────────────────────────
+     Subscribed directly rather than read back off `--tw-progress`: the stage
+     needs the number, and `StageFrame` writes that custom property for stages
+     that want it as a CSS input. Both read the same registry. */
+  useEffect(() => {
+    const index = traverseIndexOf(domain.id);
+    if (index < 0) return;
+
+    const drawMargin = () => {
+      const node = marginRef.current;
+      if (!node) return;
+      const point = queryPointRef.current;
+      node.setAttribute('d', marginPath(point.x, point.y, landscapeRef.current.boundary));
+    };
+
+    const draw = (progress: number | null) => {
+      // `null` is the traverse standing down. Back to the resting picture,
+      // rather than leaving the partition frozen half-fitted.
+      const lambda = progress === null ? RESTING_CAPACITY : capacityFor(progress);
+      const landscape = landscapeAt(lambda);
+      landscapeRef.current = landscape;
+
+      const d = boundaryPath(landscape.boundary);
+      boundaryRef.current?.setAttribute('d', d);
+      scanRef.current?.setAttribute('d', d);
+      innerRef.current?.setAttribute('d', contourPath(landscape.boundary, landscape.offsets, 0));
+      outerRef.current?.setAttribute('d', contourPath(landscape.boundary, landscape.offsets, 1));
+      fitRef.current?.setAttribute('d', fitBarPath(lambda));
+
+      flagsRef.current.forEach((node, flag) => {
+        node?.setAttribute('opacity', flagLit(flag, lambda) ? '1' : '0');
+      });
+
+      drawMargin();
+    };
+
+    return subscribeStageProgress(index, draw);
+  }, [domain.id]);
+
+  /* ── The pointer ────────────────────────────────────────────────────────
+     Its own listener rather than `usePointerField`, which is otherwise the
+     shared hook for this: that hook answers through React state, which is one
+     render of the whole stage per pointer frame. Here the pointer moves four
+     attributes and nothing re-renders.
+
+     The contract from MOTION_SYSTEM §4 is unchanged and is what the `active`
+     guard below enforces: **an inactive stage attaches nothing.** Listeners
+     are passive, so a touch drag over the stage still scrolls the page, and
+     `pointerdown` is handled as well as `pointermove` so a tap reaches the
+     same state a hover does. */
+  useEffect(() => {
+    const root = rootRef.current;
+    if (!active || !root) return;
+    const svg = root.querySelector('svg');
+    if (!svg) return;
+
+    let frame = 0;
+    let pending: { x: number; y: number } | null = null;
+
+    const apply = (point: { x: number; y: number }) => {
+      queryPointRef.current = point;
+      crossRef.current?.setAttribute('d', crosshairPath(point.x, point.y));
+      queryRef.current?.setAttribute('cx', point.x.toFixed(1));
+      queryRef.current?.setAttribute('cy', point.y.toFixed(1));
+      marginRef.current?.setAttribute('d', marginPath(point.x, point.y, landscapeRef.current.boundary));
+    };
+
+    const flush = () => {
+      frame = 0;
+      if (!pending) return;
+      const next = pending;
+      pending = null;
+      apply(next);
+    };
+
+    const handleMove = (event: PointerEvent) => {
+      const rect = svg.getBoundingClientRect();
+      if (rect.width <= 0 || rect.height <= 0) return;
+      pending = clampToPlot(
+        ((event.clientX - rect.left) / rect.width) * STAGE_WIDTH,
+        ((event.clientY - rect.top) / rect.height) * STAGE_HEIGHT,
+      );
+      if (frame === 0) frame = requestAnimationFrame(flush);
+    };
+
+    const handleRelease = () => {
+      if (frame !== 0) cancelAnimationFrame(frame);
+      frame = 0;
+      pending = null;
+      apply({ ...RESTING_QUERY });
+    };
+
+    svg.addEventListener('pointermove', handleMove, { passive: true });
+    svg.addEventListener('pointerdown', handleMove, { passive: true });
+    svg.addEventListener('pointerleave', handleRelease, { passive: true });
+    svg.addEventListener('pointercancel', handleRelease, { passive: true });
+
+    return () => {
+      if (frame !== 0) cancelAnimationFrame(frame);
+      svg.removeEventListener('pointermove', handleMove);
+      svg.removeEventListener('pointerdown', handleMove);
+      svg.removeEventListener('pointerleave', handleRelease);
+      svg.removeEventListener('pointercancel', handleRelease);
+      handleRelease();
+    };
+  }, [active]);
 
   return (
-    <StageFrame domain={domain} active={active} frameRef={ref}>
-      {/* The revealed part of the fan. A `<rect>` width is an SVG presentation
-          attribute, not an inline `style` — the site's CSP drops those — so the
-          horizon can be driven from React without writing one. */}
-      <clipPath id={`tw-fan-${domain.id}`}>
-        <rect x={PLOT_LEFT - 8} y={0} width={Math.max(0, horizonX - PLOT_LEFT + 8)} height={STAGE_HEIGHT} />
-      </clipPath>
-
-      <g className="tw-fc-grid">
-        <line x1={PLOT_LEFT} y1={MID_Y - 44} x2={PLOT_RIGHT} y2={MID_Y - 44} />
-        <line x1={PLOT_LEFT} y1={MID_Y} x2={PLOT_RIGHT} y2={MID_Y} />
-        <line x1={PLOT_LEFT} y1={MID_Y + 44} x2={PLOT_RIGHT} y2={MID_Y + 44} />
-      </g>
-
-      {/* The clip sits on the outer group and the activation transform on the
-          inner one, so "how far the fan has opened" (CSS, one-shot) and "how
-          far the reader has pushed the horizon" (pointer) never multiply. */}
-      <g clipPath={`url(#tw-fan-${domain.id})`}>
-        <g className="tw-fc-open">
-          <path className="tw-fc-band" data-level="outer" d={OUTER_PATH} />
-          <path className="tw-fc-band" data-level="inner" d={INNER_PATH} />
-          {/* Ambient, and rendered only while the stage is active. The wash
-              sweeps out from the rule with the scan below: behind a rolling
-              origin the interval is no longer a forecast, it is a horizon that
-              has been scored. */}
-          {active ? <path className="tw-fc-resolved" d={OUTER_PATH} /> : null}
-          <path className="tw-fc-median" d={MEDIAN_PATH} />
-        </g>
-      </g>
-
-      {/* Deliberately NOT clipped to the horizon: the realised path runs the
-          whole width, through the interval, whether or not the fan has been
-          opened that far. That is the picture of rolling-origin validation —
-          the observations exist, and the forecast is scored against them. */}
-      <path className="tw-fc-realised" d={REALISED_PATH} />
-      {/* Ambient. Rendered only while the stage is active, so nothing in this
-          section has a resting state that depends on an animation running
-          (MOTION_SYSTEM §6). It re-walks the realised path from the rule
-          outward: each pass is one origin rolling forward. */}
-      {active ? <path className="tw-fc-scan" d={REALISED_PATH} pathLength={100} /> : null}
-
-      {/* Observed history. `pathLength` normalises the dash geometry the
-          activation draws it with to a plain 0–100 constant in CSS. */}
-      <path className="tw-fc-history" d={HISTORY_PATH} pathLength={100} />
-
-      <line className="tw-fc-now" x1={FORECAST_NOW_X} y1={26} x2={FORECAST_NOW_X} y2={AXIS_Y} />
-
-      <g className="tw-fc-horizon">
-        <line x1={horizonX} y1={30} x2={horizonX} y2={AXIS_Y} />
-        <path
-          d={
-            `M${(horizonX - 4).toFixed(2)} ${upperY.toFixed(2)} L${(horizonX + 4).toFixed(2)} ${upperY.toFixed(2)} ` +
-            `M${horizonX.toFixed(2)} ${upperY.toFixed(2)} L${horizonX.toFixed(2)} ${lowerY.toFixed(2)} ` +
-            `M${(horizonX - 4).toFixed(2)} ${lowerY.toFixed(2)} L${(horizonX + 4).toFixed(2)} ${lowerY.toFixed(2)}`
-          }
-        />
-        <circle cx={horizonX} cy={centreY} r={2.2} />
-      </g>
-
-      <line className="tw-rule" x1={PLOT_LEFT} y1={AXIS_Y} x2={PLOT_RIGHT} y2={AXIS_Y} />
-      <g className="tw-fc-ticks">
-        {TICKS.map((x, index) => (
-          <line key={index} x1={x} y1={AXIS_Y} x2={x} y2={AXIS_Y + 4} />
+    <StageFrame domain={domain} active={active} frameRef={rootRef}>
+      <g className="tw-dl-grid">
+        {GRID_LINES.vertical.map((x) => (
+          <line key={`v${x}`} x1={x} y1={PLOT.y} x2={x} y2={PLOT.y + PLOT.height} />
+        ))}
+        {GRID_LINES.horizontal.map((y) => (
+          <line key={`h${y}`} x1={PLOT.x} y1={y} x2={PLOT.x + PLOT.width} y2={y} />
         ))}
       </g>
+
+      {/* The confidence corridor. Two levels of one field, so the wider one is
+          drawn first and the narrower reads as sitting inside it. */}
+      <path ref={outerRef} className="tw-dl-contour" data-level="outer" d={RESTING_PATHS.outer} />
+      <path ref={innerRef} className="tw-dl-contour" data-level="inner" d={RESTING_PATHS.inner} />
+
+      <g className="tw-dl-glyphs">
+        {GLYPHS.map((glyph, index) => {
+          if (glyph.klass === 0) {
+            return <circle key={index} className="tw-dl-glyph" data-class="0" cx={glyph.x} cy={glyph.y} r={DISC_R} />;
+          }
+          if (glyph.klass === 1) {
+            return <circle key={index} className="tw-dl-glyph" data-class="1" cx={glyph.x} cy={glyph.y} r={RING_R} />;
+          }
+          return (
+            <path
+              key={index}
+              className="tw-dl-glyph"
+              data-class="2"
+              d={
+                `M${glyph.x - CROSS_ARM} ${glyph.y}L${glyph.x + CROSS_ARM} ${glyph.y}` +
+                `M${glyph.x} ${glyph.y - CROSS_ARM}L${glyph.x} ${glyph.y + CROSS_ARM}`
+              }
+            />
+          );
+        })}
+      </g>
+
+      {/* Always mounted, never conditionally rendered: nine `opacity` writes a
+          frame is a cheaper and steadier thing than nine elements entering and
+          leaving the tree as the reader scrolls back and forth. They rest at 0
+          — the resting picture is the fitted one, in which nothing is wrong. */}
+      <g className="tw-dl-flags">
+        {FLAG_PATHS.map((d, index) => (
+          <path
+            key={index}
+            ref={(node) => {
+              flagsRef.current[index] = node;
+            }}
+            className="tw-dl-flag"
+            d={d}
+            opacity="0"
+          />
+        ))}
+      </g>
+
+      <path ref={boundaryRef} className="tw-dl-boundary" d={RESTING_PATHS.boundary} pathLength={100} />
+
+      {/* Ambient, and rendered only while the stage is active, so nothing here
+          has a resting state that depends on an animation running
+          (MOTION_SYSTEM §6). It re-walks the partition the model has settled
+          on — the one pass over the data that is never finished. */}
+      {active ? <path ref={scanRef} className="tw-dl-scan" d={RESTING_PATHS.boundary} pathLength={100} /> : null}
+
+      <path ref={marginRef} className="tw-dl-margin" d={RESTING_PATHS.margin} />
+      <path ref={crossRef} className="tw-dl-cross" d={RESTING_PATHS.cross} />
+      <circle ref={queryRef} className="tw-dl-query" cx={RESTING_QUERY.x} cy={RESTING_QUERY.y} r={1.9} />
+
+      <line className="tw-rule" x1={PLOT.x} y1={FOOT_AXIS_Y} x2={PLOT.x + PLOT.width} y2={FOOT_AXIS_Y} />
+      <g className="tw-dl-ticks">
+        {FOOT_TICKS.map((x) => (
+          <line key={x} x1={x} y1={FOOT_AXIS_Y} x2={x} y2={FOOT_AXIS_Y + FOOT_TICK} />
+        ))}
+      </g>
+
+      {/* The meter, its track, and a notch at the fit the reader started from —
+          without that reference the bar is just long, and the fifteen points it
+          travels are invisible. */}
+      <line className="tw-dl-fit-track" x1={PLOT.x} y1={FIT_BAR_Y} x2={PLOT.x + PLOT.width} y2={FIT_BAR_Y} />
+      <line
+        className="tw-dl-fit-origin"
+        x1={FIT_ORIGIN_X}
+        y1={FIT_BAR_Y - 3.5}
+        x2={FIT_ORIGIN_X}
+        y2={FIT_BAR_Y + 3.5}
+      />
+      <path ref={fitRef} className="tw-dl-fit" d={RESTING_PATHS.fit} />
     </StageFrame>
   );
 }
