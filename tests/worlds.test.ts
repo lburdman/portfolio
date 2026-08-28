@@ -28,10 +28,11 @@ import {
 } from '../src/components/visuals/worlds/traverse';
 import { HYDRATION_QUERY, REDUCED_MOTION_QUERY, TRAVERSE_QUERY } from '../src/components/visuals/worlds/useMediaQuery';
 import {
+  clockPath,
   createRandom,
   manhattanLength,
   manhattanPath,
-  spectrumBars,
+  STAGE_WIDTH,
   wavePath,
 } from '../src/components/visuals/worlds/stage-geometry';
 import { ROUTE_CELLS, ROUTE_STEPS } from '../src/components/visuals/worlds/stages/RoutingStage';
@@ -711,20 +712,47 @@ describe('createRandom', () => {
 });
 
 /**
- * One number in this island lives in both TypeScript and CSS — the FPGA route's
- * step count, because a keyframe timing function cannot import a module and
- * handing one a value would mean an inline custom property, which the site's
- * CSP drops. It is asserted against the stylesheet's own source, so a change on
- * either side fails here rather than quietly clocking the pulse at the wrong
- * rate.
+ * Two numbers in this island live in both TypeScript and CSS, because a
+ * keyframe cannot import a module and handing one a value would mean an inline
+ * custom property, which the site's CSP drops. Both are asserted against the
+ * stylesheet's own source, so a change on either side fails here rather than
+ * quietly clocking a pulse at the wrong rate or wiping the wrong distance.
  */
-describe('the constant duplicated into the stylesheet', () => {
+describe('the constants duplicated into the stylesheet', () => {
   const stylesheet = readFileSync(new URL('../src/components/home/TechnicalWorlds.astro', import.meta.url), 'utf8');
 
   it('steps the FPGA pulse once per cell on the route', () => {
     expect(ROUTE_CELLS.length).toBeGreaterThan(0);
     for (const route of ROUTE_CELLS) expect(route.length).toBe(ROUTE_STEPS);
     expect(stylesheet).toContain(`steps(${ROUTE_STEPS}, end)`);
+  });
+
+  it('wipes the audio sweep across exactly the frame', () => {
+    expect(stylesheet).toContain(`clip-path: inset(-20px ${STAGE_WIDTH}px -20px 0);`);
+  });
+
+  /**
+   * The repair this guards. `.tw-wave` is the only stroked path on the band
+   * under a group the scroll *scales*, and it carries
+   * `vector-effect: non-scaling-stroke` so the hairline survives that scale.
+   * With both, the dash pattern and `pathLength`'s normalisation are measured
+   * in different spaces, and `tw-draw`'s finished `stroke-dasharray: 100 100` —
+   * a solid stroke on every other path here — left a third to a half of the
+   * waveform unpainted at rest. It shipped that way. The arrival is a clip
+   * wipe now, and the wave must never be dashed or normalised again.
+   */
+  it('never dashes the waveform, whose stroke lives in a scaled space', () => {
+    const source = readFileSync(
+      new URL('../src/components/visuals/worlds/stages/WaveformStage.tsx', import.meta.url),
+      'utf8',
+    );
+    expect(source).not.toMatch(/className="tw-wave"[^>]*pathLength/);
+    expect(source).not.toMatch(/strokeDasharray/);
+    const rules = stylesheet.replace(/\/\*[\s\S]*?\*\//g, '');
+    for (const match of rules.matchAll(/([^{}]*\.tw-wave\b[^{}]*)\{([^{}]*)\}/g)) {
+      expect(match[2]).not.toMatch(/stroke-dash/);
+      expect(match[2]).not.toMatch(/animation:\s*tw-draw/);
+    }
   });
 });
 
@@ -771,30 +799,61 @@ describe('wavePath', () => {
   });
 });
 
-describe('spectrumBars', () => {
-  it('puts the tallest bar at the requested peak', () => {
-    const bars = spectrumBars(41, 0.25, 12);
-    const tallest = bars.indexOf(Math.max(...bars));
-    expect(tallest / (bars.length - 1)).toBeCloseTo(0.25, 1);
+describe('clockPath', () => {
+  /**
+   * The property the FPGA timing strip is built on. Its accent marker walks the
+   * wave with `steps(6)` over a `pathLength="100"` normalisation, so it lands on
+   * one whole clock period per step **only if every period has the same arc
+   * length**. If a period ever differed, the marker would drift across the
+   * edges it is supposed to be marking and the link between the pulse crossing
+   * the fabric and the clock below it would quietly stop being true.
+   */
+  const periodLengths = (path: string, periods: number) => {
+    const points = [...path.matchAll(/[ML](-?[\d.]+) (-?[\d.]+)/g)].map((m) => [Number(m[1]), Number(m[2])] as const);
+    const perPeriod = (points.length - 1) / periods;
+    const lengths: number[] = [];
+    for (let p = 0; p < periods; p += 1) {
+      let total = 0;
+      for (let i = p * perPeriod; i < (p + 1) * perPeriod; i += 1) {
+        const a = points[i];
+        const b = points[i + 1];
+        if (!a || !b) continue;
+        total += Math.abs(b[0] - a[0]) + Math.abs(b[1] - a[1]);
+      }
+      lengths.push(total);
+    }
+    return lengths;
+  };
+
+  it('gives every period an identical arc length', () => {
+    const lengths = periodLengths(clockPath(40, 100, 240, 14, ROUTE_STEPS), ROUTE_STEPS);
+    expect(lengths).toHaveLength(ROUTE_STEPS);
+    for (const length of lengths) expect(length).toBeCloseTo(lengths[0] ?? 0, 9);
   });
 
-  it('moves the peak when the pointer moves', () => {
-    const low = spectrumBars(41, 0.2, 12);
-    const high = spectrumBars(41, 0.7, 12);
-    expect(low.indexOf(Math.max(...low))).toBeLessThan(high.indexOf(Math.max(...high)));
+  it('starts low on a rising edge and ends low, so the wave tiles cleanly', () => {
+    const path = clockPath(0, 10, 120, 14, 6);
+    expect(path.startsWith('M0.00 24.00')).toBe(true);
+    expect(path.endsWith('120.00 24.00')).toBe(true);
   });
 
-  it('stays within 0…1', () => {
-    for (const value of spectrumBars(41, 0.5, 12)) {
-      expect(value).toBeGreaterThanOrEqual(0);
-      expect(value).toBeLessThanOrEqual(1);
+  it('spans exactly the width it is given, in right angles only', () => {
+    const path = clockPath(46, 144, 232, 14, ROUTE_STEPS);
+    const points = [...path.matchAll(/[ML](-?[\d.]+) (-?[\d.]+)/g)].map((m) => [Number(m[1]), Number(m[2])] as const);
+    expect(Math.min(...points.map((p) => p[0]))).toBeCloseTo(46, 6);
+    expect(Math.max(...points.map((p) => p[0]))).toBeCloseTo(278, 6);
+    for (let i = 1; i < points.length; i += 1) {
+      const a = points[i - 1];
+      const b = points[i];
+      if (!a || !b) continue;
+      // Every segment moves along exactly one axis: a clock has no ramps.
+      expect(a[0] === b[0] || a[1] === b[1]).toBe(true);
     }
   });
 
-  it('answers a single sample at the low end rather than dividing by zero', () => {
-    const [only] = spectrumBars(1, 0.5, 12);
-    expect(Number.isFinite(only)).toBe(true);
-    expect(spectrumBars(0, 0.5, 12)).toHaveLength(1);
+  it('answers a single period rather than dividing by zero', () => {
+    expect(clockPath(0, 0, 60, 10, 0)).toContain('M0.00 10.00');
+    expect(clockPath(0, 0, 60, 10, 0)).not.toMatch(/NaN/);
   });
 });
 

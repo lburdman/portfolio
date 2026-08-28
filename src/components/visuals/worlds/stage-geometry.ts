@@ -77,26 +77,43 @@ export function wavePath(
   return parts.join(' ');
 }
 
+/* `spectrumBars` used to live here: a resonance envelope sampled into an array
+   of normalised heights, for the audio stage's spectrum. It is now
+   `response()` in `src/lib/worlds/resonance.ts`, written as a *continuous*
+   function of frequency rather than as a sampled array, because that stage now
+   needs the same number in three places at once — every bar's height, the
+   waveform's amplitude and the numeric readout. Three samplings of a shape
+   that were tuned to agree would be three things to keep in step; one function
+   evaluated three times cannot disagree with itself. The tests moved with it,
+   to `tests/resonance.test.ts`. */
+
 /**
- * A resonance envelope: one peak at `peak` with skirts, sampled into `bars`
- * normalised heights. Used as the audio stage's spectrum.
+ * A square-wave clock, as an SVG path: `periods` cycles across `width`,
+ * starting **on a rising edge** at `x` and ending low.
+ *
+ * Every period contributes exactly the same arc length — two vertical edges of
+ * `height` plus two horizontal runs of `width / periods / 2` — which is what
+ * lets a `pathLength="100"` dash walk it in `steps(periods)` and land on one
+ * whole clock period per step. The FPGA stage depends on that: the marker
+ * riding this wave and the pulse crossing the fabric advance together, so the
+ * two are visibly one event rather than two things sharing a frame.
  */
-export function spectrumBars(bars: number, peak: number, sharpness: number): number[] {
-  const count = Math.max(1, Math.trunc(bars));
-  const out: number[] = [];
+export function clockPath(x: number, y: number, width: number, height: number, periods: number): string {
+  const count = Math.max(1, Math.trunc(periods));
+  const step = width / count;
+  const half = step / 2;
+  const low = y + height;
+  const parts = [`M${x.toFixed(2)} ${low.toFixed(2)}`];
 
   for (let i = 0; i < count; i += 1) {
-    const t = count === 1 ? 0 : i / (count - 1);
-    const delta = (t - peak) * sharpness;
-    const fundamental = 1 / (1 + delta * delta);
-    // A second, quieter formant an octave up keeps it reading as sound rather
-    // than as a single bell curve.
-    const overtoneDelta = (t - Math.min(peak * 2 + 0.08, 1)) * sharpness * 1.6;
-    const overtone = 0.42 / (1 + overtoneDelta * overtoneDelta);
-    out.push(Math.min(1, fundamental + overtone));
+    const rise = x + i * step;
+    parts.push(`L${rise.toFixed(2)} ${y.toFixed(2)}`);
+    parts.push(`L${(rise + half).toFixed(2)} ${y.toFixed(2)}`);
+    parts.push(`L${(rise + half).toFixed(2)} ${low.toFixed(2)}`);
+    parts.push(`L${(rise + step).toFixed(2)} ${low.toFixed(2)}`);
   }
 
-  return out;
+  return parts.join(' ');
 }
 
 /** Centre of a cell in a uniform `columns × rows` lattice inside `bounds`. */
