@@ -342,8 +342,17 @@ export function LandscapeStage({ domain, active }: StageProps) {
       {/* Ambient, and rendered only while the stage is active, so nothing here
           has a resting state that depends on an animation running
           (MOTION_SYSTEM §6). It re-walks the partition the model has settled
-          on — the one pass over the data that is never finished. */}
-      {active ? <path ref={scanRef} className="tw-dl-scan" d={RESTING_PATHS.boundary} pathLength={100} /> : null}
+          on — the one pass over the data that is never finished.
+
+          It mounts holding the boundary the frame is CURRENTLY drawing, not
+          `RESTING_PATHS.boundary`. The stage becomes active at the centred
+          hold, where progress is about 0.5 and `capacityFor` has already moved
+          λ to 0.53, so seeding from the resting λ=1 constant laid a λ=1
+          highlight over a λ=0.53 partition until the next scroll tick
+          repainted it. `landscapeRef` is the same value `draw` last wrote. */}
+      {active ? (
+        <path ref={scanRef} className="tw-dl-scan" d={boundaryPath(landscapeRef.current.boundary)} pathLength={100} />
+      ) : null}
 
       <path ref={marginRef} className="tw-dl-margin" d={RESTING_PATHS.margin} />
       <path ref={crossRef} className="tw-dl-cross" d={RESTING_PATHS.cross} />
