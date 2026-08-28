@@ -86,6 +86,45 @@ Every stage must:
 achievable in Canvas 2D, SVG or DOM at a fraction of the cost, and the brief's
 performance contract (§30) forbids a GPU dependency for meaningful content.
 
+### Two rendering traps, both of which shipped
+
+Neither is visible in source review and neither raises a console error. Both were
+found in pass 3 by measuring the rendered output, and both had been live.
+
+**1. A presentation attribute loses to a CSS rule.** Any property a stage writes
+per frame through `setAttribute` must **not** also be set for that element in the
+stylesheet. If it is, the CSS wins and the writes silently do nothing.
+
+The Bloch sphere hit this in reverse and it is worth stating both ways: its
+arrival animated `opacity: 0 → 1` on a group whose glass veil rested at
+`opacity: 0.1`, and the animation replaced the resting value rather than
+multiplying it, leaving an opaque disc over the whole sphere. The fix was to move
+the resting value to a `fill-opacity` attribute so the two compose.
+
+Practical rule: for anything animated by CSS **and** written by script, keep the
+two on different properties — one on the element as an attribute, one in the
+rule — and add a guard test.
+
+**2. A dashed stroke under a scaled group, carrying `vector-effect:
+non-scaling-stroke`, is not solid at its finished state.** Under both, the dash
+pattern and `pathLength`'s normalisation are measured in _different_ spaces, so
+`tw-draw`'s finished `stroke-dasharray: 100 100` leaves the path partly
+unpainted. The audio waveform shipped this way, with a third to a half of the
+wave missing at rest.
+
+Isolated: `vector-effect: none` renders solid, `stroke-dasharray: none` renders
+solid, both together do not.
+
+**The related, simpler defect in the same family:** every user of a
+`pathLength`-normalised dash keyframe must itself declare `pathLength`. The FPGA
+route did not. Its real length was 290 units, so the shared keyframe's finished
+`100 100` rendered 100 on / 100 off / 90 on — a third of the net invisible, and
+its two ends reading as unconnected. It had shipped that way.
+
+Before adding any `stroke-dasharray` animation, check all three: does the element
+declare `pathLength`? Is it under a scaled group? Does it carry
+`non-scaling-stroke`?
+
 ---
 
 ## 5. Technology ownership
@@ -160,10 +199,10 @@ animation the design is built around.
 | --------------------------------- | ---------------------------------------- | -------- | --------- |
 | **Critical**                      | Every visitor, before first paint        | **0 KB** | **0 KB**  |
 | **Stack**                         | Mobile, reduced motion, narrow window    | ≤ 4 KB   | 1.88 KB   |
-| **Desktop traverse**              | Desktop pointer user with motion enabled | ≤ 120 KB | 116.28 KB |
+| **Desktop traverse**              | Desktop pointer user with motion enabled | ≤ 120 KB | 117.68 KB |
 | — of which **framework**          | React + GSAP + ScrollTrigger             | fixed    | 102.02 KB |
-| — of which **the island**         | Everything this repo actually writes     | ≤ 18 KB  | 14.26 KB  |
-| CSS, gzipped                      | Every visitor                            | < 15 KB  | 12.27 KB  |
+| — of which **the island**         | Everything this repo actually writes     | ≤ 18 KB  | 15.66 KB  |
+| CSS, gzipped                      | The heaviest page, not a convenient one  | < 15 KB  | 13.57 KB  |
 | Blocking third-party requests     | —                                        | **0**    | **0**     |
 | Preloader / loading screen        | —                                        | **none** | none      |
 | WebGL contexts                    | —                                        | **0**    | **0**     |

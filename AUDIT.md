@@ -367,3 +367,62 @@ Genuinely lean and mostly correct. Total client JS is ~1 KB across three inline 
 5. A11y pass: About `<h1>`, skip link, reduced-motion (with the `.animate-in` override), contrast tokens, menu Escape handling (2.2–2.7).
 6. Collapse the EN/ES page pairs and move the remaining hardcoded strings into `UIStrings` (5.1, 2.8) — after which most of this class of bug cannot recur.
 7. Hygiene: `.gitignore`, `.prettierignore`, `npm audit fix`, `.nvmrc` (4, 5.5).
+
+---
+
+## Priority 6 — Defects found live in pass 3 (2026-08-28)
+
+Added to the do-not-reintroduce baseline. All four had **shipped to production**.
+None raised a console error, none was visible in source review, and none would
+have been caught by the existing test suite. Every one was found by measuring
+rendered output in a real browser against the production build.
+
+The common thread is worth more than the individual fixes: `astro dev` serves no
+CSP, and an SVG that computes to nothing still renders as valid, silent markup.
+"It looks right in dev" and "the tests pass" were both true the whole time.
+
+### 6.1 A shared dash keyframe used without `pathLength`
+
+`.tw-route` (FPGA) animated with `tw-draw`, whose finished state is
+`stroke-dasharray: 100 100` — solid only in the `pathLength="100"` space that
+every _other_ user of that keyframe declares. This path declared none. Its real
+length was 290 units, so it rendered 100 on / 100 off / 90 on: **a third of the
+routed net was invisible at rest, and its two ends read as unconnected.**
+
+Do not use a `pathLength`-normalised dash keyframe on an element that does not
+declare `pathLength`.
+
+### 6.2 A dashed stroke under a scaled group with `non-scaling-stroke`
+
+`.tw-wave` (audio) sat under a group the scroll scales _and_ carried
+`vector-effect: non-scaling-stroke`. Under both, the dash pattern and
+`pathLength`'s normalisation are measured in different spaces, so `tw-draw`'s
+finished state is not a solid stroke: **a third to a half of the waveform was
+unpainted at rest.**
+
+Isolated: `vector-effect: none` renders solid, `stroke-dasharray: none` renders
+solid, both together do not. Before adding any `stroke-dasharray` animation,
+check all three conditions.
+
+### 6.3 An arrival animation replacing a resting value instead of composing with it
+
+The Bloch sphere's entry animated `opacity: 0 → 1` on a group whose glass veil
+rested at `opacity: 0.1`. The animation replaced that value rather than
+multiplying it, leaving **an opaque disc over the whole sphere**. Fixed by moving
+the resting value to a `fill-opacity` attribute so the two compose.
+
+General form: a property written per frame by script must not also be set for
+that element in the stylesheet, and a property animated by CSS must not be the
+same one a resting value depends on. Keep them on different properties and add a
+guard test.
+
+### 6.4 A test whose scope silently widened when a section was renamed
+
+`tests/decision-landscape.test.ts` scoped itself with
+`slice(indexOf(start), indexOf(end))`. When the Bloch sphere renamed the end
+marker, `indexOf` returned `-1` and `slice(start, -1)` ran to the end of the
+file, so an "exactly one accent object" assertion began silently inspecting every
+other stage's rules. It passed for the wrong reason.
+
+Any `indexOf`-delimited slice in a test must assert that **both** markers were
+found. This is 3.2's pattern — a test block that cannot fail — in a new costume.

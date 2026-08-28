@@ -579,3 +579,96 @@ runtime — consistent with pass 2's rule 4. Boundaries are extracted per class
 pair by marching squares, arc-length-resampled to a fixed vertex count, and
 interpolated between a small number of baked frames. Resampling is not optional:
 the unoptimised prototype is 76 KB against ~5 KB gzip for the resampled form.
+
+## The three kept worlds — repaired, not replaced
+
+FPGA, Electronics and Audio kept their concepts. Each was asked one question:
+does the newly available local scroll progress carry this concept better? Two
+said no, and their reasons are the more interesting ones.
+
+**FPGA — declined scroll progress.** The whole claim of a synchronous fabric is
+that it advances on its own clock whether or not anyone is watching. Binding the
+pulse to scroll would say the opposite about the one domain whose defining
+property is that it does not depend on you. The reader's agency is already spent
+on the thing that _is_ a choice — which net gets placed — and that is the
+pointer. Repairs: the route now declares `pathLength` (see AUDIT 6.1), unselected
+candidates are dashed so a track that is not there reads as absent, and a timing
+strip gives the empty bottom third six clock periods driven by the _same_
+keyframe, period and delay as the fabric pulse, so the link is structural rather
+than coincidental.
+
+**Electronics — declined scroll progress.** The subject is a comparison across
+five stages, made by looking rather than by scrolling. Binding the energised
+prefix to progress would mean that at the centred dwell — where readers actually
+stop — exactly half the chain is ever lit, so the complete chain, which is the
+whole claim, would never be on screen while the world was being looked at.
+Repairs: the signal now visibly _changes_ across the chain (noise at the source,
+gone after the filter, a staircase after the converter, an envelope after
+processing, two-valued at the output) where previously one dash slid along an
+unchanging trace — a picture that asserted a chain transforms a signal and showed
+it untransformed. The inter-block jogs were also geometrically broken: a 61-unit
+pitch with 34-unit blocks and 12 units of clearance left a 3-unit horizontal run,
+so what rendered was four bare vertical stubs. Removed.
+
+**Audio — used scroll progress, and it was the fix.** The waveform and spectrum
+were coupled only for readers who moved a mouse; with no pointer the wave
+travelled and the spectrum stood still. That is the identical failure that
+retired the AI forecast, and it cannot be fixed by tuning. Scroll now sweeps the
+excitation frequency so the coupling is autonomous, and one `response()` function
+sets the wave's amplitude, every bar and the readout, so the three cannot
+disagree. Bar count was made odd so the centred dwell lands mid-bar rather than
+on a seam.
+
+### Copy was checked and deliberately left alone
+
+All ten `worlds.items.*` strings describe the **domain**, not the visual — the
+section subtitle says so outright. The AI summary's "demand forecasting" is a
+claim about the energy-forecasting project, not about a forecast chart; the
+Quantum summary never mentioned interference, and its "quantum information" is
+better supported by a Bloch sphere than by what it replaced. Nothing contradicts
+a new stage, so nothing was rewritten.
+
+## Project cards — a sheet of paper under a raking light
+
+The previous hover was a 2px `translateY` with no shadow, border, background or
+media change, and the inner `a.card__link` — the actual focusable, clickable
+element — had **no hover or focus state at all**.
+
+The design finding that unlocked it: the earlier spotlight failed because
+**paper-raised on paper is 1.076:1 — a gradient with nowhere to travel.** On a
+paper ground the only available direction is _down_, so the sheet is now shaded
+_away_ from the cursor rather than brightened toward it, which is also what a
+real sheet under a real lamp does. The 7% ink mix is a measured ceiling in two
+directions: past it `--color-slate` drops under 4.5:1 **and** the FPGA channel
+mark drops under 3:1.
+
+Rejected deliberately: tilt (fights the flat-sheet-on-a-desk reading), and media
+parallax or zoom (every cover is a figure whose axis labels _are_ the evidence,
+which is why `.card__media` contains rather than crops). An ultramarine link
+treatment was built, rendered and rejected on the screenshot — a three-line 40px
+heading turned entirely accent reads as an unvisited hyperlink and fights the
+blue plot behind it.
+
+Reduced motion and touch get the design, not the leftovers: the resting light has
+a real value, so keyboard, touch, reduced-motion and no-JS all get the identical
+shadow, edge, gradient and accent CTA. Only the light stops moving.
+
+### Two corrections to the original defect list
+
+- **`transition: all` on `.card__link` was a phantom.** `all` is the _initial_
+  value of `transition-property`, so it is simply what `getComputedStyle` returns
+  for an element with no transition. The substantive half was real: there was no
+  `:hover` and no `:focus-visible`.
+- **View transitions were already enabled**, as native cross-document
+  `@view-transition { navigation: auto }` with per-slug names — not Astro's
+  `<ClientRouter />`, which is correctly absent. The audit read "a plain full page
+  load with no VT meta tag" as evidence they were off; cross-document view
+  transitions **are** a full page load. Nothing needed changing.
+
+**And the morph is now confirmed on camera**, closing an open question pass 2
+could not: a CDP screencast of a real navigation on the production build shows
+frames at 292–595 ms that match neither the listing nor the destination, with the
+title and the confusion-matrix figure caught mid-morph. `pagereveal` carries a
+`viewTransition` and `getAnimations()` shows the named groups. Under
+`prefers-reduced-motion` both names compute to `none` and ordinary navigation
+happens.
