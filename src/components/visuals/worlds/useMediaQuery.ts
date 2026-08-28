@@ -40,8 +40,16 @@ export function useMediaQuery(query: string): boolean {
   return useSyncExternalStore(subscribe, getSnapshot, () => false);
 }
 
-/** The one query that gates every timeline, loop and ambient animation here. */
-export const REDUCED_MOTION_QUERY = '(prefers-reduced-motion: reduce)';
+/**
+ * The one query that gates every timeline, loop and ambient animation here.
+ *
+ * Declared in `@/lib/motion/media` and re-exported, not restated: the hero
+ * field reads the same query from a React-free module, and two copies of a
+ * media query is two places to get `reduce` wrong. The import points at the
+ * React-free module rather than the other way round so the hero never pulls
+ * React in through it.
+ */
+export { REDUCED_MOTION_QUERY } from '@/lib/motion/media';
 
 /**
  * The traverse breakpoint.

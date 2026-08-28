@@ -38,7 +38,7 @@
  */
 
 import { INFLUENCE_RADIUS_IN_PITCHES, REST_ANGLE_DEG, lineResponse, stepEngagement } from '@/lib/motion/magnet-field';
-import { FINE_POINTER_QUERY, REDUCE_MOTION_QUERY, matchesMedia, watchMedia } from '@/lib/motion/media';
+import { FINE_POINTER_QUERY, REDUCED_MOTION_QUERY, matchesMedia, watchMedia } from '@/lib/motion/media';
 
 /** The two custom properties the stylesheet reads back. */
 const ANGLE_PROPERTY = '--hero-field-angle';
@@ -127,7 +127,7 @@ export function createMagnetLines(container: HTMLElement, options: MagnetLinesOp
 
   let started = false;
   let onScreen = true;
-  let allowed = matchesMedia(FINE_POINTER_QUERY) && !matchesMedia(REDUCE_MOTION_QUERY);
+  let allowed = matchesMedia(FINE_POINTER_QUERY) && !matchesMedia(REDUCED_MOTION_QUERY);
   let destroyed = false;
 
   /* ── Measurement ─────────────────────────────────────────────────────────
@@ -306,13 +306,13 @@ export function createMagnetLines(container: HTMLElement, options: MagnetLinesOp
     else detach();
   }
 
-  const stopWatchingMotion = watchMedia(REDUCE_MOTION_QUERY, (reduce) => {
+  const stopWatchingMotion = watchMedia(REDUCED_MOTION_QUERY, (reduce) => {
     allowed = !reduce && matchesMedia(FINE_POINTER_QUERY);
     evaluate();
   });
 
   const stopWatchingPointer = watchMedia(FINE_POINTER_QUERY, (fine) => {
-    allowed = fine && !matchesMedia(REDUCE_MOTION_QUERY);
+    allowed = fine && !matchesMedia(REDUCED_MOTION_QUERY);
     evaluate();
   });
 

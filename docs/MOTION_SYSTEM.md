@@ -70,10 +70,10 @@ appears once and is never repeated (brief §5).
 At most **one** expensive visual is rendering at any moment. This is enforced,
 not hoped for.
 
-| Stage             | Technology              | Lifecycle                                                                      |
-| ----------------- | ----------------------- | ------------------------------------------------------------------------------ |
-| Hero signal field | Canvas 2D, no framework | Starts after first paint. **Stops** when Technical Worlds enters the viewport. |
-| Domain stage      | SVG / DOM               | Only the active domain animates. The other four are static.                    |
+| Stage             | Technology                                           | Lifecycle                                                                                                                                                                    |
+| ----------------- | ---------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Hero magnet field | DOM spans + CSS `transform`, no framework, no canvas | Attaches after first paint, and only when a fine pointer is present and motion is not reduced. **Stops** when the hero leaves the viewport and when Technical Worlds enters. |
+| Domain stage      | SVG / DOM                                            | Only the active domain animates. The other four are static.                                                                                                                  |
 
 Every stage must:
 
@@ -113,8 +113,9 @@ same visual quality, less movement.
 
 - Long pinned and parallax sequences: **removed**. Technical Worlds becomes a
   vertical stack of five domain panels, fully readable, in document order.
-- Continuous decorative animation: **stopped**. The hero signal field renders
-  **one static frame** and never starts its loop — not a blank canvas.
+- Continuous decorative animation: **stopped**. The hero magnet field stands at
+  its resting rake and attaches no listener at all — a deliberate static hatch,
+  not a degraded one, and not an empty box.
 - Entrance animations: content is visible immediately.
 - `scroll-behavior: smooth`: off.
 - Navigation, focus order and every interactive affordance: unchanged.
@@ -127,8 +128,8 @@ was meant to help. The fix is structural: the hidden state lives **inside** the
 keyframe, so no animation ⇒ visible. Never reintroduce a resting `opacity: 0`.
 
 Query it in JavaScript too, not only CSS — a `matchMedia` check gates whether
-the GSAP timeline and the canvas loop are ever created, and it listens for
-changes so toggling the OS setting takes effect without a reload.
+the GSAP timeline and the hero field's pointer loop are ever created, and it
+listens for changes so toggling the OS setting takes effect without a reload.
 
 ---
 
@@ -140,8 +141,8 @@ Mobile is a deliberate composition, not a squeezed desktop (brief §33).
   tablet breakpoint; the domains stack.
 - No hover dependency anywhere. Anything a pointer reveals must also be
   reachable by tap and by keyboard — if information is hover-only, it is a bug.
-- The hero signal field runs at reduced density, or renders a single static
-  frame on low-end devices. Prefer static over janky.
+- The hero magnet field ships fewer lines at narrower breakpoints, and renders
+  as a static hatch wherever the pointer is coarse. Prefer static over janky.
 - Project cards get stronger, not weaker: the card itself is the affordance.
 
 ---
@@ -164,7 +165,7 @@ animation the design is built around.
 | Blocking third-party requests     | —                                        | **0**    | **0**    |
 | Preloader / loading screen        | —                                        | **none** | none     |
 | WebGL contexts                    | —                                        | **0**    | **0**    |
-| Simultaneously animating canvases | —                                        | **1**    | 1        |
+| Simultaneously animating canvases | —                                        | **1**    | **0**    |
 
 **Justification for the desktop traverse ceiling.** This document originally set
 a flat 90 KB. The Technical Worlds island measured 109 KB on the desktop motion

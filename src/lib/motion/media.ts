@@ -19,8 +19,15 @@
  * CSS self and attaches nothing at all.
  */
 
-/** Gates every loop, timeline and ambient animation on the site. */
-export const REDUCE_MOTION_QUERY = '(prefers-reduced-motion: reduce)';
+/**
+ * Gates every loop, timeline and ambient animation on the site.
+ *
+ * This is the single declaration. `visuals/worlds/useMediaQuery.ts` re-exports
+ * it for the React side rather than restating the string — the dependency runs
+ * in that direction because this module is React-free, and the hero must stay
+ * off the React path to keep the critical path at 0 KB.
+ */
+export const REDUCED_MOTION_QUERY = '(prefers-reduced-motion: reduce)';
 
 /**
  * A pointer that can actually hover — a mouse, a trackpad, a stylus.
