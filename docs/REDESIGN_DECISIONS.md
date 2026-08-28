@@ -236,3 +236,346 @@ Rules for implementers:
 - **Real touch gestures.** Viewport and touch flags were emulated and scrolling was programmatic; no swipe was performed.
 - **Frame rate.** Pixel diffing measures _amount_ of change, not jank. Nothing here claims 60fps.
 - **Appearance on a real display.** All contrast figures are headless sRGB. 1.2:1 is far enough below the ~3:1 visibility threshold that the conclusion holds regardless.
+
+---
+
+# Redesign decisions — pass 3 (motion recovery)
+
+Pass 2 shipped real correctness wins and one large regression. This pass repairs
+the regression without giving the wins back, then layers two signature
+interactions on the repaired base.
+
+Deployment was verified current before any diagnosis: CI on `3ebd5eb` succeeded,
+and `origin/main` matches the deployed build. Every measurement below came from
+the live site, not from reading source.
+
+## What actually regressed, with numbers
+
+Measured on the deployed build at 1440x900. Pin runs 1913 -> 4438 (2525px);
+track is 5 panels x 1156px inside a 1344px `overflow:hidden` viewport.
+
+| #   | Defect                                                                             | Measurement                                                                                                                                                                      |
+| --- | ---------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| D1  | No world ever holds at centre                                                      | Track moves 2.14px per 1px scrolled, linear, no plateau. Each world is within 60px of centre for 50-75px of scroll (0.5-0.75 wheel ticks).                                       |
+| D2  | World 0 (AI/ML) can never centre                                                   | Closest approach 95px, reached at the instant the pin engages, then only worsens. Gets 300px active vs 525-550px for the others.                                                 |
+| D2b | AI/ML's entry animation fires at page load                                         | `getAnimations()` running count goes 3 -> 9 at t=672ms **at scrollY=0**, ~1900px above the fold, back to 3 by 1.8s. Scrolling to the section later triggers zero new animations. |
+| D3  | Neighbouring panel text hard-cut mid-word                                          | 2125px of 3400px scrolled (**63%**) has at least one `h3`/`p` crossing the clip edge. At the Quantum panel the visitor reads `Computac`, `clasi`, `co`, `n`.                     |
+| D4  | A frozen tail before release                                                       | 350px (3.5 wheel ticks) where the transform is saturated at -4623 but the pin has not released.                                                                                  |
+| D5  | World 4 (Audio) also never centres                                                 | Passes through centre at y~4030, overshoots to -94px, freezes there.                                                                                                             |
+| D6  | Fast scroll skips a world                                                          | 800px jumps yield active sequence `[0,1,3,4]` — FPGA is never marked current. 100px and 20px steps are fine.                                                                     |
+| D7  | Hero pointer response is imperceptible (**not** absent — see the correction below) | With the rAF clock frozen: 6604 changed pixels, peak luminance delta 123/255, up to 30.5px of vertex displacement. Unfrozen, the metric inverts and reads as dead.               |
+| D8  | Project card hover is a 2px nudge                                                  | `translateY(-2px)`, no shadow/border/background change. The inner `a.card__link` has `transition: all` and **no hover state at all** — 0% pixels changed.                        |
+
+Reverse scroll was clean and left no stale transform. Console was silent at every
+viewport: zero errors, zero CSP violations. Mobile and reduced-motion both
+correctly decline to hydrate and show complete content.
+
+### This closes an open question from pass 2
+
+Pass 2 left "whether the orphan text fragments are a bug or intended" unresolved.
+They are a bug, and the figure is 63% of the traverse. The `::after` spacer added
+in `0b05cf2` fixed the _registration_ error (fragments landing at the wrong
+offset) but not the _chop_ — a 1156px panel inside a 1344px clip lets the
+neighbour intrude 188px with no mask.
+
+## Root causes, mapped to commits
+
+`0b05cf2` changed the pin end from `+=${distance()}` (travel and scroll cost were
+the same number, ratio 1.0) to `+=${2.8 * innerHeight}`. Travel did not shrink —
+it grew from 330% to 344% of the viewport with the new spacer. Per-world dwell
+fell from ~1109px to ~540px. The stated goal was pass 2's own item #14, "The
+pinned traverse is 4500px — 47% ... Shorten." The traverse got shorter on paper
+and worse in the hand. **This is the lesson of the pass: a page-share percentage
+is not a pacing metric.**
+
+Compounding it, in the same commit:
+
+- `--tw-settle: 800ms` gates ambient motion whose first cycle needs 3-7.5s —
+  routinely longer than a world stays active, so the meaningful phase is never
+  seen. `tw-wave-travel` runs at 7.5s inside a sub-second-of-attention window.
+- The negative `animation-delay` values were deleted (`.tw-bar` had
+  -0.43s..-2.16s; edges -0.68s..-4.08s), so every world now arrives frozen at
+  keyframe 0. The one stage that still reads as continuous, `.tw-ripple circle`,
+  is exactly the one that kept its negative delays.
+
+Two causes predate pass 2 and were merely made visible by it: there is **no
+`snap`** anywhere in the repo, and `setActiveIndex` is called inside ScrollTrigger
+`onUpdate`, re-rendering five panels and five stages every tick.
+
+### The geometry bug behind "never centres"
+
+The track carried a single **trailing** 188px spacer. With a 1156px pitch in a
+1344px viewport, panel 0's centre sits 94px right of viewport centre at
+`translateX: 0` — centring world 0 was structurally impossible, and world 4
+overshot by the same 94px at the far end.
+
+Fix: **symmetric** leading and trailing spacers of `(100% - pitch)/2` each.
+Centring world _i_ then becomes exactly `tx = -i * pitch`, both ends land dead
+centre, and total travel is unchanged.
+
+## Kept from pass 2 — do not regress these
+
+The `::after` spacer's whole-pitch registration fix; `travelProgress` /
+`TRAVEL_SHARE`; the `clampIndex(-0)` fix; the `useSyncExternalStore` media hook;
+the `client:media` hydration gate (0 KB on mobile); the `LayerSpine`
+`animation-duration: auto` fix; and every hero contrast change in `005924d`,
+which took the field from 1.32:1 to 3.85:1.
+
+## Pacing model
+
+The single linear tween is replaced by an alternating segment timeline:
+
+```
+hold(0)  move(0->1)  hold(1)  move(1->2)  hold(2)  move(2->3)  hold(3)  move(3->4)  hold(4)
+```
+
+Five real dwells at exact centre, four eased moves. `hold(4)` **is** the finale
+dwell, so the dead tail (D4) is deleted rather than tuned.
+
+Active index is derived from **which segment the timeline is in**, not from
+`Math.round(progress * (count-1))`. Index _i_ becomes active at the start of
+`hold(i)` — exactly when the panel reaches centre — so every arrival animation
+starts on a centred panel and runs during a real dwell. The outgoing world stays
+active through the move so its ambient keeps running as it slides out.
+
+### On the budget test
+
+`tests/worlds.test.ts` asserted `pin/(rest+pin) < 1/3` against a hardcoded
+`rest = 5750`, capping the per-step scroll at 0.698 and thereby **enforcing the
+bad pacing**. The bound was retuned, not deleted: a real assertion still fails if
+someone makes the traverse absurdly long, and the test carries a comment saying
+what it now protects and why 1/3 was wrong. Arbitrary round numbers do not
+outrank correct pacing — but they are replaced by a justified number, never by
+nothing.
+
+## Local progress channel
+
+Stages previously received a boolean `active` and nothing else. They now also
+receive a continuous local progress `p` in [0,1] spanning each world's full
+ownership window, with **p = 0.5 falling exactly at the centred dwell**. This is
+a hard requirement, not a convenience: the Bloch sphere keys its `|+>` midpoint
+to it.
+
+`p` is delivered by CSSOM custom-property writes plus a ref-based subscription —
+never React state per frame.
+
+## Quantum — scroll-driven Bloch sphere
+
+Replaces the interference visual. User direction, not up for relitigation.
+
+`|psi(theta)> = cos(theta/2)|0> + e^{i phi} sin(theta/2)|1>`, with
+`theta = p * pi`, so p=0 -> `|0>` at +Z, p=0.5 -> `|+>` at +X, p=1 -> `|1>` at -Z.
+
+- **SVG, not canvas** — and the reason is CSP. Every colour must come from a
+  stylesheet rule; SVG reads `--tw-accent` natively, canvas would need
+  `getComputedStyle` to launder tokens through JS. SVG also server-renders a
+  correct picture for the no-JS and reduced-motion cases.
+- **Orthographic projection**, camera at elevation 20 degrees, azimuth 62. Under
+  orthographic every great circle projects to an ellipse centred on the sphere's
+  screen centre with semi-major axis exactly `R`, so the equator and meridians
+  are closed-form half-ellipses with no runtime sampling. Verified to 1.8e-15.
+- **phi_max = 16 degrees, not 35.** Measured: at 35 the equatorial vector's depth
+  goes negative, so `|+>` would pass _behind_ the sphere at the story's midpoint;
+  and because +x is foreshortened to depth 0.44, a 35-degree phi shortens the
+  on-screen vector from 0.897R to 0.547R, which reads as _theta changed_ — the one
+  thing the mapping must never suggest.
+- **A latitude ring at the current theta** was added beyond the brief and is the
+  element that makes the piece feel like an instrument rather than a diagram. It
+  collapses to a point at both poles and is widest at `|+>`, so it is a picture of
+  how much superposition there is, and it makes pointer-driven phi read as sliding
+  along a drawn circle.
+- **The vector is never split.** Depth is linear and zero at the origin, so one
+  sign test decides the whole arrow. Two identical copies are authored, one in the
+  back group and one in the front, crossfaded on `smoothstep` of depth — true
+  z-order with no DOM reparenting and no flicker.
+- **No jump at activation is structurally impossible**: scroll owns the geometry
+  from frame zero and the entry animation only multiplies group opacity. There is
+  no moment where a transition and the scroll write the same attribute.
+- **Review rule:** no CSS `transition` may ever be declared on the vector's `d`,
+  `x2` or `transform`, or on the latitude ring's `d`. A transition there breaks
+  the 1:1 monotonic contract and fights reverse scroll.
+- Reduced motion and mobile render the static `|+>` frame — both probability bars
+  equal, latitude ring at its widest, vector on the equator. Superposition stated
+  in one picture.
+
+## Hero — Magnet Lines, rewritten not installed
+
+The React Bits `MagnetLines-TS-TW` registry component **would ship completely
+invisible in production**, and would look perfect in `astro dev` while doing it.
+
+The emitted policy is `style-src 'self'` plus six sha256 hashes, with no
+`unsafe-inline`, no `unsafe-hashes` and no `style-src-attr`. A hash authorises a
+`<style>` _element_, never a `style` _attribute_. So the container loses its
+`grid-template-columns/rows` and its size, and each of the 81 spans loses its
+background, width, height, the `--rotate` initialisation, and — decisively — the
+`transform: rotate(var(--rotate))` declaration itself. Result: 81 zero-size
+invisible spans in one collapsed column, with no console error.
+
+The component's JS write, `item.style.setProperty('--rotate', ...)`, is CSSOM and
+is **not** blocked. The driver runs perfectly; it just sets a custom property
+nothing reads. **Moving `transform: rotate(var(--rotate))` into the stylesheet is
+the entire unlock.**
+
+That CSSOM exemption is already load-bearing here: GSAP animates the traverse
+exclusively through `element.style`, so if `style-src` blocked CSSOM writes the
+existing site would already be dead. In-repo proof, not inference.
+
+Do **not** "fix" this by switching the island to `client:only`. Astro
+server-renders every other directive, `renderToString` serialises `style={{}}`
+into a literal attribute, and hydration does not rewrite it — `client:only` would
+trade a CSP bug for a blank-until-JS hole and lose the SSR markup.
+
+Other required departures from the registry source: it ships a `//@ts-ignore`
+(forbidden outright by CLAUDE.md's suppression rule) and a `#efefef` hex literal
+(forbidden outside `tokens.css`). It has no reduced-motion handling.
+
+### And it thrashes layout
+
+One `pointermove` listener on `window` — firing while the hero is fully offscreen
+— with no rAF and a read/write interleave: `getBoundingClientRect()` then
+`setProperty()` per item, which is **81 forced synchronous reflows per pointer
+event**. Because rotation is about `transform-origin: center`, the centres never
+move, so caching them on mount and resize is exactly correct rather than an
+approximation. Steady state becomes 81 pure writes behind a single rAF.
+
+## Project cards — custom, no registry component
+
+Every React Bits card effect encodes its dynamics in inline styles, which is the
+one thing this CSP forbids. `SpotlightCard-TS-TW` is the closest fit and still
+fails; `TiltedCard-TS-TW` adds a `motion@12` dependency _and_ fails the same way.
+Adoption means a rewrite in every case, so a custom implementation against
+`tokens.css` is cleaner than one laundered through a registry file.
+
+## Correction — the hero pointer path was never broken
+
+An early pixel-diff measurement concluded the hero canvas ignored the pointer
+entirely, because the pointer-left/pointer-right diff (1.57-1.64% of pixels
+changed) was consistently _smaller_ than a stationary control (1.61-1.67%). That
+conclusion was wrong, and the method that produced it is a trap worth naming.
+
+Re-measured with `requestAnimationFrame`'s timestamp frozen so the ambient wave
+holds still, the noise floor is **0 pixels** and the pointer's contribution is
+unambiguous: 6604 changed pixels (0.62% of the hero), peak luminance delta
+123/255, and up to **30.5px of vertical vertex displacement** against 7.5px of
+ambient drift per 700ms. 42 of 42 `pointermove` events reach the handler; a
+500ms flick emits 6 wavepackets past the 90ms rate limit. The deployed script is
+byte-identical to the local build.
+
+**Why the metric lied:** changed-pixel fraction measures _area touched_, not
+_displacement_. Within 700ms the ambient loop has already repainted every carrier
+stroke, so superimposing a localised gain on strokes already counted as "changed"
+adds almost no new pixels. The metric saturates, and the sign of the difference
+between treatment and control becomes pure phase noise.
+
+**QA rule going forward:** never validate a pointer-driven effect with a
+whole-region changed-pixel diff. Freeze the animation clock first, then diff
+pointer-on against pointer-off.
+
+### Why it still felt dead — the real, more useful diagnosis
+
+1. **No coupling cue.** The pointer term is a symmetric Gaussian _amplitude
+   gain_. Nothing in the picture points at the cursor, has an edge at it, or
+   moves with it.
+2. **It lags past the gesture.** Ease 0.08 per frame is ~200ms to 63% and ~600ms
+   to settle, so the swell arrives after the hand has stopped.
+3. **Ambient camouflage.** The traces drift 3.5-7.5px per 700ms unprompted — the
+   same order as the visitor's own contribution over a short move. There is no
+   still state to perceive a change against.
+4. **It is quietest where the cursor lives.** The `QUIET` legibility damping
+   covers x 144-1296 — **80% of the canvas width** — rendering carriers there at
+   roughly 1.47:1. The strong response survives only in two ~120px margins.
+
+### Requirements this imposes on the Magnet Lines replacement
+
+Magnet Lines is structurally the right answer here, not merely a prettier one: it
+is _still_ at rest and responds _in position_.
+
+- Bind the pointer to something with no ambient motion of its own, or make the
+  pointer term at least 3x the ambient amplitude. A visitor cannot attribute a
+  change to their own hand when the thing already moves that much by itself.
+- Respond in **position, not gain**. Rotation toward the cursor is self-evidently
+  caused; an amplitude swell is not.
+- Keep latency under ~100ms: ease per frame >= 0.25, or none at all.
+- Never attenuate the response in the region the cursor occupies. Damp the
+  _ambient_ and keep the _response_ at full contrast, or move the response to
+  where the type is not.
+
+Two latent bugs found in passing, neither causal: `packets.length > PACKET_LIMIT`
+allows 5 alive rather than 4, and `onPointerMove` writes `pointerX/Y` before the
+`shouldRun()` guard.
+
+## AI/ML — replace the forecast stage with a nonlinear decision landscape
+
+Three concepts were built as real prototypes at the true 320x200 frame and judged
+side by side: (A) classification / nonlinear decision landscape, (B) embedding /
+cluster organisation, (C) the current forecasting + uncertainty visual.
+
+**Chosen: A.** Three reasons, all visible in the contact sheet.
+
+1. **C does not use scroll progress at all.** Its frames at p=0.15, 0.50 and 0.88
+   are _pixel-identical_ — verified by eye, not merely reported. The current
+   stage's only variable is the pointer horizon, so a visitor who scrolls through
+   the dwell without moving the mouse sees a still image. Now that a local
+   progress channel exists, that is disqualifying.
+2. **C does not read as machine learning.** At 320x200 the confidence band hugs a
+   wiggly curve, so its actual claim (uncertainty grows with horizon) is masked by
+   the signal's own amplitude. It reads as "a chart with an envelope" — equally
+   econometrics, equally finance. A reads as supervised learning in under two
+   seconds: labelled classes, a decision surface, margin contours.
+3. **Composition of the set.** Electronics is a left-to-right chain and Audio is a
+   left-to-right waveform. Keeping C makes three of five stages a horizontal line
+   crossing the frame. A is a 2-D field, which is what Quantum's sphere and FPGA's
+   lattice are — a sibling instrument rather than a third copy of one.
+
+A's activation carries real meaning: a straight-line nearest-centroid partition
+bends into a curved kernel boundary while ringed misclassified points extinguish
+one by one and the fit bar fills (84.7% -> 100%). **The scroll is the fit.**
+
+### On the earlier rejection of "a decision boundary"
+
+`ForecastStage.tsx` records that "a decision boundary over two blobs was rejected
+— it is the scikit-learn illustration the brief forbids." That rejection was
+correct for what it described and does not reach this. This is not two blobs and
+a static boundary; it is a three-class margin field whose boundary is
+scroll-driven and whose training error is visibly falling. The earlier note's own
+test — "nothing had been learned, so nothing was being shown" — is the test A
+passes and the node graph failed.
+
+### What is given up
+
+The one-to-one tie to `energy-demand-forecast` and its split-conformal band. A
+makes a statement about classification on synthetic data and does not point at a
+named repo. Accepted: the section's job is Lucas's ML _identity_, and forecasting
+is one project, not the identity.
+
+B is rejected outright — its meaning lives entirely in the transition, its
+reduced-motion frame is three dot clumps in dashed polygons, and its only accent
+object is a point joined by hairlines to its neighbours, which is literally the
+connected-dots idiom the brief forbids by name.
+
+### Two required corrections to A before it ships
+
+Both came from inspecting the prototype at true size rather than from the
+comparison itself.
+
+1. **Widen the glyph size separation.** At true 320px the filled dot (r=1.9), open
+   ring (r=2.1) and diamond (r=2.6) collapse toward "same grey speck", and the
+   picture degrades into _dots on either side of a curve_ — precisely the sklearn
+   illustration being avoided. The ordering is right; the separation is too narrow
+   to carry it. Must be verified at true rendered size and at low DPI, not at
+   contact-sheet scale.
+2. **Break the symmetry of the initial linear partition.** At p=0.15 the
+   piecewise-linear boundary forms a near-symmetric "Y" that reads as a logo mark
+   rather than a partition. Adjust the seeded blob positions so the opening state
+   is asymmetric.
+
+Known weakness, accepted: this is the densest stage in the set and the only one
+whose reading depends on distinguishing marks rather than following a single line.
+
+### Data discipline
+
+The landscape is generated at build time into a constant module, never solved at
+runtime — consistent with pass 2's rule 4. Boundaries are extracted per class
+pair by marching squares, arc-length-resampled to a fixed vertex count, and
+interpolated between a small number of baked frames. Resampling is not optional:
+the unoptimised prototype is 76 KB against ~5 KB gzip for the resampled form.
