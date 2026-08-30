@@ -7,6 +7,8 @@ summary: 'A speech emotion recognition pipeline on CREMA-D using mel-spectrogram
 
 An end-to-end research pipeline for speech emotion recognition on the CREMA-D dataset. The central contribution is a controlled comparison between a classical head and a variational quantum head, both trained on top of the same frozen classical backbone.
 
+This is the work behind my Electronic Engineering degree thesis at the University of Buenos Aires (FIUBA), _Redes Neuronales Híbridas Clásico-Cuánticas para Clasificación de Emociones en Audio_, directed by Dr. Ing. Leónidas Caram and co-directed by Ing. Ricardo A. Veiga, and defended in April 2026. The full document is linked above.
+
 ## Problem
 
 Quantum machine learning is a field with significant theoretical promise but limited empirical validation under realistic constraints. This project asks: can a variational quantum circuit head compete with — or improve upon — a classical head on an audio classification task, when both receive identical features and the circuit is small enough to run on today's hardware?

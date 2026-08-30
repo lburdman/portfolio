@@ -5,7 +5,8 @@
   "domains": ["quantum", "ai", "audio"],
   "stack": ["Quantum ML", "PyTorch", "PennyLane", "Qiskit", "Speech Processing", "Deep Learning", "CREMA-D"],
   "links": {
-    "github": "https://github.com/lburdman/qnn-transfer-learning"
+    "github": "https://github.com/lburdman/qnn-transfer-learning",
+    "paper": "https://drive.google.com/file/d/16WUN--ghjHGpY8tSYwtZPCqsDENdDB1l/view?usp=share_link"
   },
   "cover": "media/confusion-matrix.webp",
   "order": 20
