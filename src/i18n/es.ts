@@ -123,6 +123,8 @@ export const es: UIStrings = {
     relatedWork: 'Trabajo relacionado',
     backToList: 'Volver a proyectos',
     mediaAlt: {
+      'augmenta/trust-boundary':
+        "Tres versiones del mismo mensaje a medida que atraviesa la capa de privacidad. Desde el cliente: 'Contact me at john.doe@example.com'. Pasado un límite de confianza marcado, el gateway del LLM solo ve 'Contact me at [[AUG:EMAIL_ADDRESS:1]]'. Rehidratado, vuelve la dirección original. Al pie se citan los dos tests que lo verifican.",
       'room-acoustics/modal-distribution':
         'Tres filas de líneas verticales finas sobre un eje de frecuencia de 50 a 300 Hz, una por clase de modo: 13 axiales, 42 tangenciales, 37 oblicuos. La altura y la oscuridad de cada marca codifican el peso energético del modo, así que la fila axial es la más alta y oscura. Una marca punteada en 57,17 Hz señala el modo más bajo de la sala. Los oblicuos se agolpan por encima de los 200 Hz.',
       'energy-forecasting/prediction-interval':

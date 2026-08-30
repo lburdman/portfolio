@@ -40,22 +40,46 @@ Stated takeaway: strong data analysis is not running models, it is asking the
 right questions, choosing methods deliberately, and turning results into clear
 and actionable reporting.
 
-### Why this one matters
+### Status: already on the site — and that is the point
 
-This is the strongest thing in this file and it does not belong here — it is a
-**credential**, not a publication. `about.facts` already carries a trio of
-credentials shared with the Hero, and a completed MITx MicroMasters in
-Statistics and Data Science is a better claim than anything currently in that
-trio's neighbourhood.
+**This credential is NOT missing.** `src/i18n/{en,es}.ts` already carries
+`'MITx MicroMasters · Statistics & Data Science'` in the `CREDENTIALS` trio,
+which the Hero and the About page both render. My first read of the screenshot
+said "add this to About"; that was wrong, and checking before writing caught it.
 
-It also underwrites work already on the site: the time-series forecasting course
-content is directly the ground `energy-forecasting` stands on, and the
-uncertainty-quantification material is exactly what its conformal prediction
-intervals are doing.
+What is missing is everything that would make it **checkable**, which is the
+whole argument the rest of the site makes:
 
-**Recommended placement:** the About page, alongside the teaching roles — not a
-project card, and not a "publications" section. Needs the completion date from
-the user.
+| Fact          | Value                                                                       | Source                                                                               |
+| ------------- | --------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| Program       | Statistics and Data Science (General Track)                                 | MicroMasters certificate                                                             |
+| Issued        | May 2026                                                                    | MicroMasters certificate                                                             |
+| Credential ID | `95a95ec9be394396a5e9b082f1d00fcc`                                          | MicroMasters certificate                                                             |
+| Verify URL    | `https://credentials.edx.org/credentials/95a95ec9be394396a5e9b082f1d00fcc/` | **checked live, HTTP 200**                                                           |
+| Final course  | 6.419x Data Analysis: Statistical Modeling and Computation in Applications  | Verified certificate                                                                 |
+| 6.419x issued | 7 January 2026                                                              | Verified certificate                                                                 |
+| 6.419x score  | 97%                                                                         | LinkedIn post (NOT on the certificate — the certificate states a passing grade only) |
+
+Source PDFs, both in `~/Downloads`, neither in any repo:
+`MicroMasters | edX Credentials.pdf`, `MITx 6.419x Certificate | edX.pdf`.
+
+### The proposal, not yet executed
+
+Make the credential a link to that verify URL. Right now the trio is an
+assertion; one `href` turns it into something a reader can check in a click —
+on a site whose entire case is evidence over assertion, that is a
+disproportionately large gain for a small change.
+
+It is **not** done here because it is not free. `CredentialTrio` is
+`readonly [string, string, string]`, rendered as bare list items in **two**
+places (`Hero.astro`, `about.astro`). Making an entry linkable means changing
+that type to carry an optional `href`, touching both components, both
+dictionaries and the i18n tests — and the Hero's credential line is a tight
+typographic element where introducing link affordances changes how the hero
+reads. That is a design decision, so it waits for a yes.
+
+The 97% is worth stating somewhere too, but note it appears only in the post:
+the certificate itself records a passing grade, not a score.
 
 ---
 

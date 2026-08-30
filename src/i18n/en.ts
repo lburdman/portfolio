@@ -123,6 +123,8 @@ export const en: UIStrings = {
     relatedWork: 'Related work',
     backToList: 'Back to projects',
     mediaAlt: {
+      'augmenta/trust-boundary':
+        "Three versions of the same message as it moves through the privacy layer. From the client: 'Contact me at john.doe@example.com'. Past a marked trust boundary the LLM gateway sees only 'Contact me at [[AUG:EMAIL_ADDRESS:1]]'. Rehydrated, the original address returns. Footnotes cite the two tests asserting no raw PII reaches the gateway and no plaintext is stored.",
       'room-acoustics/modal-distribution':
         'Three rows of vertical hairlines on a shared frequency axis from 50 to 300 Hz, one row per mode class: 13 axial, 42 tangential, 37 oblique. Tick height and darkness encode modal energy weight, so the sparse axial row is tallest and darkest. A dashed marker at 57.17 Hz labels the room\u2019s lowest mode. The axial modes are few and widely spaced; the oblique modes crowd together above roughly 200 Hz.',
       'energy-forecasting/prediction-interval':
