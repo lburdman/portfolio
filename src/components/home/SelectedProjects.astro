@@ -65,9 +65,42 @@ const SECTION: SectionId = 'projects';
 const projects = await getFeaturedProjects(locale);
 const headingId = `${SECTION}-heading`;
 const allProjectsHref = localizePath('/projects', locale, base);
+
+/*
+ * NO `width="wide"` HERE, AND THAT IS THE FIX FOR A REAL DEFECT.
+ *
+ * This section used to opt into `--container-wide` (84rem) so the `lead`
+ * project could span the full measure. `lead` is gone — the listing is a set
+ * of equals now — so the wider container had nothing left to buy, and it was
+ * costing something: it put the projects' own content column underneath the
+ * layer spine.
+ *
+ * The spine positions itself with
+ *   margin-inline-start: clamp(0.75rem, (100vw - var(--container-content))/2 - 4.5rem, 7rem)
+ * which reserves a lane against `--container-content` (68rem). A section that
+ * renders at `--container-wide` reaches past that lane, and since the spine
+ * paints *behind* the section (tree order; `.section__inner` is z-index 1),
+ * the result was a hairline running straight through the card — under the
+ * title, the summary and the tags. Measured, spine right edge vs content left
+ * edge, at `wide`:
+ *
+ *   1180px  6px into the column      1512px  68px
+ *   1280px  18px                     1600px  24px
+ *   1440px  96px                     1728px  clear
+ *
+ * So it was broken across every common laptop width and correct only on very
+ * wide displays, which is why it survived review. At `content` the spine
+ * clears the column by 8px at 1180 and by more at every width above it.
+ *
+ * The rule this encodes: the spine's lane is reserved against
+ * `--container-content`, so anything wider than that on the homepage will run
+ * over it. `TechnicalWorlds` is also `wide`, but it paints its own ink band
+ * across the full bleed, so the spine is deliberately hidden there rather than
+ * colliding with type.
+ */
 ---
 
-<Section section={SECTION} label={t.sections[SECTION]} labelledBy={headingId} width="wide">
+<Section section={SECTION} label={t.sections[SECTION]} labelledBy={headingId}>
   <header class="selected__header">
     <h2 id={headingId}>{t.projects.heading}</h2>
     <p class="selected__lede">{t.projects.subtitle}</p>
