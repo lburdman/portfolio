@@ -47,6 +47,7 @@ const roles = ROLE_IDS.map((id) => t.about.roles[id]);
 const HEADING_ID = 'about-heading';
 const CURRENTLY_ID = 'about-currently';
 const TEACHING_ID = 'about-teaching';
+const CLIENT_WORK_ID = 'about-client-work';
 ---
 
 <PageLayout
@@ -69,6 +70,23 @@ const TEACHING_ID = 'about-teaching';
         <h2 id={CURRENTLY_ID} class="about__block-heading">{t.about.currentlyHeading}</h2>
         <ul class="about__interests">
           {t.about.interests.map((interest) => <li class="about__interest">{interest}</li>)}
+        </ul>
+      </section>
+
+      <section class="about__block" aria-labelledby={CLIENT_WORK_ID}>
+        <h2 id={CLIENT_WORK_ID} class="about__block-heading">{t.about.clientWorkHeading}</h2>
+        <ul class="about__clients">
+          {
+            t.about.clientWork.map((client) => (
+              <li class="about__client">
+                <h3 class="about__client-name">{client.name}</h3>
+                <p class="about__client-description">{client.description}</p>
+                <a class="about__client-link" href={client.href} rel="noopener noreferrer" target="_blank">
+                  {client.site}
+                </a>
+              </li>
+            ))
+          }
         </ul>
       </section>
 
@@ -200,5 +218,46 @@ const TEACHING_ID = 'about-teaching';
     line-height: var(--leading-body);
     color: var(--color-slate);
     text-wrap: pretty;
+  }
+
+  /* --- client work ---------------------------------------------------------
+     Deliberately quieter than a project card. This work is real and shipped,
+     and it is not the argument the projects grid is making — the type scale
+     says so without the copy having to.
+     ---------------------------------------------------------------------- */
+
+  .about__clients {
+    list-style: none;
+    display: grid;
+    gap: var(--spacing-stack);
+    margin: 0;
+    padding: 0;
+  }
+
+  .about__client-name {
+    font-family: var(--font-display);
+    font-stretch: var(--display-width-wide);
+    font-size: var(--text-display-4);
+    font-weight: 600;
+    letter-spacing: var(--tracking-label);
+    text-transform: uppercase;
+  }
+
+  .about__client-description {
+    margin-top: 0.5rem;
+    font-size: var(--text-base);
+    line-height: var(--leading-body);
+    color: var(--color-slate);
+    max-width: 52ch;
+    text-wrap: pretty;
+  }
+
+  .about__client-link {
+    display: inline-block;
+    margin-top: 0.5rem;
+    font-family: var(--font-mono);
+    font-stretch: normal;
+    font-size: var(--text-caption);
+    letter-spacing: var(--tracking-label);
   }
 </style>

@@ -173,6 +173,16 @@ export const es: UIStrings = {
           'Ayudante de cátedra en Computación y Comunicaciones Cuánticas. Fundamentos de circuitos cuánticos, teoría de la información cuántica y su relación con los sistemas criptográficos y de comunicaciones actuales.',
       },
     },
+    clientWorkHeading: 'Trabajo para clientes',
+    clientWork: [
+      {
+        name: 'ByLou Yoga',
+        href: 'https://www.bylou.com.ar',
+        site: 'bylou.com.ar',
+        description:
+          'Diseño y desarrollo del sitio de una práctica de yoga con base científica en Buenos Aires — un export estático de Next.js, desplegado y en uso. Publicado con permiso de su dueña.',
+      },
+    ],
   },
 
   contact: {

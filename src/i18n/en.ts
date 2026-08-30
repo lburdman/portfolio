@@ -173,6 +173,16 @@ export const en: UIStrings = {
           'Teaching assistant for Quantum Computation and Communications. Covering quantum circuit fundamentals, quantum information theory, and their relationship to modern cryptographic and communication systems.',
       },
     },
+    clientWorkHeading: 'Client work',
+    clientWork: [
+      {
+        name: 'ByLou Yoga',
+        href: 'https://www.bylou.com.ar',
+        site: 'bylou.com.ar',
+        description:
+          'Design and build of the site for a science-based yoga practice in Buenos Aires — a static Next.js export, deployed and in use. Published with the owner\u2019s permission.',
+      },
+    ],
   },
 
   contact: {

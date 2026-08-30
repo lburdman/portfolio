@@ -197,6 +197,27 @@ export interface UIStrings {
         description: string;
       }
     >;
+    /**
+     * Shipped client work, which lives here rather than in the projects grid.
+     *
+     * A project on that grid must declare at least one `DomainId`, and the five
+     * of them — ai, quantum, fpga, electronics, audio — are the site's argument,
+     * not a tag vocabulary. Client web work belongs to none of them, and adding
+     * a sixth domain to hold it would insert a layer into a descent that runs
+     * from the abstract down into the physics, where it does not sit.
+     *
+     * So it is named here instead. "I ship for real clients" is a fair claim
+     * and worth making; it is simply not the same claim the grid makes.
+     */
+    clientWorkHeading: string;
+    clientWork: readonly {
+      name: string;
+      /** The deployed site. Shown as the link text too, so no bare URL is duplicated. */
+      href: string;
+      /** Domain shown as the link's visible label, e.g. `bylou.com.ar`. */
+      site: string;
+      description: string;
+    }[];
   };
 
   /**
