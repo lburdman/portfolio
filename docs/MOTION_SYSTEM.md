@@ -70,10 +70,10 @@ appears once and is never repeated (brief §5).
 At most **one** expensive visual is rendering at any moment. This is enforced,
 not hoped for.
 
-| Stage             | Technology                                           | Lifecycle                                                                                                                                                                    |
-| ----------------- | ---------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Hero magnet field | DOM spans + CSS `transform`, no framework, no canvas | Attaches after first paint, and only when a fine pointer is present and motion is not reduced. **Stops** when the hero leaves the viewport and when Technical Worlds enters. |
-| Domain stage      | SVG / DOM                                            | Only the active domain animates. The other four are static.                                                                                                                  |
+| Stage                | Technology                                           | Lifecycle                                                                                                                                                                                                                                                                                                                                                           |
+| -------------------- | ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Opening magnet field | DOM spans + CSS `transform`, no framework, no canvas | Spans the Hero **and** the descent beneath it — `FieldBand.astro` is the box, since an absolutely-positioned field cannot cover two sibling sections without an ancestor holding both. Attaches after first paint, and only when a fine pointer is present and motion is not reduced. **Stops** when the band leaves the viewport and when Technical Worlds enters. |
+| Domain stage         | SVG / DOM                                            | Only the active domain animates. The other four are static.                                                                                                                                                                                                                                                                                                         |
 
 Every stage must:
 
@@ -187,7 +187,7 @@ same visual quality, less movement.
 
 - Long pinned and parallax sequences: **removed**. Technical Worlds becomes a
   vertical stack of five domain panels, fully readable, in document order.
-- Continuous decorative animation: **stopped**. The hero magnet field stands at
+- Continuous decorative animation: **stopped**. The magnet field stands at
   its resting rake and attaches no listener at all — a deliberate static hatch,
   not a degraded one, and not an empty box.
 - Entrance animations: content is visible immediately.
@@ -215,8 +215,8 @@ Mobile is a deliberate composition, not a squeezed desktop (brief §33).
   tablet breakpoint; the domains stack.
 - No hover dependency anywhere. Anything a pointer reveals must also be
   reachable by tap and by keyboard — if information is hover-only, it is a bug.
-- The hero magnet field ships fewer lines at narrower breakpoints, and renders
-  as a static hatch wherever the pointer is coarse. Prefer static over janky.
+- The magnet field ships fewer lines at narrower breakpoints, and renders as a
+  static hatch wherever the pointer is coarse. Prefer static over janky.
 - Project cards get stronger, not weaker: the card itself is the affordance.
 
 ---

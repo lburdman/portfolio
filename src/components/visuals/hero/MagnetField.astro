@@ -1,6 +1,8 @@
 ---
 /**
- * The hero's background visual: a ruled field, locally disturbed by the pointer.
+ * The opening band's background visual: a ruled field, locally disturbed by the
+ * pointer. It spans the hero AND the descent beneath it, stopping at the edge
+ * of the Technical Worlds ink band — see `FieldBand.astro`, which owns the box.
  *
  * Adapted from React Bits' "Magnet Lines" (reactbits.dev). Nothing was
  * installed; the runtime depends on that project in no way. The behavioural
@@ -48,23 +50,35 @@ import { HERO_FIELD_LINE_COUNT } from '@/lib/motion/magnet-field';
 const lines: readonly undefined[] = Array.from({ length: HERO_FIELD_LINE_COUNT });
 ---
 
-<div class="section__bleed hero-field" data-hero-field aria-hidden="true">
+<div class="hero-field" data-hero-field aria-hidden="true">
   {lines.map(() => <span class="hero-field__line" data-hero-line />)}
 </div>
 
 <style>
   .hero-field {
+    /* The field owns its own placement now. It used to ride the hero
+       `<Section>`'s `bleed` slot, whose `.section__bleed` rule is scoped under
+       `.section` — the moment the field moved out to span the hero AND the
+       descent beneath it, that selector stopped matching and the rule had to
+       come here. The band it fills is `FieldBand.astro`, the only positioned
+       ancestor; the two sections inside it are `position: relative` with an
+       auto z-index and come later in tree order, so they paint over this
+       without needing a z-index of their own. */
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+
     display: grid;
     place-items: center;
     /* Tier 1 — phones. Mirrors HERO_FIELD_TIERS[0]. */
-    grid-template-columns: repeat(6, 1fr);
-    grid-template-rows: repeat(14, 1fr);
+    grid-template-columns: repeat(8, 1fr);
+    grid-template-rows: repeat(50, 1fr);
     overflow: hidden;
     /* Decorative. It must never intercept a click meant for a link beneath it;
-       pointer input reaches the controller through the section, not through
-       this element. */
+       pointer input reaches the controller through the band, not through this
+       element. */
     pointer-events: none;
-    /* Two hundred siblings whose transforms change together. Containment keeps
+    /* A thousand siblings whose transforms change together. Containment keeps
        that work off the rest of the page's layout and paint. */
     contain: layout paint style;
   }
@@ -74,8 +88,8 @@ const lines: readonly undefined[] = Array.from({ length: HERO_FIELD_LINE_COUNT }
        `-16deg` is `REST_ANGLE_DEG`; the two must agree, and the built CSS is
        read back in `tests/hero-field.test.ts` to check that they do. It is
        raked off level so a hairline can never be mistaken for a strikethrough
-       through the hero's own copy, nor for the level rules that carry real
-       structure elsewhere in this section.
+       through the band's own copy, nor for the level rules that carry real
+       structure in the descent below the hero.
        Two consequences, both deliberate:
          · the field is already correct before any script runs, and stays
            correct if none ever does — no JavaScript, reduced motion and a
@@ -86,10 +100,11 @@ const lines: readonly undefined[] = Array.from({ length: HERO_FIELD_LINE_COUNT }
     --hero-field-angle: -16deg;
     --hero-field-heat: 0;
 
-    /* 28px of line on a ~72px pitch: a mark, not a rule. Long enough for its
-       angle to be legible, short enough that two hundred of them read as
-       texture behind the name rather than as a competing grid. */
-    width: 1.75rem;
+    /* 16px of line on a ~48px pitch: a mark, not a rule. `1rem` is
+       `LINE_LENGTH_REM`, and the same third-of-a-pitch proportion the field
+       ran at when it was sparser and lived in the hero alone — the marks got
+       shorter because the grid got denser, not instead of it. */
+    width: 1rem;
     height: var(--border-hairline);
     transform: rotate(var(--hero-field-angle));
     transform-origin: center;
@@ -99,30 +114,33 @@ const lines: readonly undefined[] = Array.from({ length: HERO_FIELD_LINE_COUNT }
        the hairlines and links on this page already use, so the field belongs
        to the composition instead of introducing a palette of its own. */
     background-color: color-mix(in oklab, var(--color-accent) calc(var(--hero-field-heat) * 100%), var(--color-rule));
-    opacity: calc(0.34 + var(--hero-field-heat) * 0.6);
+    /* A touch quieter at rest than the sparse field was (0.34): five times as
+       many marks over the same ground would otherwise read as a grey wash
+       behind the descent's own hairline rules. Lit, it reaches the same place. */
+    opacity: calc(0.26 + var(--hero-field-heat) * 0.68);
 
-    /* No `will-change`. The original sets it on every span; promoting two
-       hundred elements to their own compositing layers costs far more than the
-       repaint of a 28x1px box it is meant to save. */
+    /* No `will-change`. The original sets it on every span; promoting a
+       thousand elements to their own compositing layers costs far more than
+       the repaint of a 16x1px box it is meant to save. */
   }
 
-  /* The tail beyond tier 1's 6x14 grid. */
-  .hero-field__line:nth-child(n + 85) {
+  /* The tail beyond tier 1's 8x50 grid. */
+  .hero-field__line:nth-child(n + 401) {
     display: none;
   }
 
   /* Tier 2 — large phones and narrow windows. Mirrors HERO_FIELD_TIERS[1]. */
   @media (min-width: 30rem) {
     .hero-field {
-      grid-template-columns: repeat(9, 1fr);
-      grid-template-rows: repeat(12, 1fr);
+      grid-template-columns: repeat(10, 1fr);
+      grid-template-rows: repeat(44, 1fr);
     }
 
-    .hero-field__line:nth-child(n + 85) {
+    .hero-field__line:nth-child(n + 401) {
       display: block;
     }
 
-    .hero-field__line:nth-child(n + 109) {
+    .hero-field__line:nth-child(n + 441) {
       display: none;
     }
   }
@@ -130,15 +148,15 @@ const lines: readonly undefined[] = Array.from({ length: HERO_FIELD_LINE_COUNT }
   /* Tier 3 — tablets. Mirrors HERO_FIELD_TIERS[2]. */
   @media (min-width: 48rem) {
     .hero-field {
-      grid-template-columns: repeat(12, 1fr);
-      grid-template-rows: repeat(10, 1fr);
+      grid-template-columns: repeat(16, 1fr);
+      grid-template-rows: repeat(41, 1fr);
     }
 
-    .hero-field__line:nth-child(n + 109) {
+    .hero-field__line:nth-child(n + 441) {
       display: block;
     }
 
-    .hero-field__line:nth-child(n + 121) {
+    .hero-field__line:nth-child(n + 657) {
       display: none;
     }
   }
@@ -147,11 +165,11 @@ const lines: readonly undefined[] = Array.from({ length: HERO_FIELD_LINE_COUNT }
      HERO_FIELD_TIERS[3]. */
   @media (min-width: 80rem) {
     .hero-field {
-      grid-template-columns: repeat(20, 1fr);
-      grid-template-rows: repeat(10, 1fr);
+      grid-template-columns: repeat(30, 1fr);
+      grid-template-rows: repeat(38, 1fr);
     }
 
-    .hero-field__line:nth-child(n + 121) {
+    .hero-field__line:nth-child(n + 657) {
       display: block;
     }
   }

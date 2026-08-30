@@ -32,7 +32,6 @@
 
 import ActionLink from '@/components/ui/ActionLink.astro';
 import Section from '@/components/ui/Section.astro';
-import MagnetField from '@/components/visuals/hero/MagnetField.astro';
 import { DOMAINS, domainOrdinal } from '@/config/domains';
 import { CONTACT_SECTION_ID, HOME_PATH } from '@/config/navigation';
 import { SITE } from '@/config/site';
@@ -75,8 +74,6 @@ const HEADING_ID = 'hero-heading';
 ---
 
 <Section section="hero" label={t.sections.hero} labelledBy={HEADING_ID} spacing="none" class="hero">
-  <MagnetField slot="bleed" />
-
   <div class="hero__lockup">
     <h1 id={HEADING_ID} class="hero__name">{t.hero.name}</h1>
     <p class="hero__role">{t.hero.role}</p>
@@ -293,86 +290,3 @@ const HEADING_ID = 'hero-heading';
     text-transform: uppercase;
   }
 </style>
-
-<script>
-  /**
-   * NOTE ON WHERE THIS SHIPS. Astro inlines a `<script>` chunk only while it is
-   * under Vite's `build.assetsInlineLimit` (4096 bytes). Whether this one lands
-   * inline or as `<script type="module" src=…>` changes nothing that the
-   * performance contract measures: a module script is deferred either way, so
-   * blocking critical-path bytes stay at 0 KB and the hero's semantic content
-   * never waits on it. Both forms are already covered by the built CSP —
-   * `script-src 'self'` plus a hash per inline block.
-   */
-  import { createMagnetLines } from '../visuals/hero/magnet-lines';
-  import { bindPageLifecycle } from '../../lib/motion/page-lifecycle';
-
-  const field = document.querySelector<HTMLElement>('[data-hero-field]');
-  const section = field?.closest<HTMLElement>('section') ?? null;
-
-  if (field && section) {
-    /**
-     * The pointer target is the SECTION, not the field. The field is
-     * `pointer-events: none` so it cannot swallow a click meant for a CTA
-     * beneath it, which means it never receives a pointer event of its own —
-     * and it is not `window` either, so moving the pointer anywhere else on
-     * the page costs this hero nothing.
-     */
-    const lines = createMagnetLines(field, { pointerTarget: section });
-    lines.start();
-
-    /**
-     * At most one expensive visual runs at a time (docs/MOTION_SYSTEM.md §4).
-     * The controller already stops itself when the hero leaves the viewport,
-     * so this is the belt to that braces — but it is also the site's one
-     * cross-island contract and it is kept deliberately: any element carrying
-     * `data-stops-hero-visual` stops this field while it is on screen. No
-     * global store, no event bus, no import across islands.
-     */
-    const rival = document.querySelector('[data-stops-hero-visual]');
-
-    let observer: IntersectionObserver | null = null;
-
-    if (rival && 'IntersectionObserver' in window) {
-      observer = new IntersectionObserver(
-        (entries) => {
-          for (const entry of entries) {
-            if (entry.isIntersecting) lines.stop();
-            else lines.start();
-          }
-        },
-        { threshold: 0 },
-      );
-      observer.observe(rival);
-    }
-
-    /**
-     * Teardown, and the back/forward cache.
-     *
-     * Ordinary navigation here is cross-document (there is no `<ClientRouter />`),
-     * so the page is torn down wholesale and the `destroy()` branch is
-     * belt-and-braces. It is worth the line anyway: it makes "no listener and no
-     * pending frame survives this hero" a property the controller can be tested
-     * for rather than one the runtime happens to provide.
-     *
-     * The freeze branch is not belt-and-braces, and it is why this goes through
-     * `bindPageLifecycle` instead of a bare `pagehide` listener. This hero
-     * shipped destroying itself on every `pagehide`, including the persisted one
-     * — so on Safari and Firefox, where Back restores the document without
-     * re-running this module, the field came back permanently dead. The rule and
-     * the reasoning live in `src/lib/motion/page-lifecycle.ts`, where they are
-     * unit-tested; `ProjectGrid.astro` binds its card light through the same
-     * function, so the two cannot drift apart again.
-     *
-     * The observer is released on a real unload because `destroy()` cannot reach
-     * it — it belongs to this script, not to the controller — and left connected
-     * it would go on calling `start()`/`stop()` on a dead handle. It is
-     * deliberately kept across a freeze: the restored document is the same
-     * document, and the rival element is still the one it observes.
-     */
-    bindPageLifecycle(window, lines, () => {
-      observer?.disconnect();
-      observer = null;
-    });
-  }
-</script>

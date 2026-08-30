@@ -4,10 +4,17 @@
  *
  * A ruled ledger rather than a box grid: each entry opens with its own channel
  * masthead and the columns are separated by generous whitespace, not by
- * borders. The one asymmetry — `lead`, which gives the first project the full
- * measure and a larger title — is earned by hierarchy: the opening project is
- * the strongest piece of evidence on the page and the layout should say so.
- * Everything after it pairs up. Below 48rem the whole thing is one column.
+ * borders. The grid is regular — two equal columns above 48rem, one below, and
+ * every card the same card.
+ *
+ * It was not always. A `lead` prop used to give the first project the full
+ * measure and a larger title, on the argument that the opening entry was the
+ * strongest evidence on the page and the layout should say so. That argument
+ * holds for a listing of four; it stops holding for a listing that is growing,
+ * because a single promoted entry turns an ordered set into a ranked one and
+ * every project added afterwards reads as an also-ran. The order is still
+ * expressed — by `order` in the content, and by the figure number in each
+ * card's margin — it is simply no longer expressed in square footage.
  *
  * The empty state lives here rather than in each caller, so the homepage and
  * the projects index cannot disagree about it — and so `t.projects.empty`
@@ -30,13 +37,11 @@ interface Props {
   base: string;
   /** Heading level for the card titles — one below the section's own heading. */
   headingLevel?: 2 | 3 | 4 | undefined;
-  /** Give the first project the full measure. */
-  lead?: boolean | undefined;
   /** Show the two-digit figure number in each card's margin. */
   numbered?: boolean | undefined;
 }
 
-const { projects, t, locale, base, headingLevel = 3, lead = false, numbered = true } = Astro.props;
+const { projects, t, locale, base, headingLevel = 3, numbered = true } = Astro.props;
 
 /**
  * Which card gets `loading="eager"` + `fetchpriority="high"`.
@@ -65,12 +70,13 @@ const priorityIndex = Math.max(
   ) : (
     <ul class="grid" data-card-field>
       {projects.map((project, position) => {
-        const isLead = lead && position === 0;
-        // Not `isLead`: emphasis is an editorial decision this listing may
-        // decline to make, while the LCP candidate is a fact about which card
-        // holds the first image. See `priorityIndex` above.
+        // Every card is the same card. The listing used to promote position 0
+        // to the full measure; a grid where one entry is three times the size
+        // of the rest ranks the work for the reader, and this listing has no
+        // ranking to express — it has an order, which the figure number
+        // already carries. See the note above the grid's own styles.
         return (
-          <li class:list={['grid__item', isLead && 'grid__item--lead']}>
+          <li class="grid__item">
             <ProjectCard
               project={project}
               t={t}
@@ -78,7 +84,6 @@ const priorityIndex = Math.max(
               base={base}
               headingLevel={headingLevel}
               index={numbered ? position + 1 : undefined}
-              emphasis={isLead ? 'lead' : 'default'}
               priority={position === priorityIndex}
             />
           </li>
@@ -109,14 +114,14 @@ const priorityIndex = Math.max(
     width: 100%;
   }
 
+  /* One shape, repeated. No `grid-column: 1 / -1` on the first item any more:
+     the listing is a set of equals, so the grid is regular and every card is
+     the same size. `minmax(0, 1fr)` on both tracks is what keeps a long title
+     from widening its own column and breaking that. */
   @media (min-width: 48rem) {
     .grid {
       grid-template-columns: repeat(2, minmax(0, 1fr));
       column-gap: var(--spacing-block);
-    }
-
-    .grid__item--lead {
-      grid-column: 1 / -1;
     }
   }
 

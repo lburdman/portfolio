@@ -120,21 +120,20 @@ interface Props {
    * than an untranslated string.
    */
   index?: number | undefined;
-  /** `lead` is the editorial opener of a listing: larger title, wider measure. */
-  emphasis?: 'lead' | 'default' | undefined;
   /**
-   * This card opens its listing, so its cover is a candidate for the page's
-   * Largest Contentful Paint and must not be lazy-loaded.
+   * This card holds the first cover in its listing, so that cover is the page's
+   * likely Largest Contentful Paint and must not be lazy-loaded.
    *
-   * Separate from `emphasis` on purpose. `emphasis="lead"` is an editorial
-   * decision about weight that a listing may decline to make; loading priority
-   * is a fact about document order that every listing has. Collapsing them
-   * would mean an un-emphasised first card silently lost its priority.
+   * There used to be an `emphasis` prop beside this one, promoting a listing's
+   * opener to a larger title and the full measure, and the two were kept apart
+   * deliberately: emphasis was an editorial decision a listing could decline to
+   * make, while loading priority is a fact about which card holds the first
+   * image. `ProjectGrid` no longer promotes anything, so only the fact remains.
    */
   priority?: boolean | undefined;
 }
 
-const { project, t, locale, base, headingLevel = 3, index, emphasis = 'default', priority = false } = Astro.props;
+const { project, t, locale, base, headingLevel = 3, index, priority = false } = Astro.props;
 const { meta, title, summary } = project;
 
 const HEADINGS = { 2: 'h2', 3: 'h3', 4: 'h4' } as const;
@@ -190,14 +189,14 @@ const coverWidths = fitted.length > 0 ? fitted : cover ? [cover.width] : [];
  * whole media pass exists to be sharp. `fetchpriority="high"` had faithfully
  * rushed the wrong file.
  *
- * The measured widths, from `.card__media` at each breakpoint: lead is ~95vw
- * capped at the 84rem container; default is 95vw in one column, ~45vw in two,
- * settling at 40rem once the container caps. `sizes` is allowed to overstate —
- * that costs bytes — but understating costs resolution, so each stop is rounded
- * up rather than down.
+ * The measured widths, from `.card__media` at each breakpoint: 95vw in one
+ * column, ~45vw once the grid is two, settling at 40rem once the container
+ * caps. One expression rather than two, because every card is now the same
+ * width — the second branch existed only for the full-measure lead card.
+ * `sizes` is allowed to overstate — that costs bytes — but understating costs
+ * resolution, so each stop is rounded up rather than down.
  */
-const coverSizes =
-  emphasis === 'lead' ? '(min-width: 84rem) 84rem, 95vw' : '(min-width: 84rem) 40rem, (min-width: 48rem) 45vw, 95vw';
+const coverSizes = '(min-width: 84rem) 40rem, (min-width: 48rem) 45vw, 95vw';
 
 /**
  * Which reserved box this cover gets.
@@ -292,11 +291,7 @@ const mediaTransition = `project-media-${meta.slug}`;
      addressed by role, not by styling: a listing that ever renders a card
      variant which should not track the pointer simply omits it. */
 }
-<article
-  class:list={['card', `card--${emphasis}`, !cover && 'card--typographic']}
-  data-project={meta.slug}
-  data-card-light
->
+<article class:list={['card', !cover && 'card--typographic']} data-project={meta.slug} data-card-light>
   {
     /* The card's masthead rule: one tinted segment per technical domain, then a
       hairline running out to the measure. A datasheet channel legend. It is
@@ -912,28 +907,6 @@ const mediaTransition = `project-media-${meta.slug}`;
 
   .card__external-mark {
     font-size: 0.9em;
-  }
-
-  /* ---------------------------------------------------------------------------
-     Editorial emphasis
-     ------------------------------------------------------------------------ */
-
-  .card--lead {
-    gap: 1.125rem;
-  }
-
-  @media (min-width: 48rem) {
-    .card--lead .card__title {
-      font-size: var(--text-display-3);
-    }
-
-    .card--lead .card__summary {
-      font-size: var(--text-lg);
-    }
-
-    .card--lead .card__channel {
-      width: 3.5rem;
-    }
   }
 
   /* No cover: the title is the image. Slightly more air and a heavier masthead

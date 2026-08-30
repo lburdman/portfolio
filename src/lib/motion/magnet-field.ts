@@ -114,6 +114,17 @@ export const REST_ANGLE_DEG = -16;
  */
 export const HEAT_RADIUS_SCALE = 0.72;
 
+/**
+ * The length of one line, in `rem`.
+ *
+ * A mark, not a rule: about a third of the grid pitch, so that a thousand of
+ * them read as texture behind the type rather than as a competing ruled grid.
+ * The stylesheet carries the same number as a literal — a `width` cannot be
+ * driven from here without an inline style, which this site's CSP drops — and
+ * `tests/hero-field.test.ts` reads the built CSS back to check the two agree.
+ */
+export const LINE_LENGTH_REM = 1;
+
 export interface LineResponse {
   /** Rotation in degrees, written as a CSS custom property. */
   readonly angleDeg: number;
@@ -178,8 +189,14 @@ export function stepEngagement(current: number, target: number): number {
  * Expressed in pitches rather than pixels so the disturbance covers the same
  * *number of lines* at every breakpoint. A fixed pixel radius would swallow a
  * whole small window and read as a pinprick on a 27-inch display.
+ *
+ * Raised from 5.2 when the pitch tightened to ~48px: at the old multiple the
+ * disturbance would have shrunk from a 374px halo to a 250px one, which reads
+ * as a smaller effect rather than as a denser one. Seven pitches holds the
+ * halo near its previous physical size, so the density change is the only
+ * change the eye is asked to notice.
  */
-export const INFLUENCE_RADIUS_IN_PITCHES = 5.2;
+export const INFLUENCE_RADIUS_IN_PITCHES = 7;
 
 /**
  * The grid, per breakpoint tier.
@@ -202,23 +219,46 @@ export interface FieldTier {
 /**
  * Four tiers, not three, and the extra one is not decoration.
  *
- * The hero is content-height, so its aspect ratio swings hard: about 0.4 on a
- * phone (390x980) and about 1.9 on a laptop (1440x740). A single track count
+ * The field spans the whole opening band — the hero *and* the descent beneath
+ * it, ending at the edge of the Technical Worlds ink band — so its box is
+ * content-height twice over and its aspect ratio swings hard: about 0.16 on a
+ * phone (390x2450) and about 0.78 on a laptop (1440x1860). A single track count
  * stretched across that range stops reading as a grid — measured on a 390px
  * device with 6x8, the vertical pitch came out at twice the horizontal one and
  * the field read as scattered marks, one of which sat exactly on a text
  * baseline and looked like a strikethrough. Each tier below is chosen to keep
  * the cell roughly square at the viewport it serves.
+ *
+ * The pitch is held near 48px at every tier — two thirds of the 72px the hero
+ * alone used to run at. Denser marks on a taller band, so the texture reads as
+ * one continuous sheet the page descends through rather than as a patch behind
+ * the name.
+ *
+ * ── Where the band heights come from ────────────────────────────────────────
+ *
+ * They are computed, not eyeballed: the hero is `min(82svh, 50rem)` and the
+ * descent is deterministic type, so its height adds up from the tokens — the
+ * section padding, the figure rule, a two-line `--text-display-2` heading, the
+ * narrative at `--text-xl`, and five list items whose own height is set by
+ * `--spacing-stack` padding plus a `--text-display-4` name. The intro stacks
+ * below 60rem and the list items stack below 48rem, which is why the band grows
+ * taller as the viewport gets narrower even though it holds the same words.
+ *
+ * The arithmetic is close, not exact — a description that wraps to a third line
+ * moves it. A row count that is off by one leaves the cell a couple of percent
+ * from square, which for a 16px mark raked 16 degrees off level is not a defect
+ * anyone can see. It is worth knowing that this is the number to adjust if the
+ * field ever reads as vertically stretched on a real screen.
  */
 export const HERO_FIELD_TIERS = [
-  /* Phones, ~390x980: 65 x 70. Static — nothing here has a fine pointer. */
-  { minWidthRem: 0, columns: 6, rows: 14 },
-  /* Large phones and narrow windows, ~480x800: 53 x 67. */
-  { minWidthRem: 30, columns: 9, rows: 12 },
-  /* Tablets, ~768x700: 64 x 70. */
-  { minWidthRem: 48, columns: 12, rows: 10 },
-  /* The desktop composition the response is tuned for, ~1440x740: 72 x 74. */
-  { minWidthRem: 80, columns: 20, rows: 10 },
+  /* Phones, ~390x2450: 49 x 49. Static — nothing here has a fine pointer. */
+  { minWidthRem: 0, columns: 8, rows: 50 },
+  /* Large phones and narrow windows, ~480x2060: 48 x 47. */
+  { minWidthRem: 30, columns: 10, rows: 44 },
+  /* Tablets, ~768x1980: 48 x 48. */
+  { minWidthRem: 48, columns: 16, rows: 41 },
+  /* The desktop composition the response is tuned for, ~1440x1860: 48 x 49. */
+  { minWidthRem: 80, columns: 30, rows: 38 },
 ] as const satisfies readonly FieldTier[];
 
 /** Lines in a tier. */

@@ -87,22 +87,32 @@ describe('LCP: the opening card is not lazy-loaded', () => {
     expect(code).toMatch(/fetchpriority=\{priority \? 'high' : 'auto'\}/);
   });
 
-  it('gives the priority to the first card with an image, not to editorial emphasis', () => {
-    // `emphasis="lead"` is opt-in per listing, so the priority must not be tied
-    // to it: a listing that declined to emphasise its opener must not thereby
-    // lose it.
-    //
-    // Nor is it `position === 0`, which is what this asserted while no project
+  it('gives the priority to the first card with an image, not to document order', () => {
+    // Not `position === 0`, which is what this asserted while no project
     // shipped media. A card with no cover renders as type and cannot be the
-    // Largest Contentful Paint, and the current ordering opens with exactly
-    // such a card — so hardcoding position 0 handed `fetchpriority="high"` to
-    // a heading and left the real LCP element, a 1500px plot one card later,
-    // behind `loading="lazy"`. `findIndex` returning −1 collapses to 0, so a
-    // listing with no media at all behaves exactly as before.
+    // Largest Contentful Paint, so hardcoding position 0 would hand
+    // `fetchpriority="high"` to a heading and leave the real LCP element — a
+    // 1500px plot one card later — behind `loading="lazy"`. `findIndex`
+    // returning −1 collapses to 0, so a listing with no media at all behaves
+    // exactly as before.
     const grid = withoutComments(source('components/projects/ProjectGrid.astro'));
     expect(grid).toContain('priority={position === priorityIndex}');
     expect(grid).toMatch(/findIndex\(\(project\) => project\.meta\.cover !== undefined\)/);
-    expect(grid).not.toContain('priority={isLead}');
+    expect(grid).not.toContain('priority={position === 0}');
+  });
+
+  it('renders one uniform grid — no card is promoted to the full measure', () => {
+    // The listing is a set of equals. A `grid-column: 1 / -1` on the first item
+    // would rank the work for the reader; the order is carried by the figure
+    // number in the margin instead. This is the guard against the lead
+    // treatment coming back by accident with the next layout pass.
+    const grid = withoutComments(source('components/projects/ProjectGrid.astro'));
+    expect(grid).not.toMatch(/grid-column:\s*1 \/ -1/);
+    expect(grid).not.toContain('emphasis=');
+    expect(grid).toMatch(/grid-template-columns:\s*repeat\(2, minmax\(0, 1fr\)\)/);
+
+    const card = withoutComments(source('components/projects/ProjectCard.astro'));
+    expect(card).not.toContain('card--lead');
   });
 
   it('keeps the reserved box that holds CLS at zero either way', () => {
