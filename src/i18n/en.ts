@@ -123,6 +123,8 @@ export const en: UIStrings = {
     relatedWork: 'Related work',
     backToList: 'Back to projects',
     mediaAlt: {
+      'room-acoustics/modal-distribution':
+        'Three rows of vertical hairlines on a shared frequency axis from 50 to 300 Hz, one row per mode class: 13 axial, 42 tangential, 37 oblique. Tick height and darkness encode modal energy weight, so the sparse axial row is tallest and darkest. A dashed marker at 57.17 Hz labels the room\u2019s lowest mode. The axial modes are few and widely spaced; the oblique modes crowd together above roughly 200 Hz.',
       'energy-forecasting/prediction-interval':
         'Line chart of German electricity load over 14 days in August 2019: actual load in black, XGBoost forecast dashed, and a shaded 95% conformal prediction interval around it. The forecast tracks the daily peaks and troughs closely; the interval widens where the model is least certain.',
       'energy-forecasting/backtest-rmse-by-fold':

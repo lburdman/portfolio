@@ -123,6 +123,8 @@ export const es: UIStrings = {
     relatedWork: 'Trabajo relacionado',
     backToList: 'Volver a proyectos',
     mediaAlt: {
+      'room-acoustics/modal-distribution':
+        'Tres filas de líneas verticales finas sobre un eje de frecuencia de 50 a 300 Hz, una por clase de modo: 13 axiales, 42 tangenciales, 37 oblicuos. La altura y la oscuridad de cada marca codifican el peso energético del modo, así que la fila axial es la más alta y oscura. Una marca punteada en 57,17 Hz señala el modo más bajo de la sala. Los oblicuos se agolpan por encima de los 200 Hz.',
       'energy-forecasting/prediction-interval':
         'Gráfico de líneas de la demanda eléctrica alemana durante 14 días de agosto de 2019: la carga real en negro, la predicción de XGBoost en línea discontinua y un intervalo de predicción conformal del 95 % sombreado a su alrededor. La predicción sigue de cerca los picos y valles diarios; el intervalo se ensancha donde el modelo tiene menos certeza.',
       'energy-forecasting/backtest-rmse-by-fold':
