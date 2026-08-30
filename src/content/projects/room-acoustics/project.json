@@ -1,0 +1,11 @@
+{
+  "slug": "room-acoustics",
+  "status": "published",
+  "featured": true,
+  "domains": ["audio"],
+  "stack": ["Go", "Acoustics", "Numerical Methods", "Python", "NumPy", "pyroomacoustics", "Test-Driven Development"],
+  "links": {
+    "github": "https://github.com/lburdman/acustics"
+  },
+  "order": 15
+}
