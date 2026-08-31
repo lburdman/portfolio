@@ -153,6 +153,16 @@ export const en: UIStrings = {
       'Time series forecasting pipelines',
       'Privacy-preserving AI architectures',
     ],
+    researchHeading: 'Research presented',
+    research: [
+      {
+        title: 'Transfer Learning para Redes Neuronales Híbridas Clásico–Cuánticas',
+        venue: 'LANET 2025 · Latin American Conference on Complex Networks',
+        where: 'Punta del Este, Uruguay',
+        description:
+          'Poster, with Leónidas Facundo Caram. The transfer-learning result behind my thesis: a frozen classical backbone feeding a variational quantum circuit, on binary and three-class emotion classification from audio. Work from the Laboratorio de Redes y Sistemas Móviles at FIUBA.',
+      },
+    ],
     teachingHeading: 'Teaching & community',
     roles: {
       qiskit: {
@@ -160,7 +170,7 @@ export const en: UIStrings = {
         org: 'Qiskit Fall Fest FIUBA',
         period: '2023 – Present',
         description:
-          'Led end-to-end delivery of an IBM-supported annual quantum computing event — 30+ talks, hybrid sessions, a closing hackathon, and 500+ attendees. Responsible for program design, speaker coordination, logistics, and community engagement.',
+          'Co-organizer of the IBM Quantum-backed festival at FIUBA — 30+ talks across a month, hybrid sessions and 500+ attendees, closing with a hackathon where teams built a Grover search in Qiskit from scratch. Its reach earned the faculty an invitation to Noche de los Museos, where we exhibited the only 2-qubit NMR quantum computer in Argentina.',
       },
       digitalSystems: {
         role: 'Teaching Assistant',

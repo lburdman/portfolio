@@ -29,6 +29,17 @@ export interface SocialLink {
   readonly display: string;
 }
 
+/**
+ * The address, written once.
+ *
+ * It used to appear three times in this file — as `email`, and again as the
+ * `href` and `display` of the email social entry. Three copies of one fact in
+ * the file whose own header forbids that elsewhere; a change to one of them was
+ * a silent mismatch between the visible address and the one a click actually
+ * sends to. There is now one literal and two derivations.
+ */
+const EMAIL = 'lucasburdman@gmail.com';
+
 export const SITE = {
   origin: ORIGIN,
   basePath: BASE_PATH,
@@ -42,7 +53,7 @@ export const SITE = {
    */
   role: 'Electronic Engineer · AI Engineer',
 
-  email: 'lucas.burdman@gmail.com',
+  email: EMAIL,
 
   social: [
     {
@@ -57,8 +68,8 @@ export const SITE = {
     },
     {
       id: 'email',
-      href: 'mailto:lucas.burdman@gmail.com',
-      display: 'lucas.burdman@gmail.com',
+      href: `mailto:${EMAIL}`,
+      display: EMAIL,
     },
   ] as const satisfies readonly SocialLink[],
 

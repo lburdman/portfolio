@@ -187,6 +187,26 @@ export interface UIStrings {
     facts: CredentialTrio;
     currentlyHeading: string;
     interests: string[];
+    /**
+     * Work presented outside this site, to people who did not have to be kind
+     * about it.
+     *
+     * It sits above teaching on the page because it is the only thing here that
+     * was reviewed by strangers. Everything else on About is self-reported.
+     *
+     * `title` is deliberately NOT localized, for the same reason the credential
+     * names are not: a translated paper title is one nobody can search for. The
+     * surrounding prose is translated; the citation is not.
+     */
+    researchHeading: string;
+    research: readonly {
+      /** The work's own title, in the language it was presented in. */
+      title: string;
+      /** Conference and year, as it would appear in a citation. */
+      venue: string;
+      where: string;
+      description: string;
+    }[];
     teachingHeading: string;
     roles: Record<
       'qiskit' | 'digitalSystems' | 'quantumComms',

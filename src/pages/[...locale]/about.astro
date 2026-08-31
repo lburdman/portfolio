@@ -48,6 +48,7 @@ const HEADING_ID = 'about-heading';
 const CURRENTLY_ID = 'about-currently';
 const TEACHING_ID = 'about-teaching';
 const CLIENT_WORK_ID = 'about-client-work';
+const RESEARCH_ID = 'about-research';
 ---
 
 <PageLayout
@@ -71,6 +72,26 @@ const CLIENT_WORK_ID = 'about-client-work';
         <ul class="about__interests">
           {t.about.interests.map((interest) => <li class="about__interest">{interest}</li>)}
         </ul>
+      </section>
+
+      <section class="about__block" aria-labelledby={RESEARCH_ID}>
+        <h2 id={RESEARCH_ID} class="about__block-heading">{t.about.researchHeading}</h2>
+        <ol class="about__research">
+          {
+            t.about.research.map((item) => (
+              <li class="about__paper">
+                <h3 class="about__paper-title" lang="es">
+                  {item.title}
+                </h3>
+                <p class="about__paper-meta">
+                  <span class="about__paper-venue">{item.venue}</span>
+                  <span class="about__paper-where">{item.where}</span>
+                </p>
+                <p class="about__paper-description">{item.description}</p>
+              </li>
+            ))
+          }
+        </ol>
       </section>
 
       <section class="about__block" aria-labelledby={CLIENT_WORK_ID}>
@@ -259,5 +280,58 @@ const CLIENT_WORK_ID = 'about-client-work';
     font-stretch: normal;
     font-size: var(--text-caption);
     letter-spacing: var(--tracking-label);
+  }
+
+  /* --- research ------------------------------------------------------------
+     A citation, set like one. The title carries `lang="es"` because it is not
+     translated -- a paper title people can search for has to stay in the
+     language it was presented in -- and without that attribute a Spanish title
+     is read aloud with English phonemes on the English page.
+     ---------------------------------------------------------------------- */
+
+  .about__research {
+    list-style: none;
+    display: grid;
+    gap: var(--spacing-stack);
+    margin: 0;
+    padding: 0;
+  }
+
+  .about__paper {
+    padding-left: var(--spacing-gutter);
+    border-left: var(--border-rule) solid var(--color-accent);
+  }
+
+  .about__paper-title {
+    font-size: var(--text-lg);
+    line-height: var(--leading-snug);
+    max-width: 46ch;
+    text-wrap: pretty;
+  }
+
+  .about__paper-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem 0.75rem;
+    margin-top: 0.5rem;
+    font-family: var(--font-mono);
+    font-stretch: normal;
+    font-size: var(--text-caption);
+    letter-spacing: var(--tracking-label);
+    text-transform: uppercase;
+    color: var(--color-slate);
+  }
+
+  .about__paper-where {
+    color: var(--color-rule);
+  }
+
+  .about__paper-description {
+    margin-top: 0.75rem;
+    font-size: var(--text-base);
+    line-height: var(--leading-body);
+    color: var(--color-slate);
+    max-width: 62ch;
+    text-wrap: pretty;
   }
 </style>

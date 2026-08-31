@@ -27,3 +27,9 @@ pnpm-debug.log*
 
 # jetbrains setting folder
 .idea/
+
+# Working material: LinkedIn post drafts and event photography, kept out of the
+# build. Referenced by docs/PUBLICATIONS_SOURCE.md; anything the site actually
+# uses is committed under src/content/projects/<slug>/media/ or public/.
+/images/
+/publications/
