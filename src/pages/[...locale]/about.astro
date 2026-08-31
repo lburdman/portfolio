@@ -20,6 +20,8 @@
 import Container from '@/components/ui/Container.astro';
 import { DEFAULT_LOCALE, LOCALES, useTranslations, type Locale, type UIStrings } from '@/i18n';
 import PageLayout from '@/layouts/PageLayout.astro';
+import { Image } from 'astro:assets';
+import lanetPoster from '@/assets/lanet-2025-poster.webp';
 
 export function getStaticPaths() {
   return LOCALES.map((locale) => ({
@@ -88,6 +90,23 @@ const RESEARCH_ID = 'about-research';
                   <span class="about__paper-where">{item.where}</span>
                 </p>
                 <p class="about__paper-description">{item.description}</p>
+                {
+                  /* One entry, one poster, so the image is imported directly rather
+                     than globbed. `posterAlt` is the switch: an entry cannot show a
+                     picture without someone having written what it shows. */
+                  item.posterAlt && (
+                    <figure class="about__paper-figure">
+                      <Image
+                        src={lanetPoster}
+                        alt={item.posterAlt}
+                        widths={[480, 768, 1200]}
+                        sizes="(min-width: 60rem) 26rem, 90vw"
+                        loading="lazy"
+                        decoding="async"
+                      />
+                    </figure>
+                  )
+                }
               </li>
             ))
           }
@@ -333,5 +352,20 @@ const RESEARCH_ID = 'about-research';
     color: var(--color-slate);
     max-width: 62ch;
     text-wrap: pretty;
+  }
+
+  /* The poster, set as a document rather than a photograph: a hairline, a small
+     measure, and no rounding. It is evidence, and evidence on this site looks
+     like the figures do. */
+  .about__paper-figure {
+    margin: var(--spacing-stack) 0 0;
+    max-width: 26rem;
+  }
+
+  .about__paper-figure :global(img) {
+    display: block;
+    width: 100%;
+    height: auto;
+    border: var(--border-hairline) solid var(--color-rule);
   }
 </style>

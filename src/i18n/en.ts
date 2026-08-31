@@ -161,6 +161,8 @@ export const en: UIStrings = {
         where: 'Punta del Este, Uruguay',
         description:
           'Poster, with Leónidas Facundo Caram. The transfer-learning result behind my thesis: a frozen classical backbone feeding a variational quantum circuit, on binary and three-class emotion classification from audio. Work from the Laboratorio de Redes y Sistemas Móviles at FIUBA.',
+        posterAlt:
+          "Photograph of the printed poster on its stand at the conference. The header reads 'Transfer Learning para Redes Neuronales Híbridas Clásico–Cuánticas', Lucas Burdman and Leónidas Facundo Caram, Universidad de Buenos Aires. Below it, four columns: objective, introduction, the hybrid model architecture, an audio emotion-classification use case, results and conclusions.",
       },
     ],
     teachingHeading: 'Teaching & community',

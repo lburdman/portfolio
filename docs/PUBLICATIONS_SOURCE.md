@@ -1,92 +1,128 @@
 # Publications — raw source material
 
-Collection point for LinkedIn posts and other writing, pending a decision on
-where any of it belongs. **Nothing here is published yet.**
+Working notes on the LinkedIn posts and photographs in the (gitignored)
+`publications/` and `images/` folders. **This file is the record of what was
+used, what was not, and why.** The folders themselves are not build input.
 
-The open design question, unchanged from when it was first raised: are these a
-new section on the site, or evidence attached to existing projects? A new
-section is an application change — it touches `SECTION_IDS`, the navigation,
-both dictionaries and the spine's band count. Attaching them to projects is
-content-only. Decide before building.
-
-Transcribed from screenshots supplied by the user. Anything transcribed from an
-image is marked as such, because the wording is theirs and should be checked
-before it goes anywhere near the site.
+Anything transcribed from an image is marked as such: the wording is the
+author's and should be checked before it goes near the site.
 
 ---
 
-## 1. MITx MicroMasters — Statistics and Data Science (complete)
+## Used
 
-_Source: screenshot of a LinkedIn post, transcribed 2026-08-30. Post date unknown._
+### LANET 2025 — the research poster
 
-Finished **6.419x: Data Analysis — Statistical Modeling and Computation in
-Applications** with an overall score of **97%**, completing **all four courses**
-of the Statistics and Data Science track of the MITx MicroMasters Programs.
+**On the site**, as a new `Research presented` block on About, above teaching,
+with the poster photograph.
 
-The course covered the interplay between statistics and computation on real
-datasets — core foundations, then applied across four domains:
+- Title: _Transfer Learning para Redes Neuronales Híbridas Clásico–Cuánticas_
+- Authors: Lucas Burdman, Leónidas Facundo Caram
+- Affiliation: Universidad de Buenos Aires, Facultad de Ingeniería, Laboratorio
+  de Redes y Sistemas Móviles (LRSyM)
+- Venue: LANET 2025, Latin American Conference on Complex Networks, Punta del
+  Este, Uruguay
+- Method visible on the poster: CREMA-D, mel-spectrograms, ResNet18 pretrained
+  on ImageNet as a 512-feature extractor, a dressed quantum circuit reducing to
+  n_q qubits, a variational circuit of parameterised rotations and CNOTs
 
-- **Genomics and high-dimensional data** — dimension reduction and visualisation
-  with PCA, MDS and t-SNE; modelling and interpretation in high dimensions.
-- **Criminal networks and network analysis** — graph-based analysis and
-  centrality measures to identify important nodes.
-- **Prices, economics and time series** — forecasting with stationary models
-  (moving average, autoregressive and related); model checking and
-  interpretation on financial-style data.
-- **Environmental data and spatial statistics** — Gaussian processes for spatial
-  modelling; prediction with uncertainty quantification.
+This is the most valuable item in the whole folder, and it is why the block
+exists: it is the only work on the site reviewed by people under no obligation
+to be kind about it. The title is not translated — a translated title is one
+nobody can search for.
 
-Stated takeaway: strong data analysis is not running models, it is asking the
-right questions, choosing methods deliberately, and turning results into clear
-and actionable reporting.
+### Qiskit Fall Fest FIUBA — into the existing About role
 
-### Status: already on the site — and that is the point
+The role description now carries what the posts document: the closing hackathon
+where teams built a Grover search in Qiskit from scratch, and the Noche de los
+Museos invitation the festival's reach earned, where the only 2-qubit NMR
+quantum computer in Argentina was exhibited.
 
-**This credential is NOT missing.** `src/i18n/{en,es}.ts` already carries
-`'MITx MicroMasters · Statistics & Data Science'` in the `CREDENTIALS` trio,
-which the Hero and the About page both render. My first read of the screenshot
-said "add this to About"; that was wrong, and checking before writing caught it.
+The kickoff post records **436 registrations**, still climbing at the time of
+writing. That figure is deliberately **not** in the copy: a first pass replaced
+the existing "500+ attendees" with it and a test caught the swap. 436 was the
+count at kickoff in a post saying it kept growing, so it never contradicted
+500+ — trading a true figure for a narrower one is not a correction.
 
-What is missing is everything that would make it **checkable**, which is the
-whole argument the rest of the site makes:
-
-| Fact          | Value                                                                       | Source                                                                               |
-| ------------- | --------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
-| Program       | Statistics and Data Science (General Track)                                 | MicroMasters certificate                                                             |
-| Issued        | May 2026                                                                    | MicroMasters certificate                                                             |
-| Credential ID | `95a95ec9be394396a5e9b082f1d00fcc`                                          | MicroMasters certificate                                                             |
-| Verify URL    | `https://credentials.edx.org/credentials/95a95ec9be394396a5e9b082f1d00fcc/` | **checked live, HTTP 200**                                                           |
-| Final course  | 6.419x Data Analysis: Statistical Modeling and Computation in Applications  | Verified certificate                                                                 |
-| 6.419x issued | 7 January 2026                                                              | Verified certificate                                                                 |
-| 6.419x score  | 97%                                                                         | LinkedIn post (NOT on the certificate — the certificate states a passing grade only) |
-
-Source PDFs, both in `~/Downloads`, neither in any repo:
-`MicroMasters | edX Credentials.pdf`, `MITx 6.419x Certificate | edX.pdf`.
-
-### The proposal, not yet executed
-
-Make the credential a link to that verify URL. Right now the trio is an
-assertion; one `href` turns it into something a reader can check in a click —
-on a site whose entire case is evidence over assertion, that is a
-disproportionately large gain for a small change.
-
-It is **not** done here because it is not free. `CredentialTrio` is
-`readonly [string, string, string]`, rendered as bare list items in **two**
-places (`Hero.astro`, `about.astro`). Making an entry linkable means changing
-that type to carry an optional `href`, touching both components, both
-dictionaries and the i18n tests — and the Hero's credential line is a tight
-typographic element where introducing link affordances changes how the hero
-reads. That is a design decision, so it waits for a yes.
-
-The 97% is worth stating somewhere too, but note it appears only in the post:
-the certificate itself records a passing grade, not a score.
+Sponsors named across the posts, unused so far: QuantumRev, Tecmaco Integral
+S.A., INVAP, Packt. IBM Quantum backs the festival.
 
 ---
+
+## Held back, with reasons
+
+### MITx — Fundamentals of Statistics, 98%
+
+Not on the site. The MicroMasters **program** is already in the credentials
+trio, and listing a component course beneath a completed program reads as
+padding. Worth having only if the individual scores go somewhere — see the
+verification note below.
+
+### MITx — 6.419x Data Analysis, 97%
+
+Same. Verified certificate issued 7 January 2026; the 97% appears **only in the
+post**, since the certificate records a passing grade and no score. Do not
+present it as certified.
+
+Program certificate: Statistics and Data Science (General Track), issued May
+2026, credential `95a95ec9be394396a5e9b082f1d00fcc`, verifiable at
+`https://credentials.edx.org/credentials/95a95ec9be394396a5e9b082f1d00fcc/` —
+checked live, HTTP 200. Making the credential a link is still an open proposal:
+`CredentialTrio` is `readonly [string, string, string]` rendered as bare list
+items in both `Hero.astro` and `about.astro`, so an `href` means changing the
+type, both components, both dictionaries and the i18n tests — and the Hero's
+credential line is a tight typographic element where link affordances change how
+the hero reads.
+
+### First semester teaching the quantum course
+
+The post records closing a first semester as a teacher, with the first quantum
+computer ever brought into the faculty — Victor Macarrein's 2-qubit NMR
+machine — used to run real circuits. About already claims the teaching role
+from 2023; "first semester" and "since 2023" need reconciling before either is
+written down.
+
+### The photographs
+
+Nine event photographs. **One is used**: the LANET poster, cropped to the poster
+itself and away from the people around it, so it reads as a document rather than
+a social moment — the register the rest of the site's figures are in.
+
+The others (hackathon, kickoff, speaking, SpinQ, semester close, Montevideo
+team, mentor badge) are good photographs and belong on LinkedIn. This site has
+no photography anywhere else; introducing a gallery of event snapshots would
+change what kind of site it is, and that is a decision to take deliberately
+rather than by accumulation.
+
+---
+
+## The one thing worth chasing
+
+**The poster's results table cannot be read from the photograph.**
+
+It is the missing result for the strongest project on the site.
+`quantum-audio`'s case study states no accuracy at all — it describes the
+pipeline and the design decisions and stops — and the `qnn-transfer-learning`
+README states none either. The poster has the numbers: a table comparing
+classical against quantum heads over two-class and three-class tasks, with an
+`Exactitud (%)` row.
+
+At the photograph's resolution those percentages are illegible, and guessing
+them onto a site whose whole argument is evidence over assertion would be the
+one unforgivable move. Needed: the numbers from the source, or a PDF of the
+poster.
 
 ## Still to collect
 
-The user mentioned several posts with images and text. Four more screenshots
-were sent and lost before they could be read (macOS deletes the
-`NSIRD_screencaptureui_*` temp directory as soon as the screenshot thumbnail is
-dismissed). To supply them: take the screenshot, wait for the floating thumbnail
-to disappear, then drag the file from `~/Desktop`.
+Four earlier screenshots never arrived — they were sent as
+`NSIRD_screencaptureui_*` temp paths, which macOS deletes the moment the
+screenshot thumbnail is dismissed. To supply one: take it, wait for the
+thumbnail to vanish, then drag the file from `~/Desktop`.
+
+## Loose end found along the way
+
+`about.portraitAlt` exists in `src/i18n/types.ts` and in both dictionaries and
+is **used nowhere**. A dead key that looks authoritative is exactly the pattern
+the audit named: the next person needing portrait alt text wires up this one,
+and the two locales are then free to drift apart unnoticed. Either render a
+portrait or delete the key.

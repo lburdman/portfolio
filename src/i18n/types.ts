@@ -206,6 +206,15 @@ export interface UIStrings {
       venue: string;
       where: string;
       description: string;
+      /**
+       * Alt text for the poster photograph, when the entry has one.
+       *
+       * Optional because a talk is a research entry too and does not come with
+       * a poster. Its presence is what makes `about.astro` render the figure,
+       * so the alt is not decoration hung off an image — it IS the switch, and
+       * an entry cannot acquire a picture without someone writing what it shows.
+       */
+      posterAlt?: string;
     }[];
     teachingHeading: string;
     roles: Record<
