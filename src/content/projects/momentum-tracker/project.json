@@ -1,0 +1,19 @@
+{
+  "slug": "momentum-tracker",
+  "status": "wip",
+  "featured": true,
+  "domains": ["product"],
+  "stack": [
+    "React",
+    "TypeScript",
+    "Vite",
+    "Tailwind CSS",
+    "IndexedDB",
+    "TanStack Query",
+    "Go",
+    "SQLite",
+    "Capacitor",
+    "PWA"
+  ],
+  "order": 40
+}
