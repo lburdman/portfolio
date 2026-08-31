@@ -101,6 +101,21 @@ describe('LCP: the opening card is not lazy-loaded', () => {
     expect(grid).not.toContain('priority={position === 0}');
   });
 
+  it('says on the card itself when a project is unfinished', () => {
+    // `isVisible()` publishes a `wip` project into every listing beside the
+    // finished ones, so a silent card presents unfinished work as done and the
+    // reader finds out only after clicking through. The card must use the SAME
+    // predicate and the SAME string as the detail page — two labels that can
+    // drift are worse than one, because they disagree in only one locale.
+    const card = withoutComments(source('components/projects/ProjectCard.astro'));
+    expect(card).toContain('isWorkInProgress(project)');
+    expect(card).toContain('t.projects.workInProgress');
+
+    const detail = withoutComments(source('pages/[...locale]/projects/[slug].astro'));
+    expect(detail).toContain('isWorkInProgress(project)');
+    expect(detail).toContain('t.projects.workInProgress');
+  });
+
   it('renders one uniform grid — no card is promoted to the full measure', () => {
     // The listing is a set of equals. A `grid-column: 1 / -1` on the first item
     // would rank the work for the reader; the order is carried by the figure

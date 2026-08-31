@@ -98,6 +98,7 @@ import { Image } from 'astro:assets';
 import { domainOrdinal, getDomain } from '@/config/domains';
 import { localizePath, type Locale, type UIStrings } from '@/i18n';
 import type { Project } from '@/lib/projects';
+import { isWorkInProgress } from '@/lib/projects/visibility';
 
 interface Props {
   /** The joined project: shared metadata plus the localized title and summary. */
@@ -337,6 +338,24 @@ const mediaTransition = `project-media-${meta.slug}`;
   <Heading class="card__title">
     <a class="card__link" href={href}><span class="card__title-text" data-vt={titleTransition}>{title}</span></a>
   </Heading>
+
+  {
+    /* The status badge, and the reason it is here rather than only on the
+       detail page. `isVisible()` publishes a `wip` project into every listing
+       alongside finished ones, and until now the only place saying so was the
+       detail page — so a card in the grid presented unfinished work as though
+       it were done, and a reader learned otherwise only after clicking. The
+       predicate and the string both already existed; only the card was silent.
+
+       Same predicate and same wording as the detail page, so the two cannot
+       drift into disagreeing about what "in progress" means. */
+    isWorkInProgress(project) && (
+      <p class="card__status">
+        <span class="card__status-dot" aria-hidden="true" />
+        {t.projects.workInProgress}
+      </p>
+    )
+  }
 
   <p class="card__summary">{summary}</p>
 
@@ -982,5 +1001,37 @@ const mediaTransition = `project-media-${meta.slug}`;
     .card:focus-within {
       transform: none;
     }
+  }
+
+  /* --- work-in-progress badge ----------------------------------------------
+     Deliberately the same object as `.detail__status`: a reader meeting the
+     card and then the page should not have to work out whether two differently
+     drawn labels mean the same thing. Accent dot, hairline border, mono micro
+     type — the site's existing vocabulary for a piece of live status.
+     ---------------------------------------------------------------------- */
+
+  .card__status {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    align-self: flex-start;
+    margin-bottom: 0.125rem;
+    padding: 0.125rem 0.5rem;
+    border: var(--border-hairline) solid var(--color-rule);
+    border-radius: var(--radius-sm);
+    font-family: var(--font-mono);
+    font-stretch: normal;
+    font-size: var(--text-micro);
+    font-weight: 500;
+    letter-spacing: var(--tracking-eyebrow);
+    text-transform: uppercase;
+    color: var(--color-ink);
+  }
+
+  .card__status-dot {
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: var(--radius-full);
+    background-color: var(--color-accent);
   }
 </style>
