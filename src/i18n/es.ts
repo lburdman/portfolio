@@ -47,6 +47,11 @@ export const es: UIStrings = {
     narrative:
       'Cada capa define los límites de la que tiene encima. Saber qué ocurre dos capas más abajo cambia las decisiones que se toman arriba.',
     items: {
+      product: {
+        layer: 'INTERFAZ',
+        description:
+          'El software que alguien abre de verdad: la interfaz, el estado que la sostiene y el uso diario que un producto tiene que ganarse.',
+      },
       ai: {
         layer: 'MODELOS',
         description:
@@ -75,8 +80,13 @@ export const es: UIStrings = {
 
   worlds: {
     heading: 'Mundos técnicos',
-    subtitle: 'Cinco áreas de trabajo. En qué consiste cada una.',
+    subtitle: 'Seis áreas de trabajo. En qué consiste cada una.',
     items: {
+      product: {
+        name: 'Producto y software',
+        summary:
+          'Aplicaciones web construidas de punta a punta: la interfaz, el modelo de datos que la sostiene y la instrumentación que dice si alguien volvió al día siguiente.',
+      },
       ai: {
         name: 'IA y Machine Learning',
         summary:

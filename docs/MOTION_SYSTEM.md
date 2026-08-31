@@ -57,8 +57,8 @@ appears once and is never repeated (brief §5).
 - The user scrolls **normally**. Vertical scroll drives horizontal traverse.
   No scroll-jacking, no hijacked trackpad, no custom wheel handler, no
   momentum simulation. Browser back/forward and touch scroll behave normally.
-- The five domains are real DOM in document order. The traverse moves them;
-  it does not create them. With JavaScript off, all five are readable.
+- The six domains are real DOM in document order. The traverse moves them;
+  it does not create them. With JavaScript off, all six are readable.
 - The band inverts to the ink ground. That inversion is the concept — you have
   descended out of the notebook and into the instrument — and it is the only
   place on the site that inverts.
@@ -73,7 +73,7 @@ not hoped for.
 | Stage                | Technology                                           | Lifecycle                                                                                                                                                                                                                                                                                                                                                           |
 | -------------------- | ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Opening magnet field | DOM spans + CSS `transform`, no framework, no canvas | Spans the Hero **and** the descent beneath it — `FieldBand.astro` is the box, since an absolutely-positioned field cannot cover two sibling sections without an ancestor holding both. Attaches after first paint, and only when a fine pointer is present and motion is not reduced. **Stops** when the band leaves the viewport and when Technical Worlds enters. |
-| Domain stage         | SVG / DOM                                            | Only the active domain animates. The other four are static.                                                                                                                                                                                                                                                                                                         |
+| Domain stage         | SVG / DOM                                            | Only the active domain animates. The other five are static.                                                                                                                                                                                                                                                                                                         |
 
 Every stage must:
 
@@ -156,7 +156,7 @@ its two ends reading as unconnected. It had shipped that way.
 
 `tests/stroke-space.test.ts` enforces the rule structurally: it reads the built
 stylesheet, resolves every `non-scaling-stroke` selector against the rendered
-markup of all five stages in both `active` states, and fails if any element
+markup of all six stages in both `active` states, and fails if any element
 carrying `pathLength` is reached by one. Its selector matcher throws rather than
 returning "no match" for a selector it cannot parse.
 
@@ -186,7 +186,7 @@ The reduced-motion site must feel deliberate — same content, same hierarchy,
 same visual quality, less movement.
 
 - Long pinned and parallax sequences: **removed**. Technical Worlds becomes a
-  vertical stack of five domain panels, fully readable, in document order.
+  vertical stack of six domain panels, fully readable, in document order.
 - Continuous decorative animation: **stopped**. The magnet field stands at
   its resting rake and attaches no listener at all — a deliberate static hatch,
   not a degraded one, and not an empty box.
@@ -234,9 +234,9 @@ animation the design is built around.
 | --------------------------------- | ---------------------------------------- | -------- | --------- |
 | **Critical**                      | Every visitor, before first paint        | **0 KB** | **0 KB**  |
 | **Stack**                         | Mobile, reduced motion, narrow window    | ≤ 4 KB   | 1.88 KB   |
-| **Desktop traverse**              | Desktop pointer user with motion enabled | ≤ 120 KB | 117.68 KB |
-| — of which **framework**          | React + GSAP + ScrollTrigger             | fixed    | 102.02 KB |
-| — of which **the island**         | Everything this repo actually writes     | ≤ 18 KB  | 15.66 KB  |
+| **Desktop traverse**              | Desktop pointer user with motion enabled | ≤ 120 KB | 119.57 KB |
+| — of which **framework**          | React + GSAP + ScrollTrigger             | fixed    | 102.31 KB |
+| — of which **the island**         | Everything this repo actually writes     | ≤ 18 KB  | 17.26 KB  |
 | CSS, gzipped                      | The heaviest page, not a convenient one  | < 15 KB  | 13.57 KB  |
 | Blocking third-party requests     | —                                        | **0**    | **0**     |
 | Preloader / loading screen        | —                                        | **none** | none      |
@@ -254,10 +254,23 @@ authored, and it is the part a budget should govern.
 So the traverse ceiling is now ≤ 120 KB with an explicit **≤ 18 KB island
 allowance** inside it. Adding a signature visual is charged against the number
 it genuinely affects, and shaving the framework floor stops counting as a win
-that was never available. The total moved 109 → 116.28 KB across this pass, and
+that was never available. The total moved 109 → 116.28 KB across that pass, and
 what bought it was a mathematically correct Bloch sphere (+2.0 KB) and a baked
 decision landscape (+3.0 KB of data) replacing two visuals that did less — while
 the hero went **down** 0.64 KB by replacing a canvas with DOM and CSS.
+
+**The sixth domain, and what is left.** Adding `product` and its completion grid
+cost **+1.60 KB** of island (15.66 → 17.26 KB gz); the framework line moved
+102.02 → 102.31 KB on dependency versions alone. The traverse path is therefore
+119.57 KB against a 120 KB ceiling, and the island has **0.74 KB of allowance
+left**. That is the real constraint on the next stage, and it is why the grid's
+168 cells are generated at run time from a seeded LCG rather than baked as a
+data table the way the decision landscape's points are: baking them would have
+been several KB of string for a picture the generator produces in a few hundred
+bytes. The next visual added here does not fit without either a saving
+elsewhere or a written case for moving the ceiling. Measured as the gzipped
+sum of `react`, `client`, `gsap`, `ScrollTrigger` and the island chunk in
+`dist/_astro`, on a production build.
 
 **Justification for the framework floor.** This document originally set a flat
 90 KB. React and ReactDOM are 58.7 KB, GSAP with ScrollTrigger 43.4 KB. That is

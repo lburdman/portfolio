@@ -1,5 +1,5 @@
 /**
- * The five technical domains, in the order the site descends through them.
+ * The six technical domains, in the order the site descends through them.
  *
  * This array is the spine of the whole portfolio. It drives, in one pass:
  *   - the "I build across layers" sequence,
@@ -8,17 +8,23 @@
  *   - domain accent colours,
  *   - the section numbering in the navigation.
  *
- * The order is deliberate and descending: the site starts at the most abstract
- * layer (models) and travels down into the physics (signals). Reordering this
- * array reorders the experience — that is the intended way to change it.
+ * The order is deliberate and descending: the site starts at the layer a person
+ * actually touches (product) and travels down through the models, the
+ * computation and the logic into the physics (signals). Reordering this array
+ * reorders the experience — that is the intended way to change it.
  *
- * Accent hues are a tempered oscilloscope channel palette: five hues at
- * matched saturation and lightness so the domains read as channels of one
- * instrument rather than five unrelated brands. Their concrete values live in
+ * `product` sits above `ai` rather than beside it because the descent is a
+ * claim about *dependency*, not about seniority: the software someone opens is
+ * built on the models, the models run on the computation, and so on down to the
+ * signal. Putting it anywhere else would break the one property the axis has.
+ *
+ * Accent hues are a tempered oscilloscope channel palette: six hues at matched
+ * saturation and lightness so the domains read as channels of one instrument
+ * rather than six unrelated brands. Their concrete values live in
  * `src/styles/tokens.css`; this file only names the token.
  */
 
-export const DOMAIN_IDS = ['ai', 'quantum', 'fpga', 'electronics', 'audio'] as const;
+export const DOMAIN_IDS = ['product', 'ai', 'quantum', 'fpga', 'electronics', 'audio'] as const;
 
 export type DomainId = (typeof DOMAIN_IDS)[number];
 
@@ -39,15 +45,16 @@ export interface Domain {
    * domain. Each is a distinct, deliberately cheap SVG/DOM treatment — see
    * docs/MOTION_SYSTEM.md for why none of them is WebGL.
    */
-  readonly stage: 'landscape' | 'bloch' | 'routing' | 'signalpath' | 'waveform';
+  readonly stage: 'completion' | 'landscape' | 'bloch' | 'routing' | 'signalpath' | 'waveform';
 }
 
 export const DOMAINS = [
-  { id: 'ai', layerIndex: 0, accentVar: '--color-domain-ai', stage: 'landscape' },
-  { id: 'quantum', layerIndex: 1, accentVar: '--color-domain-quantum', stage: 'bloch' },
-  { id: 'fpga', layerIndex: 2, accentVar: '--color-domain-fpga', stage: 'routing' },
-  { id: 'electronics', layerIndex: 3, accentVar: '--color-domain-electronics', stage: 'signalpath' },
-  { id: 'audio', layerIndex: 4, accentVar: '--color-domain-audio', stage: 'waveform' },
+  { id: 'product', layerIndex: 0, accentVar: '--color-domain-product', stage: 'completion' },
+  { id: 'ai', layerIndex: 1, accentVar: '--color-domain-ai', stage: 'landscape' },
+  { id: 'quantum', layerIndex: 2, accentVar: '--color-domain-quantum', stage: 'bloch' },
+  { id: 'fpga', layerIndex: 3, accentVar: '--color-domain-fpga', stage: 'routing' },
+  { id: 'electronics', layerIndex: 4, accentVar: '--color-domain-electronics', stage: 'signalpath' },
+  { id: 'audio', layerIndex: 5, accentVar: '--color-domain-audio', stage: 'waveform' },
 ] as const satisfies readonly Domain[];
 
 /** Runtime guard used by the content schema so invalid domains fail the build. */

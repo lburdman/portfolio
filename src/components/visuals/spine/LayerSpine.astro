@@ -3,7 +3,7 @@
  * THE LAYER SPINE — the site's one signature element (docs/MOTION_SYSTEM.md §2).
  *
  * A single hairline runs down the left margin for the page's full height, and
- * its geometry changes as it descends through the five layers:
+ * its geometry changes as it descends through the six layers:
  *
  *     models        ·  ·  ·      discrete nodes
  *     computation   ~~~~~~~      probability / phase
@@ -41,7 +41,7 @@
  *
  *   #hero      an implied line. The thesis is STATED here, not traced; the
  *              dotted connector says the descent has not started.
- *   #layers    the full five-geometry sequence, stretched over the ONE section
+ *   #layers    the full six-geometry sequence, stretched over the ONE section
  *              that names the five layers, in `DOMAINS` order. This is where
  *              the notation earns its place: the glyph beside "digital logic"
  *              is now clock edges, and it is clock edges because that row is
@@ -154,7 +154,7 @@ import { SECTION_IDS } from '@/config/navigation';
 const CX = 20;
 const W = 40;
 const SEG = 200;
-const SEQUENCE_HEIGHT = SEG * 5;
+const SEQUENCE_HEIGHT = SEG * 6;
 
 const n = (value: number): string => Number(value.toFixed(2)).toString();
 
@@ -194,59 +194,72 @@ function ticks(points: readonly (readonly [number, number])[], half: number): st
   return points.map(([x, y]) => `M ${n(x - half)} ${n(y)} L ${n(x + half)} ${n(y)}`).join(' ');
 }
 
-/* --- 00 · models — discrete nodes on a dotted connector -------------------- */
-const NODE_YS = [26, 58, 90, 122, 154, 186] as const;
+/* --- 00 · interface — a completion grid ------------------------------------
+   Three marks per row, six rows: the same object the Technical Worlds stage
+   for this domain draws, reduced to what survives in a 40-unit channel. It has
+   to read as a grid and not as the models layer below it, which is why these
+   are short marks in three columns where `nodes` is one long mark on the
+   centreline. -------------------------------------------------------------- */
+const GRID_XS = [CX - 9, CX, CX + 9] as const;
+const GRID_YS = [30, 60, 90, 120, 150, 180] as const;
+const completionGrid = ticks(
+  GRID_YS.flatMap((y) => GRID_XS.map((x) => [x, y] as const)),
+  3.5,
+);
+
+/* --- 01 · models — discrete nodes on a dotted connector -------------------- */
+const NODE_YS = [226, 258, 290, 322, 354, 386] as const;
 const nodes = ticks(
   NODE_YS.map((y) => [CX, y] as const),
   10,
 );
 
-/* --- 01 · computation — interference, four full cycles --------------------- */
-const computation = sine(SEG, 11, 50);
+/* --- 02 · computation — interference, four full cycles --------------------- */
+const computation = sine(SEG * 2, 11, 50);
 
-/* --- 02 · digital logic — clock edges -------------------------------------- */
-const logic = clock(SEG * 2, 9, 50);
+/* --- 03 · digital logic — clock edges -------------------------------------- */
+const logic = clock(SEG * 3, 9, 50);
 
-/* --- 03 · hardware — routed traces. Vertices are vertical or exactly 45°. -- */
+/* --- 04 · hardware — routed traces. Vertices are vertical or exactly 45°. -- */
 const ROUTE = [
-  [20, 600],
-  [20, 612],
-  [31, 623],
-  [31, 646],
-  [10, 667],
-  [10, 684],
-  [27, 701],
-  [27, 720],
-  [15, 732],
-  [15, 758],
-  [25, 768],
-  [25, 783],
-  [20, 788],
   [20, 800],
+  [20, 812],
+  [31, 823],
+  [31, 846],
+  [10, 867],
+  [10, 884],
+  [27, 901],
+  [27, 920],
+  [15, 932],
+  [15, 958],
+  [25, 968],
+  [25, 983],
+  [20, 988],
+  [20, 1000],
 ] as const satisfies readonly (readonly [number, number])[];
 
 const hardware = `M ${ROUTE.map(([x, y]) => `${n(x)} ${n(y)}`).join(' L ')}`;
 const vias = ticks(
   [
-    [31, 634],
-    [10, 675],
-    [27, 710],
-    [15, 745],
+    [31, 834],
+    [10, 875],
+    [27, 910],
+    [15, 945],
   ] as const,
   5,
 );
 
-/* --- 04 · signals — a denser continuous wave, eight full cycles ------------ */
-const signals = sine(SEG * 4, 8, 25, 3);
+/* --- 05 · signals — a denser continuous wave, eight full cycles ------------ */
+const signals = sine(SEG * 5, 8, 25, 3);
 
 /* --- the spine's own structure -------------------------------------------- */
 
 /** The connector every band shares: one vertical run down the centre. */
 const connector = (height: number): string => `M ${CX} 0 L ${CX} ${n(height)}`;
 
-/** Boundaries between the five layers of a sequence band. */
+/** Boundaries between the six layers of a sequence band. */
 const boundaries = ticks(
-  [1, 2, 3, 4].map((i) => [CX, SEG * i] as const),
+  [1, 2, 3, 4, 5].map((i) => [CX, SEG * i] as const),
   15,
 );
 
@@ -276,10 +289,11 @@ const [HERO, LAYERS, WORLDS, PROJECTS, CONTACT] = SECTION_IDS;
     </svg>
   </div>
 
-  {/* 01 — the five layers, named. One geometry per fifth, in DOMAINS order. */}
+  {/* 01 — the six layers, named. One geometry per sixth, in DOMAINS order. */}
   <div class="spine__band" data-band={LAYERS}>
     <svg class="spine__svg" viewBox={`0 0 ${W} ${SEQUENCE_HEIGHT}`} preserveAspectRatio="none" focusable="false">
       <path class="spine__connector" d={connector(SEG)}></path>
+      <path class="spine__stroke" d={completionGrid}></path>
       <path class="spine__stroke" d={nodes}></path>
       <path class="spine__stroke" d={computation}></path>
       <path class="spine__stroke" d={logic}></path>

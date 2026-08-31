@@ -16,7 +16,7 @@ export function isLocale(value: string): value is Locale {
 /**
  * A value that must be supplied once per technical domain.
  *
- * Keyed by `DomainId` from `src/config/domains.ts`, so adding a sixth domain
+ * Keyed by `DomainId` from `src/config/domains.ts`, so adding a seventh domain
  * is a type error in both dictionaries rather than a silently missing label.
  */
 export type PerDomain<T> = Record<DomainId, T>;
@@ -106,13 +106,16 @@ export interface UIStrings {
     ctaResume: string;
   };
 
-  /** Section 01 — the descent, from the models down to the physics. */
+  /** Section 01 — the descent, from the interface down to the physics. */
   layers: {
     heading: string;
-    /** One line explaining why five domains belong in one portfolio. */
+    /** One line explaining why six domains belong in one portfolio. */
     narrative: string;
     items: PerDomain<{
-      /** The engineering layer name: MODELS / COMPUTATION / DIGITAL LOGIC / HARDWARE / SIGNALS. */
+      /**
+       * The engineering layer name:
+       * INTERFACE / MODELS / COMPUTATION / DIGITAL LOGIC / HARDWARE / SIGNALS.
+       */
       layer: string;
       description: string;
     }>;
@@ -229,13 +232,18 @@ export interface UIStrings {
     /**
      * Shipped client work, which lives here rather than in the projects grid.
      *
-     * A project on that grid must declare at least one `DomainId`, and the five
-     * of them — ai, quantum, fpga, electronics, audio — are the site's argument,
-     * not a tag vocabulary. Client web work belongs to none of them, and adding
-     * a sixth domain to hold it would insert a layer into a descent that runs
-     * from the abstract down into the physics, where it does not sit.
+     * A project on that grid must declare at least one `DomainId`, and the six
+     * of them — product, ai, quantum, fpga, electronics, audio — are the site's
+     * argument, not a tag vocabulary.
      *
-     * So it is named here instead. "I ship for real clients" is a fair claim
+     * `product` is the newest of them and it is deliberately **not** the home
+     * for this list. The domain is the layer a person touches, sitting one rung
+     * above the models; these are commissions, and "I built this for a paying
+     * client" is a different claim from "this is where I work in the stack". A
+     * client site can carry the product layer, and one that does belongs on the
+     * grid with the tag. Being paid for is not what puts it there.
+     *
+     * So they are named here instead. "I ship for real clients" is a fair claim
      * and worth making; it is simply not the same claim the grid makes.
      */
     clientWorkHeading: string;

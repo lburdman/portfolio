@@ -47,6 +47,11 @@ export const en: UIStrings = {
     narrative:
       'Each layer sets the limits of the one above it. Knowing what happens two layers down changes the decisions you make at the top.',
     items: {
+      product: {
+        layer: 'INTERFACE',
+        description:
+          'The software someone actually opens: the interface, the state behind it, and the daily use a product has to earn.',
+      },
       ai: {
         layer: 'MODELS',
         description:
@@ -75,8 +80,13 @@ export const en: UIStrings = {
 
   worlds: {
     heading: 'Technical Worlds',
-    subtitle: 'Five areas of work. What each one actually involves.',
+    subtitle: 'Six areas of work. What each one actually involves.',
     items: {
+      product: {
+        name: 'Product & Software',
+        summary:
+          'Web applications built end to end: the interface, the data model under it and the instrumentation that says whether anyone came back the next day.',
+      },
       ai: {
         name: 'AI & Machine Learning',
         summary:

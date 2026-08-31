@@ -416,11 +416,14 @@ const mediaTransition = `project-media-${meta.slug}`;
      Same pattern as the Technical Worlds island. `--domain-accent` is consumed
      only as a `background-color` mix; see the NON-TEXT ONLY notes below.
 
-     These five lines mirror `Domain['accentVar']`, typed
+     These six lines mirror `Domain['accentVar']`, typed
      `--color-domain-${DomainId}`. CSS cannot derive the name, so a sixth domain
      needs a sixth line — `tests/project-card.test.ts` fails if one is missing.
      ------------------------------------------------------------------------ */
 
+  .card [data-domain='product'] {
+    --domain-accent: var(--color-domain-product);
+  }
   .card [data-domain='ai'] {
     --domain-accent: var(--color-domain-ai);
   }
