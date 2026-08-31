@@ -133,6 +133,8 @@ export const es: UIStrings = {
     relatedWork: 'Trabajo relacionado',
     backToList: 'Volver a proyectos',
     mediaAlt: {
+      'room-acoustics/app-modal-field':
+        'Captura de la aplicación web Room Acoustics. Una tabla de modos lista nx, ny, nz, frecuencia, tipo y peso energético — el axial de 57,17 Hz está seleccionado y resaltado, con filas tangenciales y oblicuas debajo. Abajo, el campo de presión de ese modo se dibuja como una onda estacionaria de rojo a azul, con un deslizador de plano de corte y una escala fija de −1 a +1.',
       'augmenta/trust-boundary':
         "Tres versiones del mismo mensaje a medida que atraviesa la capa de privacidad. Desde el cliente: 'Contact me at john.doe@example.com'. Pasado un límite de confianza marcado, el gateway del LLM solo ve 'Contact me at [[AUG:EMAIL_ADDRESS:1]]'. Rehidratado, vuelve la dirección original. Al pie se citan los dos tests que lo verifican.",
       'room-acoustics/modal-distribution':

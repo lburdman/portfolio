@@ -5,7 +5,7 @@ summary: 'A Go engine that answers two questions about a rectangular room — ho
 
 ## Overview
 
-A room shapes every sound made inside it. Two properties govern how: the reverberation time, which is how long energy takes to fall by 60 dB, and the modal distribution, which is the set of standing waves the geometry forces at low frequencies. This engine computes both for a rectangular room and exposes them over a small HTTP API.
+A room shapes every sound made inside it. Two properties govern how: the reverberation time, which is how long energy takes to fall by 60 dB, and the modal distribution, which is the set of standing waves the geometry forces at low frequencies. This engine computes both for a rectangular room and exposes them over a small HTTP API, with a browser front end over it: set the dimensions, assign materials to each surface, then pick a mode out of the table and watch its standing wave appear on a cut plane through the room. The cover of this entry is that tool, showing the 57.17 Hz axial mode selected.
 
 The interesting part is not the physics, which is textbook. It is that every number the engine produces is checked against a stated tolerance, and the check that fails is still in the report.
 

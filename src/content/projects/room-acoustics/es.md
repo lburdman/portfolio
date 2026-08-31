@@ -5,7 +5,7 @@ summary: 'Un motor en Go que responde dos preguntas sobre una sala rectangular �
 
 ## Resumen
 
-Una sala moldea todo sonido que se produce dentro de ella. Dos propiedades lo gobiernan: el tiempo de reverberación, que es cuánto tarda la energía en caer 60 dB, y la distribución modal, que es el conjunto de ondas estacionarias que la geometría impone en bajas frecuencias. Este motor calcula ambas para una sala rectangular y las expone a través de una API HTTP.
+Una sala moldea todo sonido que se produce dentro de ella. Dos propiedades lo gobiernan: el tiempo de reverberación, que es cuánto tarda la energía en caer 60 dB, y la distribución modal, que es el conjunto de ondas estacionarias que la geometría impone en bajas frecuencias. Este motor calcula ambas para una sala rectangular y las expone a través de una API HTTP, con una interfaz de navegador encima: se cargan las dimensiones, se asignan materiales a cada superficie, y después se elige un modo de la tabla para ver su onda estacionaria sobre un plano de corte de la sala. La portada de esta entrada es esa herramienta, con el modo axial de 57,17 Hz seleccionado.
 
 Lo interesante no es la física, que es de manual. Es que cada número que el motor produce se verifica contra una tolerancia declarada, y la verificación que falla sigue estando en el reporte.
 

@@ -133,6 +133,8 @@ export const en: UIStrings = {
     relatedWork: 'Related work',
     backToList: 'Back to projects',
     mediaAlt: {
+      'room-acoustics/app-modal-field':
+        'Screenshot of the Room Acoustics web app. A mode table lists nx, ny, nz, frequency, type and energy weight — 57.17 Hz axial is selected and highlighted, with tangential and oblique rows below. Beneath it, the pressure field for that mode renders as a red-to-blue standing wave across the room, with a cut-plane slider and a fixed colour scale from −1 to +1.',
       'augmenta/trust-boundary':
         "Three versions of the same message as it moves through the privacy layer. From the client: 'Contact me at john.doe@example.com'. Past a marked trust boundary the LLM gateway sees only 'Contact me at [[AUG:EMAIL_ADDRESS:1]]'. Rehydrated, the original address returns. Footnotes cite the two tests asserting no raw PII reaches the gateway and no plaintext is stored.",
       'room-acoustics/modal-distribution':
