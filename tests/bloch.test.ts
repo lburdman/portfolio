@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { LOCALES, localizePath } from '../src/i18n';
 import { HOME_PATH } from '../src/config/navigation';
+import { ENGAGEMENT_EASE, stepEngagement } from '../src/lib/motion/magnet-field';
 import {
   ARROW_HEAD_LENGTH,
   AXIS_X,
@@ -22,8 +23,10 @@ import {
   PHI_MAX,
   READOUT_WIDTH,
   READOUT_X,
+  RESTING_STATE,
   SILHOUETTE_CROSSING_P,
   STATIC_FRAME,
+  STATIC_PROGRESS,
   azimuthFromPointer,
   blochFrame,
   blochVector,
@@ -33,6 +36,7 @@ import {
   greatCircle,
   latitudeRing,
   normalise,
+  pointerState,
   polarAngle,
   probabilityOne,
   probabilityZero,
@@ -44,19 +48,27 @@ import {
 /**
  * The Quantum world's geometry, and the contracts the picture depends on.
  *
- * Two of these are not ordinary unit tests and are the reason the file exists.
+ * Three of these are not ordinary unit tests and are the reason the file exists.
  *
- * 1. **Reversibility.** The piece promises that scrolling back up retraces the
- *    same state. That holds only while a frame is a pure function of progress —
- *    no easing over time, no cached previous value, no hysteresis. Sweeping the
- *    range in both directions and comparing the serialised frames is what makes
- *    a future `lerp` toward the last frame fail here instead of in review.
+ * 1. **Statelessness.** The piece promises that the sphere is wherever the hand
+ *    is: the same pointer position always draws the same state, whatever route
+ *    the hand took to get there. That holds only while a frame is a pure
+ *    function of its two angles — no easing over time, no cached previous
+ *    value, no hysteresis. Sweeping the range in both directions and comparing
+ *    the serialised frames is what makes a future `lerp` toward the last frame
+ *    fail here instead of in review.
  *
  * 2. **The stylesheet guard.** A CSS `transition` on the vector's `d` or the
  *    latitude ring's `d` would look like a smoothing improvement and would
- *    break the 1:1 scroll contract, lagging the picture behind the scrollbar
- *    and fighting reverse scroll. It cannot be caught by rendering; it is
- *    caught by reading the stylesheet.
+ *    break the 1:1 pointer contract, lagging the picture behind the hand. It
+ *    cannot be caught by rendering; it is caught by reading the stylesheet.
+ *
+ * 3. **The DOM half.** `BlochStage.tsx`'s listeners, cached box and teardown
+ *    have no seam a node-environment test can pull on — the runner has no DOM —
+ *    so they are pinned as source assertions, in the same style as
+ *    `tests/card-light.test.ts`. Each one is a rule that is invisible in
+ *    `astro dev` and only bites on a touch device, a reduced-motion setting, a
+ *    hidden tab or a profiler.
  *
  * The rest holds the projection to its closed form, which is what lets the
  * stage draw great circles as two `A` commands instead of sampling them.
@@ -353,7 +365,88 @@ describe('the latitude ring', () => {
   });
 });
 
-describe('the pointer owns φ and only φ', () => {
+describe('the pointer drives both angles', () => {
+  const at = (x: number, y: number, engagement = 1): ReturnType<typeof pointerState> =>
+    pointerState({ x, y, engagement });
+
+  it('maps the vertical axis onto the three states the piece is about', () => {
+    // Top edge |0⟩, exact middle |+⟩, bottom edge |1⟩ — the vector points where
+    // the hand is, and +Z projects straight up the screen under this camera.
+    expect(at(0.5, 0).progress).toBe(0);
+    expect(at(0.5, 0.5).progress).toBe(STATIC_PROGRESS);
+    expect(at(0.5, 1).progress).toBe(1);
+
+    expect(blochFrame(at(0.5, 0).progress).hitZero).toBe('true');
+    expect(blochFrame(at(0.5, 1).progress).hitOne).toBe('true');
+    expect(blochFrame(at(0.5, 0.5).progress).hitPlus).toBe('true');
+  });
+
+  it('reads the probability bars off the vertical axis alone', () => {
+    // The readout is a function of θ, so it answers the hand's height and
+    // nothing else. Crossing the stage must not move it by a single digit.
+    const high = blochFrame(at(0, 0.25).progress, at(0, 0.25).phi);
+    const highSwung = blochFrame(at(1, 0.25).progress, at(1, 0.25).phi);
+    expect(highSwung.readZero).toBe(high.readZero);
+    expect(highSwung.barZero).toBe(high.barZero);
+    expect(highSwung.shaft).not.toBe(high.shaft);
+
+    const low = blochFrame(at(0.5, 0.75).progress);
+    expect(Number(low.readZero)).toBeLessThan(Number(high.readZero));
+  });
+
+  it('is the identity on the pointer at full engagement — exactly, not nearly', () => {
+    // The contract is "no perceptible lag", and `a + (b - a) * t` would answer
+    // 0.09999999999999998 for a hand at y = 0.1. A state a float away from the
+    // one being pointed at is a state that was interpolated, and this is the
+    // assertion that stops one creeping back in.
+    for (let i = 0; i <= 100; i += 1) {
+      const y = i / 100;
+      const x = 1 - y;
+      expect(at(x, y).progress).toBe(y);
+      expect(at(x, y).phi).toBe(azimuthFromPointer(x));
+    }
+  });
+
+  it('rests at |+⟩ with φ = 0 while the envelope is closed', () => {
+    // The state a pointer that has left, a coarse-pointer reader and the server
+    // all share. Whatever the last coordinates were, a closed envelope answers
+    // the still — so an engagement that reaches zero cannot leave the sphere
+    // parked a fraction of a degree off the composition it claims to be.
+    for (const [x, y] of [
+      [0, 0],
+      [1, 1],
+      [0.31, 0.87],
+    ] as const) {
+      expect(at(x, y, 0)).toEqual(RESTING_STATE);
+    }
+    expect(blochFrame(RESTING_STATE.progress, RESTING_STATE.phi)).toEqual(STATIC_FRAME);
+  });
+
+  it('stays between rest and the pointer while the envelope is opening', () => {
+    // The envelope swells the response in; it never overshoots either end, so
+    // no frame of the entrance shows a state outside the two it is between.
+    let previous = RESTING_STATE.progress;
+    for (let i = 1; i <= 20; i += 1) {
+      const state = at(1, 1, i / 20);
+      expect(state.progress).toBeGreaterThan(previous);
+      expect(state.progress).toBeLessThanOrEqual(1);
+      expect(state.phi).toBeGreaterThan(0);
+      expect(state.phi).toBeLessThanOrEqual(PHI_MAX);
+      previous = state.progress;
+    }
+  });
+
+  it('clamps a pointer that has left the stage rather than over-rotating', () => {
+    // The last event before `pointerleave` routinely carries a coordinate a
+    // pixel or two outside the box.
+    expect(at(-4, -2).progress).toBe(0);
+    expect(at(9, 3).progress).toBe(1);
+    expect(at(-4, 0.5).phi).toBe(-PHI_MAX);
+    expect(at(9, 0.5).phi).toBe(PHI_MAX);
+    expect(at(0.5, Number.NaN).progress).toBe(0);
+    expect(at(0.5, 0.5, Number.NaN)).toEqual(RESTING_STATE);
+  });
+
   it('maps the stage edges to ±φmax and its centre to zero', () => {
     close(azimuthFromPointer(0), -PHI_MAX, TIGHT);
     close(azimuthFromPointer(0.5), 0, TIGHT);
@@ -393,10 +486,55 @@ describe('the pointer owns φ and only φ', () => {
   });
 });
 
-describe('reverse scroll is exact', () => {
+describe('the engagement envelope is the only thing with a time constant', () => {
+  it('reaches its target exactly, and in a bounded number of frames', () => {
+    // "It must stop" as arithmetic. The stage's rAF loop asks for another frame
+    // only while `engagement !== engagementTarget`, so an envelope that merely
+    // converged would leave a frame pending forever.
+    let engagement = 0;
+    let frames = 0;
+    while (engagement !== 1) {
+      engagement = stepEngagement(engagement, 1);
+      frames += 1;
+      expect(frames, 'the envelope never reaches 1').toBeLessThan(60);
+    }
+    expect(engagement).toBe(1);
+
+    frames = 0;
+    while (engagement !== 0) {
+      engagement = stepEngagement(engagement, 0);
+      frames += 1;
+      expect(frames, 'the envelope never reaches 0').toBeLessThan(60);
+    }
+    expect(engagement).toBe(0);
+  });
+
+  it('settles inside the window a response still reads as caused by the hand', () => {
+    // 0.32/frame is ~165ms to 95% at 60Hz. The number lives in `magnet-field`,
+    // which is where its justification is; this asserts the sphere inherits it
+    // rather than tuning a second one of its own.
+    expect(ENGAGEMENT_EASE).toBeGreaterThanOrEqual(0.25);
+    let engagement = 0;
+    for (let i = 0; i < 10; i += 1) engagement = stepEngagement(engagement, 1);
+    expect(engagement).toBeGreaterThan(0.95);
+  });
+
+  it('leaves the angles themselves uneased', () => {
+    // The one failure this whole design is arranged to avoid: an eased angle
+    // arrives after the hand has stopped and is not read as a response at all.
+    // At full engagement two consecutive positions are two consecutive states,
+    // with nothing carried between them — there is no state to carry.
+    const a = pointerState({ x: 0.2, y: 0.2, engagement: 1 });
+    const b = pointerState({ x: 0.8, y: 0.8, engagement: 1 });
+    expect(pointerState({ x: 0.8, y: 0.8, engagement: 1 })).toEqual(b);
+    expect(pointerState({ x: 0.2, y: 0.2, engagement: 1 })).toEqual(a);
+  });
+});
+
+describe('the mapping is stateless', () => {
   const serialise = (p: number, phi = 0): string => JSON.stringify(blochFrame(p, phi));
 
-  it('produces bit-identical frames sweeping down and back up', () => {
+  it('produces bit-identical frames sweeping down the stage and back up', () => {
     const steps = Array.from({ length: 101 }, (_, i) => i / 100);
     const forward = steps.map((p) => serialise(p));
     const backward = steps
@@ -407,8 +545,8 @@ describe('reverse scroll is exact', () => {
   });
 
   it('is unaffected by whatever the pointer did on the way through', () => {
-    // φ is transient: a frame at a given p with φ back at rest is the frame at
-    // that p, whatever happened in between. This is what lets θ stay pure.
+    // A frame at a given height with φ back at rest is the frame at that
+    // height, whatever happened in between. Nothing accumulates.
     const before = serialise(0.4);
     for (let i = 0; i <= 50; i += 1) blochFrame(0.4, azimuthFromPointer(i / 50));
     expect(serialise(0.4)).toBe(before);
@@ -433,11 +571,14 @@ describe('the still frame', () => {
     expect(Number(STATIC_FRAME.barZero)).toBeCloseTo(READOUT_WIDTH / 2, 6);
   });
 
-  it('is exactly the frame the traverse publishes at the centred dwell', () => {
-    // `localProgress` reaches exactly 0.5 while a world is centred, which is
-    // the progress `STATIC_FRAME` is drawn at. The first client frame after
-    // hydration therefore matches the server markup byte for byte.
+  it('is exactly the state a closed envelope resolves to, and the centre of the stage', () => {
+    // Both routes to "at rest" land on the same picture: an envelope that has
+    // settled, and a pointer sitting in the exact middle of the stage. The
+    // first client frame after hydration therefore matches the server markup
+    // byte for byte, and there is no flash on either arrival or departure.
     expect(blochFrame(0.5, 0)).toEqual(STATIC_FRAME);
+    expect(blochFrame(RESTING_STATE.progress, RESTING_STATE.phi)).toEqual(STATIC_FRAME);
+    expect(blochFrame(pointerState({ x: 0.5, y: 0.5, engagement: 1 }).progress, 0)).toEqual(STATIC_FRAME);
   });
 });
 
@@ -573,6 +714,145 @@ describe('the stylesheet may not fight the scroll', () => {
     for (const dead of ['tw-ripple', 'tw-fringe', 'tw-emitter', 'tw-histogram', 'tw-dimension', 'tw-expand']) {
       expect(WORLDS_CSS, `${dead} outlived the stage that used it`).not.toContain(dead);
     }
+  });
+});
+
+/* ===========================================================================
+   THE DOM HALF
+
+   `BlochStage.tsx` owns listeners, a cached box and a teardown, none of which a
+   node-environment runner can exercise — there is no DOM here, and a test that
+   mocked one would assert that the mocks were called. So the rules that govern
+   it are read out of its source, the way `tests/card-light.test.ts` pins
+   `ProjectGrid.astro`'s script. Every one of them is invisible in `astro dev`
+   and bites only on a touch device, a reduced-motion setting, a hidden tab, or
+   in a profiler.
+   ======================================================================== */
+
+const STAGE_SOURCE = readFileSync(
+  fileURLToPath(new URL('../src/components/visuals/worlds/stages/BlochStage.tsx', import.meta.url)),
+  'utf8',
+);
+
+/** The source with comments stripped, so prose about a rule cannot satisfy it. */
+const STAGE_CODE = STAGE_SOURCE.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+
+/**
+ * The body of `const <name> = ...` up to its matching closing brace.
+ *
+ * Throws rather than answering an empty string for a name it cannot find: a
+ * renamed handler must fail loudly here, not pass vacuously.
+ */
+function bodyOf(name: string): string {
+  const start = STAGE_CODE.indexOf(`const ${name} = `);
+  if (start < 0) throw new Error(`BlochStage.tsx has no \`${name}\``);
+  const open = STAGE_CODE.indexOf('{', start);
+  if (open < 0) throw new Error(`\`${name}\` has no body`);
+  let depth = 0;
+  for (let i = open; i < STAGE_CODE.length; i += 1) {
+    if (STAGE_CODE[i] === '{') depth += 1;
+    else if (STAGE_CODE[i] === '}') {
+      depth -= 1;
+      if (depth === 0) return STAGE_CODE.slice(open, i + 1);
+    }
+  }
+  throw new Error(`\`${name}\` is unbalanced`);
+}
+
+describe('the stage attaches nothing it cannot take back', () => {
+  it('gates the whole effect on active, reduced motion and a fine pointer', () => {
+    // Reduced motion and a coarse pointer are not degradations here: both keep
+    // the |+⟩ still, which is a complete composition, and neither constructs a
+    // listener or a frame. `docs/MOTION_SYSTEM.md` §6, §7.
+    expect(STAGE_CODE).toContain('REDUCED_MOTION_QUERY');
+    expect(STAGE_CODE).toContain('FINE_POINTER_QUERY');
+    expect(STAGE_CODE).toMatch(/if \(!active \|\| reducedMotion \|\| !finePointer \|\| !root\) return;/);
+  });
+
+  it('reads both queries as a subscription, so an OS toggle needs no reload', () => {
+    // `useMediaQuery` is `useSyncExternalStore` over a `change` listener. A
+    // one-shot `matchMedia(...).matches` would strand a reader who turned the
+    // setting on after the page loaded.
+    expect((STAGE_CODE.match(/useMediaQuery\(/g) ?? []).length).toBe(2);
+    expect(STAGE_CODE).not.toMatch(/matchMedia/);
+  });
+
+  it('scopes every pointer listener to the stage and never to window', () => {
+    const pointerListeners = STAGE_CODE.match(/(\w+)\.addEventListener\('pointer\w+'/g) ?? [];
+    expect(pointerListeners.length).toBe(4);
+    for (const listener of pointerListeners) expect(listener.startsWith('root.')).toBe(true);
+    expect(STAGE_CODE).not.toMatch(/window\.addEventListener\('pointer/);
+    // And they are all passive, so a drag over the sphere still scrolls the page.
+    expect((STAGE_CODE.match(/'pointer\w+', handle\w+, \{ passive: true \}/g) ?? []).length).toBe(4);
+  });
+
+  it('removes every listener it adds, from the same target', () => {
+    const added = STAGE_CODE.match(/(\w+)\.addEventListener\('([\w-]+)'/g) ?? [];
+    expect(added.length).toBeGreaterThan(4);
+    for (const call of added) {
+      const [target, event] = call.replace(/'/g, '').split('.addEventListener(');
+      expect(STAGE_CODE, `${target}.${event} is added and never removed`).toContain(
+        `${target}.removeEventListener('${event}'`,
+      );
+    }
+  });
+
+  it('disconnects both observers and cancels the pending frame', () => {
+    // MOTION_SYSTEM §4: offscreen animation is paused, not throttled, and the
+    // rAF loop is cancelled on teardown.
+    expect(STAGE_CODE).toContain('intersectionObserver?.disconnect()');
+    expect(STAGE_CODE).toContain('resizeObserver?.disconnect()');
+    expect(STAGE_CODE).toContain('cancelAnimationFrame(motion.frame)');
+    expect(bodyOf('settleNow')).toContain('cancelAnimationFrame');
+  });
+
+  it('watches the two conditions §4 names, and routes both through one detach', () => {
+    expect(STAGE_CODE).toContain("document.addEventListener('visibilitychange'");
+    expect(STAGE_CODE).toContain('new IntersectionObserver(');
+    expect(STAGE_CODE).toMatch(/const shouldRun = \(\): boolean => onScreen && !document\.hidden;/);
+    expect(bodyOf('evaluate')).toContain('detach()');
+  });
+
+  it('settles to the |+⟩ still on every way out, rather than freezing mid-turn', () => {
+    const settle = bodyOf('settleNow');
+    expect(settle).toContain('STATIC_FRAME');
+    expect(settle).toContain('motion.engagement = 0');
+    expect(bodyOf('detach')).toContain('settleNow()');
+  });
+
+  it('reads no layout on the pointer path', () => {
+    // The defect this is named for: `getBoundingClientRect()` inside the
+    // handler forces a synchronous reflow on the hottest event a page has, and
+    // it is invisible everywhere except a profiler. The box is measured on
+    // attach, on resize and after a scroll, and read from cache in the frame.
+    expect((STAGE_CODE.match(/getBoundingClientRect/g) ?? []).length).toBe(1);
+    expect(bodyOf('measure')).toContain('getBoundingClientRect');
+    for (const handler of ['handlePointer', 'handleRelease', 'handleScroll']) {
+      const body = bodyOf(handler);
+      expect(body, `${handler} reads layout`).not.toContain('getBoundingClientRect');
+      expect(body, `${handler} measures`).not.toContain('measure()');
+    }
+    expect(bodyOf('handleScroll')).toContain('motion.boxDirty = true');
+  });
+
+  it('coalesces pointer events into a single animation frame', () => {
+    // A 1000 Hz mouse must not paint 1000 frames. The handler stores two
+    // numbers and asks for a frame; `schedule` is a no-op while one is pending.
+    expect(bodyOf('handlePointer')).toContain('schedule()');
+    expect(bodyOf('schedule')).toMatch(/if \(motion\.frame === 0 && attached\)/);
+    expect((STAGE_CODE.match(/requestAnimationFrame/g) ?? []).length).toBe(1);
+  });
+
+  it('no longer subscribes to the traverse — the pointer is the only driver', () => {
+    expect(STAGE_CODE).not.toContain('subscribeStageProgress');
+    expect(STAGE_CODE).not.toContain('traverseIndexOf');
+  });
+
+  it('keeps the arithmetic out of the frame callback', () => {
+    // `src/lib` is where logic lives and where a test can reach it. The frame
+    // callback measures, calls in, and writes.
+    expect(STAGE_CODE).toContain('pointerState({');
+    expect(STAGE_CODE).not.toMatch(/Math\.(sin|cos|atan2)\(/);
   });
 });
 
