@@ -19,6 +19,7 @@ export const en: UIStrings = {
   nav: {
     home: 'Home',
     projects: 'Projects',
+    writing: 'Writing',
     about: 'About',
     contact: 'Contact',
   },
@@ -137,6 +138,48 @@ export const en: UIStrings = {
     },
   },
 
+  writing: {
+    heading: 'Writing',
+    subtitle:
+      'Field reports from teaching quantum computing at FIUBA, running the student community around it, and the conferences and courses in between.',
+    empty: 'The field reports from teaching, organising and studying will appear here as they are written.',
+    readArticle: 'Read article',
+    kinds: {
+      teaching: 'Teaching',
+      community: 'Community',
+      research: 'Research',
+      study: 'Study',
+    },
+    relatedProjects: 'Related projects',
+    backToList: 'Back to writing',
+    older: 'Earlier',
+    newer: 'Later',
+    domains: 'Domains',
+    links: 'Links',
+    event: 'Event',
+    slides: 'Slides',
+    paper: 'Paper',
+    code: 'Code',
+    mediaAlt: {
+      'lanet-2025-complex-networks/lanet-conference-group-photo':
+        'Around sixty conference attendees wearing blue lanyards pose on outdoor steps in front of a modern building in bright sun.',
+      'lanet-2025-complex-networks/poster-transfer-learning-quantum':
+        'Two men stand on either side of a research poster titled "Transfer Learning para Redes Neuronales Híbridas Clásico-Cuánticas".',
+      'noche-de-los-museos-fiuba/spinq-desktop-quantum-computer':
+        'A SpinQ desktop quantum computer with its lid open, its attached tablet showing a two-qubit circuit and a probability bar chart.',
+      'qiskit-fall-fest-fiuba-2025/hackathon-group-library':
+        'Around twenty-five participants wearing lanyard badges pose together in a wood-panelled university library reading room.',
+      'qiskit-fall-fest-fiuba-2025/ibm-quantum-mentor-badge':
+        'IBM Quantum digital badge on a deep blue square reading "2025 Qiskit Fall Fest Mentor", level Advanced.',
+      'qiskit-fall-fest-fiuba-2025/kickoff-lecture-hall-audience':
+        'A tiered lecture hall with wooden bench rows, roughly sixty people seated and facing forward under long fluorescent ceiling tubes.',
+      'qiskit-fall-fest-fiuba-2025/opening-talk-quantum-utility':
+        'A young man in a cream T-shirt speaks into a handheld microphone in front of a projected Qiskit Fall Fest ARG 2025 event slide.',
+      'quantum-computing-course-fiuba/course-closing-group-classroom':
+        'About fifteen people pose in a classroom in front of a whiteboard, beside a small desktop device with a lit screen on the desk.',
+    },
+  },
+
   about: {
     heading: 'About',
     bio: "I'm an Electronic Engineer from UBA, working on AI systems in production. My background is signals, circuits and digital design; most of my time now goes to machine learning and LLM systems, and to the evaluation work that decides whether they are good enough to ship. I'm a teaching assistant in Digital Systems and in Quantum Computation and Communications at FIUBA.",
@@ -217,6 +260,12 @@ export const en: UIStrings = {
     projectDemoLabel: (title: string) => `Live demo of ${title}`,
     projectPaperLabel: (title: string) => `Paper about ${title}`,
     projectArticleLabel: (title: string) => `Article about ${title}`,
+    articleEventLabel: (title: string) => `Event page for ${title}`,
+    articleSlidesLabel: (title: string) => `Slides from ${title}`,
+    articlePaperLabel: (title: string) => `Paper presented in ${title}`,
+    articleCodeLabel: (title: string) => `Code from ${title}`,
+    articleNavigation: 'Nearby articles in time',
+    writingTimeline: 'Articles, most recent first',
     decorativeVisual: 'Decorative visual',
     worldsInstructions:
       'Use the left and right arrow keys to move between technical worlds, or Tab to reach each one in turn.',
@@ -238,6 +287,15 @@ export const en: UIStrings = {
     projects: {
       title: (projectTitle: string) => `${projectTitle} — Lucas Burdman`,
       description: (projectSummary: string) => projectSummary,
+    },
+    writingIndex: {
+      title: 'Writing — Lucas Burdman',
+      description:
+        'Field reports on teaching quantum computing at FIUBA, running a student quantum community, and the conferences and courses in between.',
+    },
+    writing: {
+      title: (articleTitle: string) => `${articleTitle} — Lucas Burdman`,
+      description: (articleSummary: string) => articleSummary,
     },
     about: {
       title: 'About — Lucas Burdman',

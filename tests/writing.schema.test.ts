@@ -262,21 +262,22 @@ describe('writingMetaSchema', () => {
 /**
  * True when the schema would let this date into the site.
  *
- * `safeParse().success` is not sufficient on its own, and the reason is a real
- * defect worth naming rather than papering over. `contentDateSchema`'s
- * refinement calls `new Date(...).toISOString()`, and for a value whose month
- * or day is out of range — `2025-13-01`, `08-11-2025` — `Date` is invalid and
- * `toISOString()` **throws** `RangeError: Invalid time value` from inside the
- * refinement instead of returning `false`. The value is still refused (nothing
- * impossible can be published, which is what these tests are really about) but
- * it is refused by crashing the build with "Invalid time value" and no filename,
- * rather than with the schema's own "Date must be a real calendar date".
+ * The `try`/`catch` is deliberately kept even though the schema no longer
+ * throws. It was added when `contentDateSchema`'s refinement called
+ * `new Date(...).toISOString()` unguarded: for a value whose month or day is out
+ * of range — `2025-13-01`, `08-11-2025` — the `Date` is invalid and
+ * `toISOString()` raises `RangeError: Invalid time value` from inside the
+ * refinement, which escapes `safeParse` entirely. Impossible dates were still
+ * refused, but by crashing the build with "Invalid time value" and no filename
+ * instead of the schema's own message naming the offending file.
  *
- * `src/content/writing-schema.ts` is not owned by this layer, so the fix — a
- * `Number.isNaN(parsed.getTime())` guard before `toISOString()` — is reported
- * rather than applied. These assertions are written against the contract that
- * matters, "this value never reaches a page", so they keep passing unchanged
- * once the refinement returns `false` instead of throwing.
+ * That guard now exists (`Number.isNaN(parsed.getTime())`, in
+ * `src/content/writing-schema.ts`), so every case below returns cleanly. The
+ * wrapper stays because these assertions are written against the contract that
+ * actually matters — "this value never reaches a page" — and that contract is
+ * satisfied by a rejection *or* a throw. Written this way, the suite proves the
+ * guarantee holds regardless of which mechanism enforces it, and it would not
+ * quietly start passing for the wrong reason if the guard were ever removed.
  */
 function accepts(value: unknown): boolean {
   try {

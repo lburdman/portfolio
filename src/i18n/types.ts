@@ -1,5 +1,6 @@
 import type { DomainId } from '../config/domains';
 import type { SectionId } from '../config/navigation';
+import type { WritingKind } from '../content/writing-schema';
 
 /** The two first-class locales. English is the unprefixed default. */
 export type Locale = 'en' | 'es';
@@ -33,6 +34,19 @@ export type PerDomain<T> = Record<DomainId, T>;
  * navigation ↔ i18n reference is not a runtime cycle.
  */
 export type PerSection<T> = Record<SectionId, T>;
+
+/**
+ * A value that must be supplied once per article kind.
+ *
+ * Keyed by `WritingKind` from `src/content/writing-schema.ts`, for exactly the
+ * reason `PerDomain` is keyed by `DomainId`: `WRITING_KINDS` is a closed
+ * taxonomy, so a fifth kind added to the schema must be a compile error in both
+ * dictionaries rather than an article whose label renders as `undefined`.
+ *
+ * The import is type-only and therefore erased, so this does not drag
+ * `astro/zod` into every module that reads a dictionary.
+ */
+export type PerWritingKind<T> = Record<WritingKind, T>;
 
 /**
  * Exactly three verifiable credentials — no more, and no fewer.
@@ -71,6 +85,13 @@ export interface UIStrings {
   nav: {
     home: string;
     projects: string;
+    /**
+     * The writing section. Named `writing` and never `notes`: `nav.notes` was a
+     * dead key the audit removed (5.4), and `tests/i18n.test.ts` still asserts
+     * it never comes back. A live section reusing the dead name would make that
+     * guard fail for the wrong reason and then be "fixed" by deleting it.
+     */
+    writing: string;
     about: string;
     contact: string;
   };
@@ -171,6 +192,60 @@ export interface UIStrings {
     mediaAlt: Record<string, string>;
   };
 
+  /**
+   * The writing section: field reports on teaching, community, research and
+   * study, rendered as a chronology at `/writing/`.
+   *
+   * It is a standalone route rather than a homepage band, so it has **no entry
+   * in `sections`** — `SECTION_IDS` numbers the homepage's figures and adding a
+   * sixth would renumber every existing margin annotation for a section that
+   * never appears on that page.
+   */
+  writing: {
+    heading: string;
+    subtitle: string;
+    /** Shown when nothing is public yet. Says what will appear, not "no posts found". */
+    empty: string;
+    /** The sighted affordance on an index entry. `aria-hidden`; the title is the link. */
+    readArticle: string;
+    /** One label per `WRITING_KIND` — how the work was done, not what it was about. */
+    kinds: PerWritingKind<string>;
+    /** Heading over the projects an article bears on. */
+    relatedProjects: string;
+    backToList: string;
+    /**
+     * Pagination wording. `older` / `newer` rather than previous / next,
+     * matching `articleNeighbours()` in `src/lib/writing/query.ts`: the index
+     * runs newest-first, so "next" means opposite things depending on whether
+     * you are thinking about the page or about the calendar.
+     */
+    older: string;
+    newer: string;
+    /** `aria-label` for the domain list, mirroring `projects.domains`. */
+    domains: string;
+    /** `aria-label` for the external link list. */
+    links: string;
+    /**
+     * Visible text for each key of `writingLinksSchema`. Typed loosely as four
+     * strings here and bound to the schema's own key union at the point of use
+     * in the detail route, the same way `projects` does it.
+     */
+    event: string;
+    slides: string;
+    paper: string;
+    code: string;
+    /**
+     * `alt` for the photographs committed under each article's `media/`
+     * directory, keyed `<slug>/<file stem>` — identical contract to
+     * `projects.mediaAlt`, including the open `Record` and the reason for it.
+     *
+     * These are photographs of rooms full of real people, so they describe what
+     * is in the frame — how many, where, what is on the screen behind them —
+     * and never what the event is supposed to have proved.
+     */
+    mediaAlt: Record<string, string>;
+  };
+
   about: {
     heading: string;
     bio: string;
@@ -266,6 +341,20 @@ export interface UIStrings {
     projectDemoLabel: (title: string) => string;
     projectPaperLabel: (title: string) => string;
     projectArticleLabel: (title: string) => string;
+    /**
+     * Accessible names for an article's external destinations, one per key of
+     * `writingLinksSchema`. Separate from the `project*Label` family because
+     * the sentence differs: a paper *about* a project, but the paper an article
+     * *presented*.
+     */
+    articleEventLabel: (title: string) => string;
+    articleSlidesLabel: (title: string) => string;
+    articlePaperLabel: (title: string) => string;
+    articleCodeLabel: (title: string) => string;
+    /** Landmark label for the older/newer pagination at the foot of an article. */
+    articleNavigation: string;
+    /** Landmark label for the chronology on the writing index. */
+    writingTimeline: string;
     /** Label for canvas/SVG visuals that carry no information. */
     decorativeVisual: string;
     /** Keyboard hint for traversing the Technical Worlds sequence. */
@@ -290,6 +379,17 @@ export interface UIStrings {
     projects: {
       title: (projectTitle: string) => string;
       description: (projectSummary: string) => string;
+    };
+    /** The writing chronology at `/writing/`. */
+    writingIndex: { title: string; description: string };
+    /**
+     * A single article. Same shape and same reasoning as `projects`: the
+     * metadata is the article's own title and standfirst, so it interpolates
+     * rather than being written a second time in two dictionaries.
+     */
+    writing: {
+      title: (articleTitle: string) => string;
+      description: (articleSummary: string) => string;
     };
     about: { title: string; description: string };
     notFound: { title: string; description: string };

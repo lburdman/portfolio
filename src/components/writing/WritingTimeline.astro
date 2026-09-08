@@ -1,0 +1,525 @@
+---
+/**
+ * The writing index, laid out on a real time axis.
+ *
+ * ## The one idea
+ *
+ * These entries are not evenly spread through the calendar. A course closes at
+ * the end of a semester and then nothing happens for months; the Qiskit Fall
+ * Fest opens on 31 October and a kickoff, a museum night and a hackathon land
+ * inside five weeks. So the vertical distance between two entries is
+ * **proportional to the time between them**, and the reader learns the shape of
+ * the year from the whitespace before reading a word. The axis encodes
+ * information; it is not a decorated list.
+ *
+ * Everything else stays quiet, deliberately: no cards, no tracked-out eyebrow
+ * above each title, no arrow glued to link text, no per-row entrance animation.
+ * One structural move, then discipline.
+ *
+ * ## How a true scale survives the CSP — the part worth reading
+ *
+ * The obvious implementation is `style="--offset: 34%"` per entry, and it is
+ * the one thing this repository cannot do. `astro.config.mjs` ships a hash-based
+ * CSP with no `'unsafe-hashes'` and Astro emits no `style-src-attr`, so
+ * `style-src` governs style *attributes* too and its hashes authorise a
+ * `<style>` element only: every inline `style=""` is dropped. `define:vars`
+ * compiles to that same attribute. The failure is silent and invisible in
+ * `astro dev`, which serves no policy — see docs/ARCHITECTURE.md §10.
+ *
+ * Three CSP-safe shapes were considered:
+ *
+ *   1. **A twelve-row grid, one row per month, entries placed by
+ *      `grid-row-start`.** Rejected on the data: two entries in the same month
+ *      resolve to the same explicit row, and grid auto-placement puts the
+ *      second one in a *new column*. November 2025 holds more than one entry,
+ *      so this breaks on exactly the cluster the design exists to show.
+ *   2. **`:nth-child()` staggers.** Rejected on meaning: nth-child knows an
+ *      entry's position in the list, which is the one thing a chronology must
+ *      not use as a proxy for its position in time.
+ *   3. **A leading gap proportional to months elapsed**, selected by a
+ *      `data-gap` attribute matched by static rules below. Chosen.
+ *
+ * (3) is a true scale, not a rounded stand-in: distance is linear in elapsed
+ * months, ties collapse to zero and stack tightly, reading order is document
+ * order, and nothing needs JavaScript to reach its resting state. The axis
+ * hairline runs unbroken through the empty stretches, so a four-month silence
+ * reads as a line with nothing on it — which is what it is.
+ *
+ * It crops the axis to the range the content actually occupies rather than
+ * drawing a fixed calendar year. That is the better generalisation: the section
+ * will span more than one year soon enough, and half a screen of empty January
+ * is whitespace that encodes nothing.
+ *
+ * `MAX_GAP_MONTHS` caps a hiatus at nine months of travel. Past that the scale
+ * is honestly compressed, and the dates on either side still say exactly how
+ * long it was.
+ *
+ * The cap was measured against a real render rather than guessed. At twelve
+ * months and a 2.25rem beat, the gap between a November 2024 entry and a July
+ * 2025 one came out taller than three entries stacked, and it stopped reading
+ * as elapsed time: with nothing in it and nothing bounding it, a void that
+ * large reads as a broken page. Nine months at a 1.875rem beat is roughly one
+ * entry's height — long enough to be unmistakably a silence, short enough that
+ * the axis still visibly connects the two things either side of it.
+ *
+ * ## Filtering
+ *
+ * This component never filters. It renders the array it is handed, in order.
+ * Which articles are public is decided once, by `isVisible()` in
+ * `src/lib/writing/visibility.ts` (AUDIT.md 2.1).
+ */
+
+import { Image } from 'astro:assets';
+import ArticleDate from '@/components/writing/ArticleDate.astro';
+import { localizePath, type Locale, type UIStrings } from '@/i18n';
+import type { Article } from '@/lib/writing';
+
+interface Props {
+  /** Already resolved and already filtered, newest first. */
+  articles: readonly Article[];
+  t: UIStrings;
+  /** Needed as well as `base` — AUDIT.md 1.3 was a component that only had `base`. */
+  locale: Locale;
+  /** Deployment base path. Every href goes through `localizePath`. */
+  base: string;
+  /** Heading level for entry titles — one below the page's own `<h1>` (AUDIT.md 2.2). */
+  headingLevel?: 2 | 3 | undefined;
+}
+
+const { articles, t, locale, base, headingLevel = 2 }: Props = Astro.props;
+
+const HEADINGS = { 2: 'h2', 3: 'h3' } as const;
+const Heading = HEADINGS[headingLevel];
+
+/**
+ * The largest gap the axis will travel, in months.
+ *
+ * Also the number of `[data-gap='n']` rules in the stylesheet below. CSS cannot
+ * compute a selector from data, so the two are bound by hand — and by the
+ * `Math.min` here, which is what guarantees no entry can ever ask for a rule
+ * that does not exist and silently render with no gap at all.
+ */
+const MAX_GAP_MONTHS = 9;
+
+/**
+ * A date's position on an absolute month scale, so subtracting two of them
+ * gives elapsed months across a year boundary.
+ *
+ * `contentDateSchema` has already proved the value is a real calendar date in
+ * one of the two accepted shapes, so the parts are known to be numeric. The
+ * `??` fallbacks are there because `noUncheckedIndexedAccess` types every index
+ * access as possibly `undefined` — handled rather than asserted away.
+ */
+function monthOrdinal(date: string): number {
+  const parts = date.split('-');
+  return Number(parts[0] ?? '0') * 12 + Number(parts[1] ?? '1') - 1;
+}
+
+/**
+ * Covers, resolved through `import.meta.glob` because `writing-schema.ts`
+ * imports no Astro virtual module and stores `cover` as a path string. The
+ * pattern must be a literal — Vite resolves it at build time.
+ */
+const covers = import.meta.glob<{ default: ImageMetadata }>('/src/content/writing/*/media/*.{webp,avif,png,jpg,jpeg}', {
+  eager: true,
+});
+
+/**
+ * Which entry gets `loading="eager"` + `fetchpriority="high"`: the first one
+ * that actually has a cover, not simply the first one. Loading priority names
+ * the Largest Contentful Paint candidate, and an entry that renders as type
+ * cannot be one. `findIndex` returning −1 collapses to 0, so a coverless
+ * chronology behaves exactly as before.
+ */
+const priorityIndex = Math.max(
+  0,
+  articles.findIndex((article) => article.meta.cover !== undefined),
+);
+
+/** Candidate widths, intersected with the source so sharp never upscales. */
+const RESPONSIVE_WIDTHS = [480, 640, 960, 1280];
+
+const entries = articles.map((article, position) => {
+  const { meta, title, summary } = article;
+  const previous = articles[position - 1];
+
+  const coverPath = meta.cover ? `/src/content/writing/${meta.slug}/${meta.cover}` : undefined;
+  const cover = coverPath ? covers[coverPath]?.default : undefined;
+  const fitted = cover ? RESPONSIVE_WIDTHS.filter((width) => width <= cover.width) : [];
+
+  /**
+   * Alt text is user-facing copy, so it comes from the dictionaries keyed
+   * `<slug>/<file stem>` — the same contract `ProjectCard.astro` documents.
+   * `mediaAlt` is an open `Record`, so under `noUncheckedIndexedAccess` the
+   * lookup is `string | undefined`; the localized title is the floor, and
+   * `tests/i18n.test.ts` sweeps `media/` in both locales so it never fires.
+   * `alt=""` would announce a photograph of a room full of people as
+   * decorative, which is the one outcome worse than a vague description.
+   */
+  const coverKey = meta.cover ? `${meta.slug}/${meta.cover.replace(/^media\//, '').replace(/\.\w+$/, '')}` : undefined;
+
+  return {
+    slug: meta.slug,
+    date: meta.date,
+    title,
+    summary,
+    href: localizePath(`/writing/${meta.slug}`, locale, base),
+    kind: t.writing.kinds[meta.kind],
+    cover,
+    coverWidths: fitted.length > 0 ? fitted : cover ? [cover.width] : [],
+    coverAlt: (coverKey === undefined ? undefined : t.writing.mediaAlt[coverKey]) ?? title,
+    priority: position === priorityIndex,
+    /**
+     * Months since the entry above. The list runs newest-first, so the
+     * *previous* element is the later one and the subtraction is that way
+     * round. Clamped at both ends: negative is impossible for a sorted list but
+     * would silently produce a missing rule, and `MAX_GAP_MONTHS` is the cap.
+     */
+    gap:
+      previous === undefined
+        ? 0
+        : Math.min(MAX_GAP_MONTHS, Math.max(0, monthOrdinal(previous.meta.date) - monthOrdinal(meta.date))),
+    /**
+     * The view-transition ident this entry hands to the article page.
+     * `SLUG_PATTERN` forbids anything outside `[a-z0-9-]`, and the literal
+     * prefix keeps the result a valid `<custom-ident>` even for a slug starting
+     * with a digit. `article-` rather than `project-` so the two sections
+     * cannot pair an article's title with a project's.
+     */
+    titleTransition: `article-title-${meta.slug}`,
+    mediaTransition: `article-media-${meta.slug}`,
+  };
+});
+---
+
+{
+  entries.length === 0 ? (
+    <p class="timeline__empty">{t.writing.empty}</p>
+  ) : (
+    <ol class="timeline" aria-label={t.a11y.writingTimeline}>
+      {entries.map((entry) => (
+        <li class="timeline__row" data-gap={String(entry.gap)}>
+          <p class="timeline__dateline">
+            <ArticleDate date={entry.date} locale={locale} />
+          </p>
+
+          <Heading class="timeline__title">
+            <a class="timeline__link" href={entry.href}>
+              <span class="timeline__title-text" data-vt={entry.titleTransition}>
+                {entry.title}
+              </span>
+            </a>
+          </Heading>
+
+          <p class="timeline__summary">{entry.summary}</p>
+
+          {entry.cover && (
+            <div class="timeline__media" data-vt={entry.mediaTransition}>
+              <Image
+                src={entry.cover}
+                alt={entry.coverAlt}
+                widths={entry.coverWidths}
+                sizes="(min-width: 48rem) 38rem, 100vw"
+                loading={entry.priority ? 'eager' : 'lazy'}
+                fetchpriority={entry.priority ? 'high' : 'auto'}
+                decoding="async"
+              />
+            </div>
+          )}
+
+          <p class="timeline__foot">
+            <span class="timeline__kind">{entry.kind}</span>
+            {/* The sighted affordance for a link that already exists. The title
+                carries the one real anchor and the stretched `::after` below
+                makes the whole row clickable, so promoting this to a second
+                anchor would duplicate the destination in the tab order. */}
+            <span class="timeline__read" aria-hidden="true">
+              {t.writing.readArticle}
+            </span>
+          </p>
+        </li>
+      ))}
+    </ol>
+  )
+}
+
+<style>
+  /* --- The rail ------------------------------------------------------------
+     Two numbers describe the whole layout: how far the content is inset, and
+     where inside that inset the axis hairline sits. Everything else — the
+     tick, the date's column on desktop — is arithmetic on those two, so the
+     axis cannot drift away from the marks that read off it.
+
+     Narrow: the line hugs the left edge and the date sits above the title,
+     because a 10rem rail on a 360px screen is a third of the measure.
+     Wide: the date moves into the rail and becomes the axis's tick label.
+     ----------------------------------------------------------------------- */
+  .timeline {
+    --rail: 1.75rem;
+    --rail-line: 0.25rem;
+    /* Vertical travel per elapsed month. The one number that sets the scale. */
+    --month: 1.25rem;
+
+    position: relative;
+    margin: 0;
+    padding: 0 0 0 var(--rail);
+    list-style: none;
+  }
+
+  @media (min-width: 48rem) {
+    .timeline {
+      --rail: 10rem;
+      --rail-line: 8.5rem;
+      --month: 1.875rem;
+    }
+  }
+
+  /* The axis itself: one unbroken hairline for the whole chronology, so an
+     empty stretch reads as a line with nothing on it rather than as a gap in
+     the layout. */
+  .timeline::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: var(--rail-line);
+    width: var(--border-hairline);
+    background-color: var(--color-rule);
+    /* The section's single entrance: the axis draws itself once, downward.
+
+       AUDIT.md 2.3 — the hidden state lives ONLY inside the keyframe. There is
+       no resting `transform: scaleY(0)` anywhere, so an element whose animation
+       never runs renders at full height rather than invisible. Under
+       `prefers-reduced-motion` the global 1ms collapse plus `both` fill lands it
+       on the `to` state immediately, which is the visible one. */
+    transform-origin: top center;
+    animation: axis-draw var(--duration-deliberate) var(--ease-instrument) both;
+  }
+
+  @keyframes axis-draw {
+    from {
+      transform: scaleY(0);
+    }
+    to {
+      transform: scaleY(1);
+    }
+  }
+
+  /* --- Elapsed time, as whitespace ----------------------------------------
+     One static rule per month of travel, up to `MAX_GAP_MONTHS`, selected by
+     `data-gap`. Keep the count here and that constant in step — the `Math.min`
+     in the frontmatter is what makes the mismatch impossible to render, but
+     only if the rules below actually go as far as the constant says.
+
+     This is the CSP-safe replacement for the inline custom property the layout
+     would otherwise want. A `style="--gap: 4"` attribute is DROPPED in
+     production by the hash-based policy in `astro.config.mjs` — silently, and
+     only in production, because `astro dev` serves no policy at all. See the
+     long note in this file's frontmatter for the two alternatives that were
+     measured against the real data and rejected.
+
+     `data-gap='0'` needs no rule: entries in the same month sit at their own
+     natural spacing, which is what a cluster should look like.
+     ----------------------------------------------------------------------- */
+  .timeline__row {
+    position: relative;
+    max-width: var(--container-prose);
+    padding-top: var(--spacing-stack);
+  }
+
+  .timeline__row[data-gap='1'] {
+    margin-top: calc(1 * var(--month));
+  }
+  .timeline__row[data-gap='2'] {
+    margin-top: calc(2 * var(--month));
+  }
+  .timeline__row[data-gap='3'] {
+    margin-top: calc(3 * var(--month));
+  }
+  .timeline__row[data-gap='4'] {
+    margin-top: calc(4 * var(--month));
+  }
+  .timeline__row[data-gap='5'] {
+    margin-top: calc(5 * var(--month));
+  }
+  .timeline__row[data-gap='6'] {
+    margin-top: calc(6 * var(--month));
+  }
+  .timeline__row[data-gap='7'] {
+    margin-top: calc(7 * var(--month));
+  }
+  .timeline__row[data-gap='8'] {
+    margin-top: calc(8 * var(--month));
+  }
+  .timeline__row[data-gap='9'] {
+    margin-top: calc(9 * var(--month));
+  }
+
+  /* The mark that reads off the axis. A short rule crossing the hairline at the
+     entry's own position — the instrument idiom the rest of the site uses for
+     a measurement, rather than a dot that would read as a bullet. */
+  .timeline__row::before {
+    content: '';
+    position: absolute;
+    top: calc(var(--spacing-stack) + 0.4em);
+    left: calc(var(--rail-line) - var(--rail));
+    width: 0.875rem;
+    height: var(--border-rule);
+    background-color: var(--color-ink);
+    transition: background-color var(--duration-fast) var(--ease-standard);
+  }
+
+  .timeline__dateline {
+    margin: 0 0 0.5rem;
+  }
+
+  @media (min-width: 48rem) {
+    /* The date becomes the axis's tick label: right-aligned against the
+       hairline, so the eye reads date → tick → title in one horizontal move.
+       Absolute rather than a grid column because the rail is shared with the
+       axis and the tick, which are positioned against the same two numbers. */
+    .timeline__dateline {
+      position: absolute;
+      top: calc(var(--spacing-stack) + 0.15em);
+      left: calc(0px - var(--rail));
+      width: calc(var(--rail-line) - 0.75rem);
+      margin: 0;
+      text-align: right;
+    }
+  }
+
+  .timeline__title {
+    margin: 0;
+    font-size: var(--text-display-4);
+    letter-spacing: var(--tracking-heading);
+    text-wrap: balance;
+  }
+
+  /* One anchor per entry, stretched over the whole row by the `::after` below.
+     The row therefore has exactly one tab stop and its accessible name is the
+     article's title — not "Read article", repeated five times down the page. */
+  .timeline__link {
+    color: inherit;
+    text-decoration: none;
+  }
+
+  .timeline__link::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+  }
+
+  /* Hover and focus change emphasis, never content, and never geometry: the
+     design brief for this section is a colour and rule change, not a lift.
+     `:focus-within` is listed beside `:hover` on every rule here so a keyboard
+     user sees exactly what a pointer user sees (MOTION_SYSTEM §7). */
+  .timeline__title-text {
+    text-decoration: underline;
+    text-decoration-color: transparent;
+    text-decoration-thickness: from-font;
+    text-underline-offset: 0.22em;
+    transition:
+      color var(--duration-fast) var(--ease-standard),
+      text-decoration-color var(--duration-fast) var(--ease-standard);
+    /* The morph into the article page's `<h1>`. The value arrives through
+       `data-vt` and is read by this completely static rule — an inline
+       `style` would be dropped by the CSP, and `var(--vt-title, …)` stays
+       first in the chain so the reduced-motion guard in `global.css`, which
+       nulls that property with `!important`, keeps winning untouched. */
+    view-transition-name: var(--vt-title, attr(data-vt type(<custom-ident>), none));
+  }
+
+  .timeline__row:hover .timeline__title-text,
+  .timeline__row:focus-within .timeline__title-text {
+    color: var(--color-accent);
+    text-decoration-color: currentColor;
+  }
+
+  .timeline__row:hover::before,
+  .timeline__row:focus-within::before {
+    background-color: var(--color-accent);
+  }
+
+  .timeline__summary {
+    margin: 0.5rem 0 0;
+    font-size: var(--text-base);
+    line-height: var(--leading-prose);
+    color: var(--color-slate);
+    text-wrap: pretty;
+  }
+
+  /* The index's one crop. Two of these covers are portrait photographs and a
+     chronology cannot hold five different image heights and still read as a
+     ruled ledger, so the listing reserves one wide plate and `object-fit`
+     fills it. The article page does the opposite and gives every figure its
+     natural aspect — see the note there. The ratio is fixed in CSS, so the box
+     is reserved before a byte arrives and CLS stays at zero. */
+  .timeline__media {
+    margin-top: var(--spacing-gutter);
+    overflow: hidden;
+    border: var(--border-hairline) solid var(--color-rule);
+    border-radius: var(--radius-sm);
+    background-color: var(--color-paper-raised);
+    view-transition-name: var(--vt-media, attr(data-vt type(<custom-ident>), none));
+  }
+
+  .timeline__media :global(img) {
+    display: block;
+    width: 100%;
+    height: 100%;
+    aspect-ratio: 12 / 5;
+    object-fit: cover;
+  }
+
+  .timeline__foot {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.375rem 1.25rem;
+    margin: var(--spacing-gutter) 0 0;
+    font-family: var(--font-mono);
+    font-stretch: normal;
+    font-size: var(--text-micro);
+    font-weight: 500;
+    letter-spacing: var(--tracking-eyebrow);
+    text-transform: uppercase;
+  }
+
+  .timeline__kind {
+    padding: 0.125rem 0.5rem;
+    border: var(--border-hairline) solid var(--color-rule);
+    border-radius: var(--radius-sm);
+    color: var(--color-ink);
+  }
+
+  .timeline__read {
+    color: var(--color-slate);
+    transition: color var(--duration-fast) var(--ease-standard);
+  }
+
+  .timeline__row:hover .timeline__read,
+  .timeline__row:focus-within .timeline__read {
+    color: var(--color-accent);
+  }
+
+  /* Belt and braces for a parser that drops the nested `@view-transition` form
+     in `global.css`. An unnamed element is simply not paired, and the browser
+     performs an ordinary navigation. */
+  @media (prefers-reduced-motion: reduce) {
+    .timeline__title-text,
+    .timeline__media {
+      view-transition-name: none;
+    }
+  }
+
+  .timeline__empty {
+    padding-block: var(--spacing-stack);
+    border-top: var(--border-hairline) solid var(--color-rule);
+    font-family: var(--font-mono);
+    font-stretch: normal;
+    font-size: var(--text-caption);
+    line-height: var(--leading-body);
+    letter-spacing: var(--tracking-label);
+    color: var(--color-slate);
+  }
+</style>

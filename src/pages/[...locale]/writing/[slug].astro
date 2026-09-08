@@ -1,0 +1,637 @@
+---
+/**
+ * `/writing/<slug>/` and `/es/writing/<slug>/`, from one file.
+ *
+ * ## One visibility predicate (AUDIT.md 2.1)
+ *
+ * `getStaticPaths` builds the cross product of *visible articles* × *locales*
+ * by calling `getVisibleArticles()` — the identical function the index calls,
+ * which filters with `isVisible()` and nothing else. The set of built article
+ * pages is therefore the set of listed articles, by construction. Nothing in
+ * this file reads `meta.status`; the moment it did, this route and the index
+ * would be two definitions of "public" that agree until one of them is edited.
+ *
+ * Resolving the article inside `getStaticPaths` and passing it through as a
+ * prop also removes the "not found" branch entirely. There is no path to this
+ * page that does not carry an article.
+ *
+ * ## The page is a column of prose, and everything defers to it
+ *
+ * One column, left-aligned, measure held at `--container-prose`. A standfirst
+ * under the title, set larger than body, that says what happened — written once
+ * in the article's frontmatter and used three times: here, on the index, and as
+ * the page's meta description. Date and kind sit on the same rail idiom the
+ * index uses, so the two pages read as one system.
+ *
+ * The template adapts by **omission**. `cover`, every one of the four `links`
+ * types, `relatedProjects` and both neighbours each render nothing at all when
+ * absent. No placeholder, no empty frame, no "coming soon".
+ *
+ * ## Figures are rendered here, not from the Markdown
+ *
+ * `.prose` carries no `img` or `figure` rule, and a Markdown-embedded image
+ * gets no `astro:assets` processing at all — no `srcset`, no intrinsic
+ * `width`/`height`, so no reserved box and a CLS cost on every one. So the
+ * photographs are discovered from the article's own `media/` directory through
+ * `import.meta.glob` and rendered after the body, exactly as
+ * `projects/[slug].astro` does it.
+ *
+ * They keep their natural aspect ratio. Two of these covers are portrait — a
+ * poster and a desktop quantum computer — and cropping a poster to a wide band
+ * removes the thing the photograph is of. The index reserves one wide plate
+ * because a chronology cannot hold five image heights and still read as a
+ * ledger; this page has one column and one story, so the right answer is the
+ * photograph as it was taken.
+ *
+ * ## View transitions
+ *
+ * Native cross-document transitions only — `@view-transition { navigation: auto }`
+ * is declared in `global.css` and there is no `<ClientRouter />`.
+ *
+ * The contract with `WritingTimeline.astro` is the **name**:
+ * `article-title-<slug>` and `article-media-<slug>`. Prefixed `article-` rather
+ * than `project-` so an article and a project sharing a slug could never pair
+ * with each other. Both sides apply them through a `data-vt` attribute read by
+ * a static rule, because the site's CSP drops every inline `style` attribute —
+ * see the note above `.article__title` in the stylesheet below.
+ */
+
+import { Image } from 'astro:assets';
+import { render } from 'astro:content';
+import ProjectGrid from '@/components/projects/ProjectGrid.astro';
+import Container from '@/components/ui/Container.astro';
+import ArticleDate from '@/components/writing/ArticleDate.astro';
+import ArticleNeighbours from '@/components/writing/ArticleNeighbours.astro';
+import type { WritingLinks } from '@/content/writing-schema';
+import { SITE } from '@/config/site';
+import { DEFAULT_LOCALE, LOCALES, localizePath, useTranslations, type Locale } from '@/i18n';
+import { getProjectBySlug, type Project } from '@/lib/projects';
+import { getArticleBodyEntry, getArticleNeighbours, getVisibleArticles, type Article } from '@/lib/writing';
+import PageLayout from '@/layouts/PageLayout.astro';
+
+export async function getStaticPaths() {
+  const perLocale = await Promise.all(
+    LOCALES.map(async (locale) => {
+      const articles = await getVisibleArticles(locale);
+      return articles.map((article) => ({
+        params: {
+          locale: locale === DEFAULT_LOCALE ? undefined : locale,
+          slug: article.meta.slug,
+        },
+        props: { locale, article },
+      }));
+    }),
+  );
+
+  return perLocale.flat();
+}
+
+interface Props {
+  locale: Locale;
+  article: Article;
+}
+
+/**
+ * The `: Props` annotation is explicit rather than inferred, and it is
+ * load-bearing.
+ *
+ * `@astrojs/check` normally links `Astro.props` to a page's `Props` interface on
+ * its own. It stops doing so once the frontmatter contains a `satisfies`
+ * expression — `LINK_ORDER` below — at which point `Props` is reported as
+ * declared-but-never-used and `astro check` fails. Annotating the destructure
+ * restores the link by using the type outright. This is the same form
+ * `projects/[slug].astro` documents at length; it is a type annotation, not a
+ * cast, so a mismatch with what `getStaticPaths` supplies is still an error.
+ */
+const { locale, article }: Props = Astro.props;
+const { meta, title, summary } = article;
+
+const t = useTranslations(locale);
+const base = SITE.basePath;
+
+const listingHref = localizePath('/writing', locale, base);
+
+/**
+ * The body is read for the locale the article actually **resolved** to, not the
+ * one requested. An article with no `es.md` renders its English title and
+ * summary via `resolveArticle`; reading the body for the requested locale
+ * instead would pair an English heading with a missing document.
+ */
+const entry = await getArticleBodyEntry(meta.slug, article.locale);
+const Content = entry ? (await render(entry)).Content : undefined;
+
+const { older, newer } = await getArticleNeighbours(meta.slug, locale);
+
+/**
+ * The projects this article bears on, resolved one slug at a time through
+ * `getProjectBySlug` — which is the projects layer's own visibility predicate,
+ * so a project that stops being public stops being linked from here without
+ * this file knowing anything about project statuses.
+ *
+ * `src/lib/writing/index.ts` already fails the build for a `relatedProjects`
+ * entry naming a project that does not exist, so an `undefined` here means the
+ * project exists and is not public — a link deliberately withheld, not a typo.
+ */
+const relatedSlugs = meta.relatedProjects ?? [];
+const resolvedRelated = await Promise.all(relatedSlugs.map((slug) => getProjectBySlug(slug, locale)));
+const related: Project[] = resolvedRelated.filter((project): project is Project => project !== undefined);
+
+/**
+ * Media, resolved through `import.meta.glob` because `writing-schema.ts`
+ * imports no Astro virtual module and stores `cover` as a path string. The
+ * pattern must be a literal — Vite resolves it at build time.
+ */
+const media = import.meta.glob<{ default: ImageMetadata }>('/src/content/writing/*/media/*.{webp,avif,png,jpg,jpeg}', {
+  eager: true,
+});
+const coverPath = meta.cover ? `/src/content/writing/${meta.slug}/${meta.cover}` : undefined;
+const cover = coverPath ? media[coverPath]?.default : undefined;
+
+/**
+ * Every other photograph the article ships, in filename order.
+ *
+ * Discovered from the directory rather than declared. `cover` is a *choice* —
+ * which photograph represents the article in a listing — and it earns its
+ * schema field. "The other images in media/" is not a choice, it is the
+ * contents of a folder, and a second array in `article.json` would mean every
+ * added file had to be named twice and could silently disagree with itself.
+ */
+const figures = Object.entries(media)
+  .filter(([path]) => path.startsWith(`/src/content/writing/${meta.slug}/media/`) && path !== coverPath)
+  .sort(([a], [b]) => a.localeCompare(b))
+  .map(([path, module]) => ({ path, image: module.default }));
+
+/**
+ * Alt text for article media, keyed `<slug>/<file stem>` in the dictionaries —
+ * the same contract `projects/[slug].astro` documents. `mediaAlt` is an open
+ * `Record` because its keys are filenames, so `noUncheckedIndexedAccess` makes
+ * every lookup `string | undefined`; the localized title is the floor under
+ * that hole, and `tests/i18n.test.ts` sweeps both `media/` trees so it never
+ * fires. `alt=""` would announce a room full of named, photographed people as
+ * decoration.
+ */
+const altFor = (path: string): string => {
+  const stem = path
+    .split('/')
+    .pop()
+    ?.replace(/\.\w+$/, '');
+  return (stem === undefined ? undefined : t.writing.mediaAlt[`${meta.slug}/${stem}`]) ?? title;
+};
+const coverAlt = coverPath ? altFor(coverPath) : title;
+
+/** Never ask sharp to upscale. Same technique as the project detail page. */
+const RESPONSIVE_WIDTHS = [640, 960, 1280];
+const widthsFor = (image: ImageMetadata): number[] => {
+  const fitted = RESPONSIVE_WIDTHS.filter((width) => width <= image.width);
+  return fitted.length > 0 ? fitted : [image.width];
+};
+
+/**
+ * `sizes`, capped at the figure's own resolution and at the reading measure.
+ *
+ * `--container-prose` is 38rem — 608px at the default root size — and that is
+ * the widest this column ever draws a photograph. The cap goes in `sizes`
+ * rather than in CSS because `max-width` cannot express a per-image limit
+ * without an inline `style`, which the CSP drops.
+ */
+const CONTENT_WIDTH = 608;
+const sizesFor = (image: ImageMetadata): string => {
+  const width = Math.min(CONTENT_WIDTH, image.width);
+  return `(min-width: ${width}px) ${width}px, 100vw`;
+};
+
+/**
+ * The accent is not carried here. `data-domain` goes on the element and one
+ * rule per domain in the stylesheet resolves it — see the CSP note on those
+ * rules for why an inline custom property cannot be used.
+ */
+const domains = meta.domains.map((id) => ({ id, name: t.worlds.items[id].name }));
+
+/** The schema's own link keys. Not re-declared here — derived. */
+type ArticleLinkId = keyof WritingLinks;
+
+/**
+ * Every link type `writingLinksSchema` accepts, in render order.
+ *
+ * `LINK_TEXT` is typed `Record<ArticleLinkId, …>`, and `ArticleLinkId` is
+ * `keyof WritingLinks` — the schema's own shape. Adding a fifth link type to
+ * the schema is therefore a **compile error** here until it is named in both
+ * dictionaries, rather than a link the schema happily accepts and this page
+ * silently never renders. That gap is exactly how `paper` and `article` sat
+ * unrendered on the projects side.
+ */
+const LINK_ORDER = ['event', 'slides', 'paper', 'code'] as const satisfies readonly ArticleLinkId[];
+
+const LINK_TEXT: Record<ArticleLinkId, { text: string; label: (articleTitle: string) => string }> = {
+  event: { text: t.writing.event, label: t.a11y.articleEventLabel },
+  slides: { text: t.writing.slides, label: t.a11y.articleSlidesLabel },
+  paper: { text: t.writing.paper, label: t.a11y.articlePaperLabel },
+  code: { text: t.writing.code, label: t.a11y.articleCodeLabel },
+};
+
+const links = meta.links;
+const external = LINK_ORDER.flatMap((id) => {
+  const href = links?.[id];
+  if (href === undefined) return [];
+  const { text, label } = LINK_TEXT[id];
+  return [{ href, text, label: label(title) }];
+});
+
+const HEADING_ID = 'article-heading';
+const RELATED_ID = 'article-related';
+
+/**
+ * View-transition idents, carried as plain data attributes — the identical
+ * mechanism `WritingTimeline.astro` ships, which is what makes the pairing
+ * exist. `SLUG_PATTERN` forbids anything outside `[a-z0-9-]` and the literal
+ * prefix keeps the result a valid `<custom-ident>` even for a slug starting
+ * with a digit.
+ */
+const titleTransition = `article-title-${meta.slug}`;
+const mediaTransition = `article-media-${meta.slug}`;
+---
+
+<PageLayout
+  locale={locale}
+  title={t.seo.writing.title(title)}
+  description={t.seo.writing.description(summary)}
+  ogImageAlt={t.seo.ogImageAlt}
+>
+  <article class="article" aria-labelledby={HEADING_ID}>
+    <Container width="content">
+      <a class="article__back link" href={listingHref}>{t.writing.backToList}</a>
+
+      <header class="article__header">
+        {
+          /* The channel legend the rest of the site uses for a domain: one
+            tinted segment per domain, then a hairline out to the measure. It is
+            redundant with the labelled domain list below, hence aria-hidden. */
+        }
+        <div class="article__channels" aria-hidden="true">
+          {domains.map((domain) => <span class="article__channel" data-domain={domain.id} />)}
+          <span class="article__channel-rule"></span>
+        </div>
+
+        <h1 id={HEADING_ID} class="article__title" data-vt={titleTransition}>{title}</h1>
+
+        <p class="article__standfirst">{summary}</p>
+
+        {
+          /* Date and kind, on the index's rail idiom rather than joined into a
+            middle-dot meta string: two marks read off the same axis. */
+        }
+        <p class="article__meta">
+          <ArticleDate date={meta.date} locale={locale} />
+          <span class="article__kind">{t.writing.kinds[meta.kind]}</span>
+        </p>
+
+        <ul class="article__tags" aria-label={t.writing.domains}>
+          {
+            domains.map((domain) => (
+              <li class="article__domain" data-domain={domain.id}>
+                <span class="article__domain-mark" aria-hidden="true" />
+                {domain.name}
+              </li>
+            ))
+          }
+        </ul>
+
+        {
+          external.length > 0 && (
+            <ul class="article__links" aria-label={t.writing.links}>
+              {external.map((link) => (
+                <li>
+                  <a class="article__external" href={link.href} aria-label={link.label}>
+                    {link.text}
+                    <span class="article__external-mark" aria-hidden="true">
+                      &#8599;
+                    </span>
+                  </a>
+                </li>
+              ))}
+            </ul>
+          )
+        }
+      </header>
+
+      {
+        cover && (
+          <div class="article__media" data-vt={mediaTransition}>
+            <Image
+              src={cover}
+              alt={coverAlt}
+              widths={widthsFor(cover)}
+              sizes={sizesFor(cover)}
+              loading="eager"
+              fetchpriority="high"
+              decoding="async"
+            />
+          </div>
+        )
+      }
+
+      <div class="prose article__body">
+        {Content && <Content />}
+      </div>
+
+      {
+        figures.length > 0 && (
+          <ul class="article__figures">
+            {figures.map((figure) => (
+              <li class="article__figure">
+                <Image
+                  src={figure.image}
+                  alt={altFor(figure.path)}
+                  widths={widthsFor(figure.image)}
+                  sizes={sizesFor(figure.image)}
+                  loading="lazy"
+                  decoding="async"
+                />
+              </li>
+            ))}
+          </ul>
+        )
+      }
+
+      {
+        related.length > 0 && (
+          <section class="article__related" aria-labelledby={RELATED_ID}>
+            <h2 id={RELATED_ID} class="article__related-heading">
+              {t.writing.relatedProjects}
+            </h2>
+            <ProjectGrid projects={related} t={t} locale={locale} base={base} headingLevel={3} numbered={false} />
+          </section>
+        )
+      }
+
+      <ArticleNeighbours older={older} newer={newer} t={t} locale={locale} base={base} />
+    </Container>
+  </article>
+</PageLayout>
+
+<style>
+  .article {
+    padding-block: var(--spacing-section);
+  }
+
+  .article__back {
+    display: inline-block;
+    margin-bottom: var(--spacing-stack);
+    font-family: var(--font-mono);
+    font-stretch: normal;
+    font-size: var(--text-caption);
+    font-weight: 500;
+    letter-spacing: var(--tracking-label);
+    text-transform: uppercase;
+  }
+
+  .article__header {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    max-width: var(--container-prose);
+  }
+
+  /* --- Domain accents ------------------------------------------------------
+     `data-domain` on the element, one rule per domain here — never an inline
+     custom property. That is a CSP requirement, not a preference: `security.csp`
+     in `astro.config.mjs` ships no `'unsafe-inline'` and Astro emits no
+     `style-src-attr`, so `style-src` governs style *attributes* too, and
+     without `'unsafe-hashes'` every `style=""` is dropped. Painted that way,
+     these bars render correctly in `astro dev` and colourless in production.
+
+     These five lines mirror `Domain['accentVar']`, typed
+     `--color-domain-${DomainId}`. CSS cannot derive the name from the data, so
+     a sixth domain needs a sixth line here.
+
+     Paper ground, so the values are consumed through an ink mix below and never
+     as a raw `color` — see the boxed warning in tokens.css.
+     ----------------------------------------------------------------------- */
+
+  .article [data-domain='ai'] {
+    --domain-accent: var(--color-domain-ai);
+  }
+  .article [data-domain='quantum'] {
+    --domain-accent: var(--color-domain-quantum);
+  }
+  .article [data-domain='fpga'] {
+    --domain-accent: var(--color-domain-fpga);
+  }
+  .article [data-domain='electronics'] {
+    --domain-accent: var(--color-domain-electronics);
+  }
+  .article [data-domain='audio'] {
+    --domain-accent: var(--color-domain-audio);
+  }
+
+  .article__channels {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    width: 100%;
+  }
+
+  .article__channel {
+    width: 3.5rem;
+    height: var(--border-rule);
+    /* NON-TEXT ONLY — the 68% mix measures 3.41-4.90:1 on paper, which clears
+       the 3:1 WCAG 1.4.11 requires of a graphic mark but NOT the 4.5:1 text
+       needs. Never move this ratio onto a `color` property. */
+    background-color: color-mix(in oklab, var(--domain-accent) 68%, var(--color-ink));
+  }
+
+  .article__channel-rule {
+    flex: 1;
+    height: 0;
+    border-top: var(--border-rule) solid var(--color-ink);
+  }
+
+  /* --- The view-transition name --------------------------------------------
+     The value comes from `data-vt`, read by this completely static rule. An
+     inline `style` attribute is dropped by the CSP; `define:vars` compiles to
+     that same attribute and fails identically; a `<style is:inline>` whose hash
+     is registered by hand does land, but puts the name beyond the reach of the
+     reduced-motion guard in `global.css` and forces a second, local copy of it.
+     One owner for reduced motion is worth more than the mechanism.
+
+     `var(--vt-title, …)` wraps `attr()` deliberately: `global.css` nulls
+     `--vt-title` with `!important`, and keeping the property first in the chain
+     means that guard still wins untouched.
+
+     Advanced `attr()` is Chromium-only for now. Where it is unsupported the
+     declaration is invalid at computed-value time, `view-transition-name`
+     resolves to `none`, and the browser performs an ordinary navigation.
+     ----------------------------------------------------------------------- */
+  .article__title {
+    font-size: var(--text-display-3);
+    text-wrap: balance;
+    view-transition-name: var(--vt-title, attr(data-vt type(<custom-ident>), none));
+  }
+
+  /* The standfirst: larger than body, and the one piece of copy on the site
+     that is written once and read three times — here, on the index, and as the
+     page's meta description. */
+  .article__standfirst {
+    font-size: var(--text-xl);
+    line-height: var(--leading-prose);
+    color: var(--color-slate);
+    text-wrap: pretty;
+  }
+
+  .article__meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.375rem 1.25rem;
+  }
+
+  .article__kind {
+    padding: 0.125rem 0.5rem;
+    border: var(--border-hairline) solid var(--color-rule);
+    border-radius: var(--radius-sm);
+    font-family: var(--font-mono);
+    font-stretch: normal;
+    font-size: var(--text-micro);
+    font-weight: 500;
+    letter-spacing: var(--tracking-eyebrow);
+    text-transform: uppercase;
+    color: var(--color-ink);
+  }
+
+  .article__tags {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.375rem 0.875rem;
+    list-style: none;
+    font-family: var(--font-mono);
+    font-stretch: normal;
+    font-size: var(--text-micro);
+    font-weight: 500;
+    line-height: 1.4;
+    letter-spacing: var(--tracking-eyebrow);
+    text-transform: uppercase;
+    color: var(--color-ink);
+  }
+
+  .article__domain {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  /* NON-TEXT ONLY, same 68% mix and the same reason as `.article__channel`. */
+  .article__domain-mark {
+    width: var(--border-heavy);
+    height: 0.75em;
+    background-color: color-mix(in oklab, var(--domain-accent) 68%, var(--color-ink));
+  }
+
+  .article__links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem 1rem;
+    list-style: none;
+    font-family: var(--font-mono);
+    font-stretch: normal;
+    font-size: var(--text-caption);
+    font-weight: 500;
+    letter-spacing: var(--tracking-label);
+    text-transform: uppercase;
+  }
+
+  .article__external {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 0.5em;
+    color: var(--color-slate);
+    text-decoration: underline;
+    text-decoration-thickness: from-font;
+    text-underline-offset: 0.3em;
+    transition: color var(--duration-fast) var(--ease-standard);
+  }
+
+  .article__external:hover,
+  .article__external:focus-visible {
+    color: var(--color-accent);
+  }
+
+  .article__external-mark {
+    font-size: 0.9em;
+  }
+
+  /* The plate hugs the photograph and never exceeds the reading measure. No
+     reserved ratio and no `object-fit`: two of these are portrait, and cropping
+     a research poster to a wide band removes the poster. `<Image />` writes
+     `width` and `height` from the source's `ImageMetadata`, so the browser
+     derives the aspect ratio and the box is reserved before a byte arrives —
+     CLS stays at zero without a CSS ratio being guessed at. */
+  .article__media {
+    width: fit-content;
+    max-width: min(100%, var(--container-prose));
+    margin-top: var(--spacing-stack);
+    overflow: hidden;
+    border: var(--border-hairline) solid var(--color-rule);
+    border-radius: var(--radius-sm);
+    background-color: var(--color-paper-raised);
+    view-transition-name: var(--vt-media, attr(data-vt type(<custom-ident>), none));
+  }
+
+  .article__media :global(img),
+  .article__figure :global(img) {
+    display: block;
+    width: auto;
+    max-width: 100%;
+    height: auto;
+  }
+
+  /* Block flow rather than a flex column, deliberately: each plate sizes itself
+     with `width: fit-content`, and a flex item's shrink-to-fit cross size
+     fights that — the item resolves against the image and the image's
+     `max-width: 100%` resolves against the item. Measured on the projects page,
+     where an 8:1 figure collapsed to a few pixels. */
+  .article__figures {
+    margin-top: var(--spacing-block);
+    padding: 0;
+    list-style: none;
+  }
+
+  .article__figure {
+    width: fit-content;
+    max-width: min(100%, var(--container-prose));
+    overflow: hidden;
+    border: var(--border-hairline) solid var(--color-rule);
+    border-radius: var(--radius-sm);
+    background-color: var(--color-paper-raised);
+  }
+
+  .article__figure + .article__figure {
+    margin-top: var(--spacing-stack);
+  }
+
+  .article__body {
+    margin-top: var(--spacing-block);
+  }
+
+  .article__related {
+    margin-top: var(--spacing-block);
+    padding-top: var(--spacing-stack);
+    border-top: var(--border-hairline) solid var(--color-rule);
+  }
+
+  .article__related-heading {
+    margin-bottom: var(--spacing-stack);
+    font-size: var(--text-display-4);
+  }
+
+  /* Reduced motion. `global.css` nulls `--vt-title` / `--vt-media` with
+     `!important`, which wins the `var()` chain above and is the primary guard.
+     This mirrors the belt-and-braces rule the timeline carries, for a parser
+     that drops the nested `@view-transition` form. */
+  @media (prefers-reduced-motion: reduce) {
+    .article__title,
+    .article__media {
+      view-transition-name: none;
+    }
+  }
+</style>

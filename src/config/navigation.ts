@@ -15,7 +15,7 @@ import type { UIStrings } from '../i18n/types';
  * `HOME_PATH` and the `nav.home` / `a11y.homeLink` strings.
  */
 
-export type NavItemId = 'projects' | 'about' | 'contact';
+export type NavItemId = 'projects' | 'writing' | 'about' | 'contact';
 
 export interface NavItem {
   readonly id: NavItemId;
@@ -79,8 +79,17 @@ export const SECTION_IDS = ['hero', 'layers', 'worlds', 'projects', 'contact'] a
 
 export type SectionId = (typeof SECTION_IDS)[number];
 
+/**
+ * `writing` sits between `projects` and `about` because that is the order of
+ * evidence: what was built, then what was taught and organised, then who did
+ * it. It is a page of its own rather than a homepage section, so it appears
+ * here and **not** in `SECTION_IDS` — the section list numbers the homepage's
+ * figure annotations, and a sixth entry there would renumber every existing one
+ * for a band that does not exist on that page.
+ */
 export const PRIMARY_NAV = [
   { id: 'projects', path: '/projects', labelKey: 'projects' },
+  { id: 'writing', path: '/writing', labelKey: 'writing' },
   { id: 'about', path: '/about', labelKey: 'about' },
   { id: 'contact', path: HOME_PATH, hash: CONTACT_SECTION_ID, labelKey: 'contact' },
 ] as const satisfies readonly NavItem[];

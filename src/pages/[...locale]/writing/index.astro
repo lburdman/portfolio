@@ -1,0 +1,116 @@
+---
+/**
+ * `/writing/` and `/es/writing/`, from one file.
+ *
+ * The sibling of `projects/index.astro`, and built to the same three rules:
+ *
+ * - **One visibility predicate (AUDIT.md 2.1).** This page does not filter on
+ *   `status`. It calls `getVisibleArticles()`, which is the same `isVisible()`
+ *   the detail route's `getStaticPaths` uses, so the set of listed articles and
+ *   the set of built article pages are equal by construction rather than by two
+ *   filters that happen to agree today. The projects pair did not agree, and
+ *   the result was a live, sitemap-eligible page that appeared in no listing.
+ * - **Heading hierarchy (AUDIT.md 2.2).** One `<h1>`, and the timeline's entry
+ *   titles are `headingLevel={2}` — nothing skipped, and no invented `<h2>`
+ *   band between them, because a heading is a promise of a localized name and
+ *   the dictionary has no string for "the listing" that is not already the
+ *   `<h1>`.
+ * - **No second copy.** Both locales render through this file, so the Spanish
+ *   axis cannot silently lose a rule the English one has (AUDIT.md 5.1).
+ *
+ * ## What this page deliberately does not have
+ *
+ * No kind filter. `getVisibleKinds()` exists and the chips would be four lines
+ * of markup, but filtering a chronology by category destroys the only thing the
+ * layout is saying: with a kind selected the gaps between the surviving entries
+ * no longer measure the time between them, they measure the time between the
+ * *survivors*. The axis would keep drawing a scale it was no longer honouring.
+ * The projects index filters because a shelf has no scale to break.
+ *
+ * ## `Container`, not `Section`
+ *
+ * This is a standalone route, not a homepage band, so it does not join
+ * `SECTION_IDS` — that array numbers the homepage's figure annotations and a
+ * sixth entry would renumber every existing one. `projects/index.astro` reaches
+ * for a bare `Container` for the same reason.
+ *
+ * The measure is `content` rather than the projects index's `wide`: a
+ * chronology is an editorial column with a rail down its left, not a grid, and
+ * the whitespace to the right of it is the page breathing rather than space
+ * waiting to be filled.
+ */
+
+import Container from '@/components/ui/Container.astro';
+import WritingTimeline from '@/components/writing/WritingTimeline.astro';
+import { SITE } from '@/config/site';
+import { DEFAULT_LOCALE, LOCALES, useTranslations, type Locale } from '@/i18n';
+import { getVisibleArticles } from '@/lib/writing';
+import PageLayout from '@/layouts/PageLayout.astro';
+
+export function getStaticPaths() {
+  return LOCALES.map((locale) => ({
+    params: { locale: locale === DEFAULT_LOCALE ? undefined : locale },
+    props: { locale },
+  }));
+}
+
+interface Props {
+  locale: Locale;
+}
+
+const { locale } = Astro.props;
+
+const t = useTranslations(locale);
+const base = SITE.basePath;
+
+const articles = await getVisibleArticles(locale);
+
+const HEADING_ID = 'writing-heading';
+---
+
+<PageLayout
+  locale={locale}
+  title={t.seo.writingIndex.title}
+  description={t.seo.writingIndex.description}
+  ogImageAlt={t.seo.ogImageAlt}
+>
+  <div class="index" aria-labelledby={HEADING_ID}>
+    <Container width="content">
+      <header class="index__header">
+        <h1 id={HEADING_ID}>{t.writing.heading}</h1>
+        <p class="index__lede">{t.writing.subtitle}</p>
+      </header>
+
+      <div class="index__listing">
+        <WritingTimeline articles={articles} t={t} locale={locale} base={base} headingLevel={2} />
+      </div>
+    </Container>
+  </div>
+</PageLayout>
+
+<style>
+  .index {
+    padding-block: var(--spacing-section);
+  }
+
+  .index__header {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-gutter);
+    max-width: var(--container-prose);
+  }
+
+  .index__lede {
+    font-size: var(--text-lg);
+    line-height: var(--leading-prose);
+    color: var(--color-slate);
+    text-wrap: pretty;
+  }
+
+  /* The axis starts a block below the lede and then owns the rest of the page.
+     Its own first entry carries the top padding that separates it from this
+     rule, so nothing here reaches into the component to space its children. */
+  .index__listing {
+    margin-top: var(--spacing-block);
+  }
+</style>

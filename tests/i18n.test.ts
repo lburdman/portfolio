@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest';
 import { DOMAIN_IDS } from '../src/config/domains';
 import { SECTION_IDS } from '../src/config/navigation';
 import { projectLinksSchema } from '../src/content/schema';
+import { WRITING_KINDS, writingLinksSchema } from '../src/content/writing-schema';
 import { en } from '../src/i18n/en';
 import { es } from '../src/i18n/es';
 import { LOCALES, type Locale, type UIStrings } from '../src/i18n/types';
@@ -41,6 +42,28 @@ const LEAVES: Record<Locale, Leaf[]> = {
   en: collectLeaves(en),
   es: collectLeaves(es),
 };
+
+/**
+ * Every committed figure under a content tree, as `<slug>/<file stem>` keys.
+ *
+ * Read off the filesystem rather than retyped, so dropping an image into a
+ * `media/` directory publishes it AND fails the suite until it has words in
+ * both locales. Shared by the projects and writing sweeps below because it is
+ * one rule about one directory shape — two copies would be two chances for the
+ * newer collection's sweep to be quietly weaker than the older one's.
+ */
+function mediaKeysUnder(collectionDir: string): string[] {
+  return readdirSync(collectionDir, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
+    .flatMap((item) => {
+      const mediaDir = join(collectionDir, item.name, 'media');
+      if (!existsSync(mediaDir)) return [];
+      return readdirSync(mediaDir)
+        .filter((file) => !file.startsWith('.'))
+        .map((file) => `${item.name}/${file.replace(/\.\w+$/, '')}`);
+    })
+    .sort();
+}
 
 describe('EN ↔ ES parity', () => {
   it('has the same top-level groups', () => {
@@ -151,7 +174,7 @@ describe('navigation strings', () => {
   it('provides a label for every link the brief requires to be always reachable', () => {
     for (const locale of LOCALES) {
       const t = DICTIONARIES[locale];
-      for (const key of ['home', 'projects', 'about', 'contact'] as const) {
+      for (const key of ['home', 'projects', 'writing', 'about', 'contact'] as const) {
         expect(t.nav[key], `${locale} nav.${key}`).toBeTruthy();
       }
     }
@@ -279,7 +302,10 @@ describe('section labels', () => {
 });
 
 describe('SEO metadata', () => {
-  const staticPages = ['home', 'projectsIndex', 'about', 'notFound'] as const;
+  // `writingIndex` joined this list with the writing section. It is the only
+  // way the new page's title and description are held to the same 60/160 SERP
+  // bounds every other static page is — an unlisted page is an unguarded one.
+  const staticPages = ['home', 'projectsIndex', 'writingIndex', 'about', 'notFound'] as const;
 
   it('supplies a title and description for every static page in both locales', () => {
     for (const locale of LOCALES) {
@@ -470,16 +496,7 @@ describe('project media alt text', () => {
    */
   const PROJECTS_DIR = fileURLToPath(new URL('../src/content/projects', import.meta.url));
 
-  const mediaKeys = readdirSync(PROJECTS_DIR, { withFileTypes: true })
-    .filter((entry) => entry.isDirectory())
-    .flatMap((project) => {
-      const mediaDir = join(PROJECTS_DIR, project.name, 'media');
-      if (!existsSync(mediaDir)) return [];
-      return readdirSync(mediaDir)
-        .filter((file) => !file.startsWith('.'))
-        .map((file) => `${project.name}/${file.replace(/\.\w+$/, '')}`);
-    })
-    .sort();
+  const mediaKeys = mediaKeysUnder(PROJECTS_DIR);
 
   it('finds the committed figures it is meant to be describing', () => {
     // Guards the guard: an empty sweep would make every assertion below vacuous.
@@ -554,10 +571,136 @@ describe('project media alt text', () => {
   });
 });
 
+describe('article kind labels', () => {
+  it('covers every WRITING_KIND in both locales, and nothing else', () => {
+    // `UIStrings['writing']['kinds']` is a `Record<WritingKind, string>`, so a
+    // fifth kind added to the schema is already a compile error. This is the
+    // runtime half: it also fails if a kind is present but blank.
+    for (const locale of LOCALES) {
+      const t = DICTIONARIES[locale];
+      expect(Object.keys(t.writing.kinds).sort()).toEqual([...WRITING_KINDS].sort());
+      for (const kind of WRITING_KINDS) {
+        expect(t.writing.kinds[kind], `${locale} writing.kinds.${kind}`).toBeTruthy();
+      }
+    }
+  });
+
+  it('gives each kind a distinct label within a locale', () => {
+    for (const locale of LOCALES) {
+      const labels = WRITING_KINDS.map((kind) => DICTIONARIES[locale].writing.kinds[kind]);
+      expect(new Set(labels).size, `${locale} duplicate kind labels`).toBe(WRITING_KINDS.length);
+    }
+  });
+
+  it('renders as a badge, not a sentence', () => {
+    for (const locale of LOCALES) {
+      for (const kind of WRITING_KINDS) {
+        const label = DICTIONARIES[locale].writing.kinds[kind];
+        expect(label.length, `${locale} writing.kinds.${kind} too long`).toBeLessThanOrEqual(24);
+        expect(label, `${locale} writing.kinds.${kind} is a sentence`).not.toContain('.');
+      }
+    }
+  });
+
+  it('translates the kinds rather than shipping the English words twice', () => {
+    expect(es.writing.kinds.teaching).not.toBe(en.writing.kinds.teaching);
+    expect(es.writing.kinds.community).not.toBe(en.writing.kinds.community);
+    expect(es.writing.kinds.research).not.toBe(en.writing.kinds.research);
+    expect(es.writing.kinds.study).not.toBe(en.writing.kinds.study);
+  });
+});
+
+describe('article media alt text', () => {
+  /**
+   * The writing half of the sweep above, driven by the same helper and holding
+   * the same contract: every committed photograph described in both locales,
+   * no orphans, keyed `<slug>/<file stem>`.
+   *
+   * It exists separately from the projects sweep because the dictionaries are
+   * separate — `writing.mediaAlt` and `projects.mediaAlt` are two open
+   * `Record`s, and without this the new collection's images would fall back to
+   * the article title with nothing failing anywhere.
+   *
+   * These are photographs of real rooms, not plots, so the standard the
+   * assertions hold them to is the same one the projects sweep holds: describe
+   * what is in the frame, never what the event is supposed to have proved.
+   */
+  const WRITING_DIR = fileURLToPath(new URL('../src/content/writing', import.meta.url));
+
+  const mediaKeys = mediaKeysUnder(WRITING_DIR);
+
+  it('finds the committed photographs it is meant to be describing', () => {
+    // Guards the guard: an empty sweep would make every assertion below vacuous.
+    expect(mediaKeys.length, 'no writing media found — this suite would pass on nothing').toBeGreaterThan(0);
+  });
+
+  it('describes every committed photograph, in both locales, keyed <slug>/<file stem>', () => {
+    for (const locale of LOCALES) {
+      const alts = DICTIONARIES[locale].writing.mediaAlt;
+      for (const key of mediaKeys) {
+        const alt = alts[key];
+        expect(alt, `${locale} writing.mediaAlt['${key}'] missing`).toBeTruthy();
+        expect(alt?.length ?? 0, `${locale} writing.mediaAlt['${key}'] too terse`).toBeGreaterThan(60);
+      }
+    }
+  });
+
+  it('describes no photograph that is not committed', () => {
+    for (const locale of LOCALES) {
+      expect(Object.keys(DICTIONARIES[locale].writing.mediaAlt).sort(), `${locale} orphan mediaAlt keys`).toEqual(
+        mediaKeys,
+      );
+    }
+  });
+
+  it('is alt text, not a caption arguing a point', () => {
+    for (const locale of LOCALES) {
+      for (const [key, alt] of Object.entries(DICTIONARIES[locale].writing.mediaAlt)) {
+        expect(alt.length, `${locale} writing.mediaAlt['${key}'] too long`).toBeLessThanOrEqual(420);
+      }
+    }
+  });
+
+  it('reads the credential printed on the IBM Quantum badge, verbatim, in both locales', () => {
+    // The badge is a verifiable credential. Paraphrasing the text on it — or
+    // dropping the level — turns something a reader could look up into a claim
+    // they have to take on trust.
+    for (const locale of LOCALES) {
+      const alt = DICTIONARIES[locale].writing.mediaAlt['qiskit-fall-fest-fiuba-2025/ibm-quantum-mentor-badge'];
+      expect(alt, `${locale} badge alt`).toContain('IBM Quantum');
+      expect(alt, `${locale} badge alt omits the wording on the badge`).toContain('2025 Qiskit Fall Fest Mentor');
+      expect(alt, `${locale} badge alt omits the level`).toContain('Advanced');
+    }
+  });
+
+  it('quotes the poster title as printed, in Spanish, in both locales', () => {
+    // The poster is in Spanish. Translating its title into the English alt text
+    // would describe a poster that does not exist.
+    for (const locale of LOCALES) {
+      const alt = DICTIONARIES[locale].writing.mediaAlt['lanet-2025-complex-networks/poster-transfer-learning-quantum'];
+      expect(alt, `${locale} poster alt`).toContain('Transfer Learning para Redes Neuronales');
+    }
+  });
+
+  it('translates the descriptions rather than shipping the English twice', () => {
+    for (const key of mediaKeys) {
+      expect(es.writing.mediaAlt[key], `es writing.mediaAlt['${key}'] is the English string`).not.toBe(
+        en.writing.mediaAlt[key],
+      );
+    }
+  });
+});
+
 describe('Spanish is a translation, not a copy', () => {
   it('differs from English on the strings a machine copy would leave identical', () => {
     expect(es.nav.projects).not.toBe(en.nav.projects);
+    expect(es.nav.writing).not.toBe(en.nav.writing);
     expect(es.nav.about).not.toBe(en.nav.about);
+    expect(es.writing.heading).not.toBe(en.writing.heading);
+    expect(es.writing.subtitle).not.toBe(en.writing.subtitle);
+    expect(es.writing.empty).not.toBe(en.writing.empty);
+    expect(es.seo.writingIndex.title).not.toBe(en.seo.writingIndex.title);
+    expect(es.a11y.articleNavigation).not.toBe(en.a11y.articleNavigation);
     expect(es.hero.positioning).not.toBe(en.hero.positioning);
     expect(es.layers.heading).not.toBe(en.layers.heading);
     expect(es.worlds.heading).not.toBe(en.worlds.heading);
@@ -664,6 +807,91 @@ describe('project link labels', () => {
       const t = DICTIONARIES[locale];
       expect(t.projects.relatedWork, `${locale} projects.relatedWork`).toBeTruthy();
       expect(t.projects.relatedWork, `${locale} still borrows projects.heading`).not.toBe(t.projects.heading);
+    }
+  });
+});
+
+describe('article link labels', () => {
+  /**
+   * The writing twin of the projects sweep above, and it exists for the same
+   * reason that one does: `writingLinksSchema` accepts four external
+   * destinations, and a type the dictionaries cannot name is a link the page
+   * renders as nothing while nothing fails. Driven by the schema's own shape,
+   * so a fifth link type added there fails here until it has words in both
+   * locales.
+   */
+  const linkTypes = Object.keys(writingLinksSchema.shape);
+
+  const a11yKeyFor = (type: string) =>
+    `article${type.replace(/^./, (c) => c.toUpperCase())}Label` as keyof UIStrings['a11y'];
+
+  it('names every link type the schema accepts, visibly and accessibly, in both locales', () => {
+    expect(linkTypes.length).toBeGreaterThan(0);
+    for (const locale of LOCALES) {
+      const t = DICTIONARIES[locale];
+      const visibleLabels = t.writing as unknown as Record<string, string | undefined>;
+      const a11yLabels = t.a11y as unknown as Record<string, ((title: string) => string) | undefined>;
+      for (const type of linkTypes) {
+        expect(visibleLabels[type], `${locale} writing.${type}`).toBeTruthy();
+        const accessible = a11yLabels[a11yKeyFor(type)];
+        expect(accessible, `${locale} a11y.${a11yKeyFor(type)}`).toBeTypeOf('function');
+        expect(accessible?.('Qiskit Fall Fest'), `${locale} a11y.${a11yKeyFor(type)}`).toContain('Qiskit Fall Fest');
+      }
+    }
+  });
+
+  it('gives each link type a distinct label and a distinct accessible name', () => {
+    for (const locale of LOCALES) {
+      const t = DICTIONARIES[locale];
+      const visibleLabels = t.writing as unknown as Record<string, string | undefined>;
+      const a11yLabels = t.a11y as unknown as Record<string, ((title: string) => string) | undefined>;
+      const visible = linkTypes.map((type) => visibleLabels[type]);
+      const accessible = linkTypes.map((type) => a11yLabels[a11yKeyFor(type)]?.('Qiskit Fall Fest'));
+      expect(new Set(visible).size, `${locale} duplicate link labels`).toBe(linkTypes.length);
+      expect(new Set(accessible).size, `${locale} duplicate link a11y names`).toBe(linkTypes.length);
+    }
+  });
+
+  it('does not reuse the project link accessible names, which say a different thing', () => {
+    // "Paper about X" is a paper *about* a project; "Paper presented in X" is
+    // the paper an article presented. Same word, different sentence.
+    for (const locale of LOCALES) {
+      const t = DICTIONARIES[locale];
+      expect(t.a11y.articlePaperLabel('X')).not.toBe(t.a11y.projectPaperLabel('X'));
+    }
+  });
+});
+
+describe('the writing section is not the dead notes key', () => {
+  it('routes and labels itself as writing, in both locales', () => {
+    // AUDIT.md 5.4 removed a dead `nav.notes`; the guard above still asserts it
+    // never comes back. A live section reusing that name would make the guard
+    // fail for the wrong reason and then be "fixed" by deleting it.
+    for (const locale of LOCALES) {
+      const t = DICTIONARIES[locale];
+      expect(Object.keys(t.nav)).toContain('writing');
+      expect(t.nav.writing, `${locale} nav.writing`).toBeTruthy();
+      expect(t.writing.heading, `${locale} writing.heading`).toBeTruthy();
+      expect(t.writing.empty, `${locale} writing.empty`).toBeTruthy();
+    }
+  });
+
+  it('says what will appear in the empty state rather than that nothing was found', () => {
+    // Design decision, asserted because it is the kind of copy that gets
+    // replaced with "No posts found" by the next person in a hurry.
+    for (const locale of LOCALES) {
+      const empty = DICTIONARIES[locale].writing.empty;
+      expect(empty.length, `${locale} writing.empty is a stub`).toBeGreaterThan(30);
+    }
+  });
+
+  it('gives the writing section its own words, not the projects section reworded', () => {
+    for (const locale of LOCALES) {
+      const t = DICTIONARIES[locale];
+      expect(t.writing.heading).not.toBe(t.projects.heading);
+      expect(t.writing.subtitle).not.toBe(t.projects.subtitle);
+      expect(t.writing.empty).not.toBe(t.projects.empty);
+      expect(t.writing.backToList).not.toBe(t.projects.backToList);
     }
   });
 });

@@ -1,0 +1,95 @@
+---
+/**
+ * An article's date, rendered once and used by both writing routes.
+ *
+ * ## Why the formatting lives in a component rather than in `src/lib/`
+ *
+ * `CLAUDE.md` says logic belongs in `src/lib/**` where it is unit-tested, and
+ * that is the right default. This is the exception the rule leaves room for:
+ * `src/lib/writing/` is owned by the data layer and is deliberately free of any
+ * concern about how a date *reads*. What matters here is the property the rule
+ * is actually protecting — that there is exactly **one** implementation, so the
+ * index and the article page cannot drift into two date formats the way the
+ * audit found four routes drifting apart. One component, imported twice, gives
+ * that guarantee just as well as one function would.
+ *
+ * ## Month precision is a real state
+ *
+ * `contentDateSchema` accepts `YYYY-MM` as well as `YYYY-MM-DD`, because some
+ * of this material happened on a day printed on a slide and some of it happened
+ * "at the end of that semester". The renderer says only as much as it knows: a
+ * month-precision date renders as a month and a year, and `datetime` carries
+ * the same `YYYY-MM` the content declares. Inventing a day here would write a
+ * fact into the site that nobody can vouch for.
+ *
+ * `hasDayPrecision()` from the data layer answers the question rather than this
+ * file re-measuring the string's length — one owner for one distinction.
+ *
+ * ## Why `Intl` rather than twenty-four dictionary strings
+ *
+ * Month names are the one class of user-facing text that is not copy: they are
+ * a property of the locale, and `Intl.DateTimeFormat` already holds every one
+ * of them, in the right order, with the right particles ("8 nov 2025" in
+ * Spanish, "Nov 8, 2025" in English). Putting them in `en.ts` and `es.ts` would
+ * be twenty-four strings nobody writes and everybody could typo. The locale is
+ * passed in explicitly, so this is not a component fetching its own
+ * translations — it receives `locale` exactly as it receives `t` elsewhere.
+ *
+ * `timeZone: 'UTC'` is load-bearing. The date is parsed as UTC midnight; without
+ * it the formatter would apply the build machine's zone and render 8 November
+ * as 7 November for anyone building west of Greenwich.
+ */
+
+import type { Locale } from '@/i18n';
+// Imported from the pure query module rather than from `@/lib/writing`, whose
+// index pulls in `astro:content`. This component needs one string predicate,
+// not a content collection, and keeping the narrow import means it stays
+// renderable outside a build (see the note in `vitest.config.ts`).
+import { hasDayPrecision } from '@/lib/writing/query';
+
+interface Props {
+  /** `YYYY-MM-DD` or `YYYY-MM`, straight from `article.meta.date`. */
+  date: string;
+  locale: Locale;
+  class?: string | undefined;
+}
+
+const { date, locale, class: className }: Props = Astro.props;
+
+const withDay = hasDayPrecision(date);
+
+/**
+ * `new Date('2025-11')` is parsed as an ISO *month*, which is legal but leaves
+ * the result at UTC midnight of the first — the same value the explicit
+ * `-01` produces, spelled out so the intent is visible rather than inferred
+ * from a parsing rule.
+ */
+const instant = new Date(`${withDay ? date : `${date}-01`}T00:00:00Z`);
+
+const options: Intl.DateTimeFormatOptions = withDay
+  ? { timeZone: 'UTC', year: 'numeric', month: 'short', day: 'numeric' }
+  : { timeZone: 'UTC', year: 'numeric', month: 'short' };
+
+const text = new Intl.DateTimeFormat(locale, options).format(instant);
+---
+
+<time class:list={['date', className]} datetime={date}>{text}</time>
+
+<style>
+  /* Datasheet annotation, like every other piece of metadata on this site.
+     Authored in normal case by `Intl` and uppercased here, so the same string
+     could be reused unshouted somewhere else. */
+  .date {
+    display: inline-block;
+    font-family: var(--font-mono);
+    font-stretch: normal;
+    font-size: var(--text-micro);
+    font-weight: 500;
+    letter-spacing: var(--tracking-eyebrow);
+    text-transform: uppercase;
+    color: var(--color-slate);
+    /* A month can wrap between its parts and read as two dates. It is three
+       short words; keep them together. */
+    white-space: nowrap;
+  }
+</style>

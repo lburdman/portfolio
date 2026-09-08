@@ -19,6 +19,7 @@ export const es: UIStrings = {
   nav: {
     home: 'Inicio',
     projects: 'Proyectos',
+    writing: 'Artículos',
     about: 'Sobre mí',
     contact: 'Contacto',
   },
@@ -137,6 +138,48 @@ export const es: UIStrings = {
     },
   },
 
+  writing: {
+    heading: 'Artículos',
+    subtitle:
+      'Crónicas de dar computación cuántica en la FIUBA, sostener la comunidad estudiantil que se armó alrededor y los congresos y cursos que hubo en el medio.',
+    empty: 'Acá van a ir apareciendo las crónicas de docencia, organización y estudio a medida que se escriban.',
+    readArticle: 'Leer artículo',
+    kinds: {
+      teaching: 'Docencia',
+      community: 'Comunidad',
+      research: 'Investigación',
+      study: 'Estudio',
+    },
+    relatedProjects: 'Proyectos relacionados',
+    backToList: 'Volver a artículos',
+    older: 'Antes',
+    newer: 'Después',
+    domains: 'Áreas',
+    links: 'Enlaces',
+    event: 'Evento',
+    slides: 'Diapositivas',
+    paper: 'Publicación',
+    code: 'Código',
+    mediaAlt: {
+      'lanet-2025-complex-networks/lanet-conference-group-photo':
+        'Alrededor de sesenta asistentes a un congreso, con credenciales de cordón azul, posan en escalinatas exteriores frente a un edificio moderno bajo sol intenso.',
+      'lanet-2025-complex-networks/poster-transfer-learning-quantum':
+        'Dos hombres de pie a ambos lados de un póster de investigación titulado "Transfer Learning para Redes Neuronales Híbridas Clásico-Cuánticas".',
+      'noche-de-los-museos-fiuba/spinq-desktop-quantum-computer':
+        'Una computadora cuántica de escritorio SpinQ con la tapa abierta y su tablet mostrando un circuito de dos qubits y un gráfico de barras de probabilidad.',
+      'qiskit-fall-fest-fiuba-2025/hackathon-group-library':
+        'Unos veinticinco participantes con credenciales colgadas posan juntos en la sala de lectura de una biblioteca universitaria con paneles de madera.',
+      'qiskit-fall-fest-fiuba-2025/ibm-quantum-mentor-badge':
+        'Insignia digital de IBM Quantum sobre un cuadrado azul intenso con el texto "2025 Qiskit Fall Fest Mentor", nivel Advanced.',
+      'qiskit-fall-fest-fiuba-2025/kickoff-lecture-hall-audience':
+        'Un aula magna en gradas con bancos de madera y unas sesenta personas sentadas mirando al frente bajo largos tubos fluorescentes.',
+      'qiskit-fall-fest-fiuba-2025/opening-talk-quantum-utility':
+        'Un joven con remera color crema habla por micrófono de mano frente a una diapositiva proyectada del evento Qiskit Fall Fest ARG 2025.',
+      'quantum-computing-course-fiuba/course-closing-group-classroom':
+        'Unas quince personas posan en un aula frente a una pizarra blanca, junto a un pequeño equipo de escritorio con la pantalla encendida sobre el pupitre.',
+    },
+  },
+
   about: {
     heading: 'Sobre mí',
     bio: 'Soy Ingeniero Electrónico por la UBA y trabajo en sistemas de IA en producción. Mi formación viene de las señales, los circuitos y el diseño digital; hoy la mayor parte de mi tiempo va al machine learning y a los sistemas con LLM, y al trabajo de evaluación que decide si un modelo está listo para salir. Soy ayudante de cátedra en Sistemas Digitales y en Computación y Comunicaciones Cuánticas, en la FIUBA.',
@@ -217,6 +260,12 @@ export const es: UIStrings = {
     projectDemoLabel: (title: string) => `Demo en vivo de ${title}`,
     projectPaperLabel: (title: string) => `Publicación sobre ${title}`,
     projectArticleLabel: (title: string) => `Artículo sobre ${title}`,
+    articleEventLabel: (title: string) => `Página del evento de ${title}`,
+    articleSlidesLabel: (title: string) => `Diapositivas de ${title}`,
+    articlePaperLabel: (title: string) => `Publicación presentada en ${title}`,
+    articleCodeLabel: (title: string) => `Código de ${title}`,
+    articleNavigation: 'Artículos cercanos en el tiempo',
+    writingTimeline: 'Artículos, del más reciente al más antiguo',
     decorativeVisual: 'Elemento visual decorativo',
     worldsInstructions:
       'Usa las flechas izquierda y derecha para recorrer los mundos técnicos, o Tab para llegar a cada uno por turno.',
@@ -238,6 +287,15 @@ export const es: UIStrings = {
     projects: {
       title: (projectTitle: string) => `${projectTitle} — Lucas Burdman`,
       description: (projectSummary: string) => projectSummary,
+    },
+    writingIndex: {
+      title: 'Artículos — Lucas Burdman',
+      description:
+        'Crónicas sobre dar computación cuántica en la FIUBA, sostener una comunidad cuántica estudiantil y los congresos y cursos del medio.',
+    },
+    writing: {
+      title: (articleTitle: string) => `${articleTitle} — Lucas Burdman`,
+      description: (articleSummary: string) => articleSummary,
     },
     about: {
       title: 'Sobre mí — Lucas Burdman',
