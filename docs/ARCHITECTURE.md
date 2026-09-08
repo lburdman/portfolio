@@ -7,7 +7,7 @@ Companion documents:
 
 - `PORTFOLIO_BRIEF.md` — product, design and experience target (source of truth)
 - `AUDIT.md` — verified defect baseline this redesign resolves
-- `docs/PROJECT_CONTENT_CONTRACT.md` — how to add and edit projects
+- `docs/PROJECT_CONTENT_CONTRACT.md` — how to add and edit projects and articles
 - `docs/MOTION_SYSTEM.md` — motion principles, budgets and fallbacks
 
 ---
@@ -90,6 +90,8 @@ src/pages/
     about.astro            →  /about/        and  /es/about/
     projects/index.astro   →  /projects/     and  /es/projects/
     projects/[slug].astro  →  /projects/x/   and  /es/projects/x/
+    writing/index.astro    →  /writing/      and  /es/writing/
+    writing/[slug].astro   →  /writing/x/    and  /es/writing/x/
   404.astro
 ```
 
@@ -99,6 +101,20 @@ src/pages/
 The audit measured the previous physical `src/pages/es/` tree at **86% duplicated
 lines**, with real drift already present between the two copies. The catch-all
 makes that class of bug structurally impossible rather than merely fixed.
+
+### Navigation
+
+`src/config/navigation.ts` is the single source of navigation structure — data
+only, no logic and no URL construction; consumers resolve the href through
+`localizePath` and the label through `t.nav[item.labelKey]`. `PRIMARY_NAV` is
+Projects → Writing → About → Contact, which is the order of evidence: what was
+built, then what was taught and organised, then who did it.
+
+Writing is a **page**, not a homepage band, so it appears in `PRIMARY_NAV` and
+deliberately **not** in `SECTION_IDS`. That array numbers the homepage's figure
+annotations (`00`…`04`) and doubles as the union `UIStrings['sections']` is keyed
+by; a sixth entry there would renumber every existing annotation for a band that
+does not exist on that page.
 
 ---
 
@@ -128,8 +144,9 @@ Rules:
 
 ## 4. Content architecture
 
-Projects are the product. The model is designed so that **adding or editing a
-normal project touches no application code at all**.
+Projects are the product; writing is the evidence of the work around them. The
+model is designed so that **adding or editing normal content touches no
+application code at all**.
 
 ```
 src/content/projects/
@@ -138,34 +155,68 @@ src/content/projects/
     en.md             English title, summary and case-study body
     es.md             Spanish title, summary and case-study body
     media/            optional images referenced from project.json
+
+src/content/writing/
+  <slug>/
+    article.json      shared, locale-independent metadata
+    en.md             English title, summary and body
+    es.md             Spanish title, summary and body
+    media/            optional cover and figures
 ```
 
-Two collections, joined in one place:
+**Four collections, two pairs.** Each pair splits shared metadata from what is
+genuinely translated, and each is joined in exactly one place:
 
-- `projects` — a data collection over `*/project.json`, validated by
-  `src/content/schema.ts`. Owns everything locale-independent: status, domains,
-  stack, links, ordering, media.
-- `projectContent` — a content collection over `*/{en,es}.md`. Owns only what is
-  genuinely localized: `title`, `summary` and the body.
+| Collection       | Over             | Schema                          | Owns                                                |
+| ---------------- | ---------------- | ------------------------------- | --------------------------------------------------- |
+| `projects`       | `*/project.json` | `src/content/schema.ts`         | Status, domains, stack, links, ordering, media      |
+| `projectContent` | `*/{en,es}.md`   | `src/content/schema.ts`         | `title`, `summary`, the case-study body             |
+| `writing`        | `*/article.json` | `src/content/writing-schema.ts` | Date, kind, domains, links, cover, related projects |
+| `writingContent` | `*/{en,es}.md`   | `src/content/writing-schema.ts` | `title`, `summary`, the body                        |
 
-Shared metadata is therefore stored exactly once. The join, the visibility rule
-and every query live in `src/lib/projects/`, which is plain TypeScript and
-directly unit-tested — not `.astro` files, where the audit found logic that had
-already diverged between routes.
+Shared metadata is therefore stored exactly once per entry — a project's tags
+cannot drift between EN and ES, and an article's date cannot say November in
+English and October in Spanish. The joins, the visibility rules and every query
+live in `src/lib/projects/` and `src/lib/writing/`, which are plain TypeScript
+and directly unit-tested — not `.astro` files, where the audit found logic that
+had already diverged between routes. `src/lib/content/id.ts` holds the id
+helpers both pairs use, because `<slug>/<locale>.md` is one id format, not two.
 
-**One visibility predicate.** `isVisible()` in `src/lib/projects/visibility.ts` is
-the only definition of which projects are public. Listings, detail pages, the
-featured set, both locales and the sitemap all call it. The audit found the
-listing and detail routes disagreeing (`status === 'published'` versus
-`status !== 'draft'`), which would have published unlisted `wip` pages.
+**Why writing is a second schema and not a wider first one.** A project has a
+repository, a stack and evidence; an article has a date, a body and a
+photograph. `PROJECT_CONTENT_CONTRACT.md` §12 says that content which seems to
+need the project schema widened is not a project — the writing collection is
+that answer taken rather than avoided. What the two schemas share they share by
+**import**: the slug pattern, the `https://` URL rule, the domain id guard and
+the media path pattern all come from `src/content/schema.ts`, because a second
+copy of any of them would be a second chance to weaken one.
 
-The Zod schema is defined once in `src/content/schema.ts` with no `astro:content`
-import, so tests and the `project:validate` script exercise the **production**
-schema rather than a copy of it. The audit found the previous test mirroring the
-schema into its own file, with fixtures that had already drifted from the real
-markdown.
+**One visibility predicate per collection.** `isVisible()` in
+`src/lib/projects/visibility.ts` and `isVisible()` in
+`src/lib/writing/visibility.ts` are the only definitions of what is public in
+their collections. Listings, detail pages, the featured set, article pagination,
+both locales and the sitemap all call them. The audit found the projects listing
+and detail routes disagreeing (`status === 'published'` versus
+`status !== 'draft'`), which would have published unlisted `wip` pages; both
+predicates are now written as the same inequality, so a status added later is
+public by default and has to argue for hiding itself.
 
-See `docs/PROJECT_CONTENT_CONTRACT.md` for the field-by-field contract.
+The statuses themselves differ, and that is the point of two predicates rather
+than one shared one: a project can honestly be `wip`, an article cannot — it is
+either finished and readable or it is a `draft`.
+
+Neither schema imports `astro:content`, so tests, and for projects the
+`project:validate` script, exercise the **production** schemas rather than a copy
+of them. The audit found the previous test mirroring the schema into its own
+file, with fixtures that had already drifted from the real markdown.
+
+Writing has no equivalent of `project:new` or `project:validate`. Its guarantees
+come from the schema at build time, from the two build-time checks in
+`src/lib/writing/index.ts` (slug agrees with directory name, `relatedProjects`
+resolves) and from `tests/writing.schema.test.ts`, which sweeps the real
+directories.
+
+See `docs/PROJECT_CONTENT_CONTRACT.md` for the field-by-field contract of both.
 
 ---
 
@@ -249,22 +300,29 @@ src/
     navigation/    Navbar, MobileMenu, LanguageSwitcher, Footer
     home/          Hero, LayersSequence, TechnicalWorlds, SelectedProjects
     projects/      ProjectCard, ProjectGrid, ProjectMeta
+    writing/       WritingTimeline, ArticleDate, ArticleNeighbours
     visuals/
       hero/        signal-field canvas module (framework-free)
       worlds/      the React island and its five domain stages
   config/          site.ts, navigation.ts, domains.ts — no logic, only values
-  content/         schema.ts, config.ts, projects/<slug>/
+  content/         schema.ts, writing-schema.ts, projects/<slug>/, writing/<slug>/
+  content.config.ts  the four collection definitions and their loaders
   i18n/            types.ts, en.ts, es.ts, routing.ts, index.ts
   layouts/         BaseLayout.astro, PageLayout.astro
   lib/
+    content/       id helpers shared by both content pairs
     projects/      query, join, visibility — plain TS, unit tested
-    seo/           metadata and JSON-LD builders
+    writing/       query, join, visibility — plain TS, unit tested
   pages/           [...locale]/ catch-all + 404
   styles/          tokens.css, global.css
 docs/              ARCHITECTURE, PROJECT_CONTENT_CONTRACT, MOTION_SYSTEM
 scripts/           project-new.mjs, project-validate.mjs
 tests/             mirrors src/lib and src/i18n
 ```
+
+`src/content.config.ts` sits at the `src/` root, not inside `src/content/`:
+Astro 5+ looks for it there, and the old `src/content/config.ts` location is
+deprecated.
 
 `BaseLayout` lives in `src/layouts/`, not `src/components/` — the audit flagged
 it as a layout filed as a component.
@@ -280,10 +338,18 @@ is now the plain noun.
 `npm run verify` runs the full gate locally, in the same order as CI:
 
 ```
-format:check → lint → type-check → test → build
+astro sync → format:check → lint → type-check → build → test
 ```
 
-All five run in CI on every push and pull request. The audit found `lint`
+Two orderings in that chain are load-bearing rather than arbitrary. `astro sync`
+runs first because `.astro/types.d.ts` does not exist on a fresh checkout, and
+both `lint` and `type-check` resolve `astro:content` through it — CI hit this
+before the step was added. The build runs _before_ the tests because
+`tests/global-setup.ts` reads `dist/`: the anchor and link suites assert against
+built HTML, not against source.
+
+All of them run in CI on every push and pull request, with `test:coverage` in
+place of `test` so the thresholds actually gate. The audit found `lint`
 advertised in the README as an active gate while failing with 26 errors and
 never running in CI. The gate now genuinely gates.
 

@@ -6,7 +6,7 @@ read the relevant one before changing anything structural.
 | Read                               | Before                                                           |
 | ---------------------------------- | ---------------------------------------------------------------- |
 | `docs/ARCHITECTURE.md`             | touching routing, i18n, the content model, layouts or deployment |
-| `docs/PROJECT_CONTENT_CONTRACT.md` | adding or editing project content, or changing the schema        |
+| `docs/PROJECT_CONTENT_CONTRACT.md` | adding or editing a project or an article, or changing a schema  |
 | `docs/MOTION_SYSTEM.md`            | adding animation, scroll behaviour or a visual island            |
 | `PORTFOLIO_BRIEF.md`               | product, copy or experience decisions                            |
 | `AUDIT.md`                         | the verified defect baseline — do not reintroduce these          |
@@ -20,7 +20,10 @@ satisfied, leave it failing and say so. The audit named this pattern in the
 repo's own history; it is the one thing that must not recur.
 
 **`npm run verify` must pass before you call anything done.** It is
-`format:check → lint → type-check → test → build`, the same order as CI. A green
+`astro sync → format:check → lint → type-check → build → test`, the same order as
+CI. `astro sync` comes first because `.astro/types.d.ts` does not exist on a fresh
+checkout and lint and type-check both need it. The build runs before the tests
+because `tests/global-setup.ts` reads `dist/`. A green
 result you did not run is not a result.
 
 ## Single sources of truth
@@ -34,8 +37,12 @@ A value that appears in two places means one of them is a bug.
 - `src/config/navigation.ts` — navigation entries.
 - `src/i18n/routing.ts` — **all** URL construction. Nothing else concatenates a
   base path, a locale prefix and a route.
-- `src/content/schema.ts` — the project schema. Tests and `project:validate`
-  import this one; never mirror it into a test file.
+- `src/content/schema.ts` — the project schema, and the content primitives both
+  schemas share (slug pattern, `https://` URL rule, domain id, media path).
+  Tests and `project:validate` import this one; never mirror it into a test file.
+- `src/content/writing-schema.ts` — the article schema. It imports those
+  primitives rather than restating them; tests import this one too, and no test
+  may mirror either.
 
 ## i18n
 
@@ -48,14 +55,20 @@ Components never fetch translations. They receive `t` and `locale` as props.
 
 ## Content
 
-Adding or editing a normal project touches **no application code** — content
-files only, per `docs/PROJECT_CONTENT_CONTRACT.md`. Use `npm run project:new` to
-scaffold and `npm run project:validate` to check. If a content change requires a
-code change, the model is wrong: fix the model, not the instance.
+Adding or editing a normal project or article touches **no application code** —
+content files only, plus the `mediaAlt` entry every committed image needs in both
+dictionaries, per `docs/PROJECT_CONTENT_CONTRACT.md`. For a project, use
+`npm run project:new` to scaffold and `npm run project:validate` to check; the
+writing collection has neither script, and is held by its schema, by the
+build-time checks in `src/lib/writing/index.ts` and by
+`tests/writing.schema.test.ts`. If a content change requires a code change, the
+model is wrong: fix the model, not the instance.
 
 `isVisible()` in `src/lib/projects/visibility.ts` is the only definition of which
-projects are public. Every listing, detail route, featured set and the sitemap
-calls it.
+projects are public, and `isVisible()` in `src/lib/writing/visibility.ts` the
+only definition for articles. Every listing, detail route, featured set,
+pagination and the sitemap calls one of them. Never re-read `status` to decide
+whether something is public.
 
 Logic belongs in `src/lib/**` as plain TypeScript, where it is unit-tested — not
 in `.astro` frontmatter, where the audit found four routes that had already
