@@ -27,3 +27,19 @@ pnpm-debug.log*
 
 # jetbrains setting folder
 .idea/
+
+# agent worktrees
+.claude/worktrees/
+
+# raw source material for content, kept local and unpublished.
+# the edited, published form of these lives in src/content/**; what sits here
+# are the unprocessed originals (LinkedIn posts, camera-resolution photos)
+# that the articles were written from.
+publications/
+images/
+
+# loose working files dropped at the repo root
+/*.png
+/*.jpeg
+/*.jpg
+PORTFOLIO_RECOVERY_SIGNATURE_MOTION_PROMPT.md

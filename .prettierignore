@@ -12,3 +12,11 @@ package-lock.json
 
 # Local scratch files (never committed — see .gitignore).
 *.tmp.*
+
+# Local agent state, never committed. `.claude/settings.local.json` is ignored by
+# the developer's global gitignore, so it never reaches CI — but Prettier scans
+# the working tree, not the index, and the CLI rewrites this file as permissions
+# change. Without this entry `npm run verify` fails locally on a file the repo
+# does not own. `.claude/worktrees/` holds full checkouts of this same repo.
+.claude/settings.local.json
+.claude/worktrees/
