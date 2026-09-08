@@ -33,8 +33,14 @@ export default tseslint.config(
   // ── Ignores ───────────────────────────────────────────────────────────────
   // Build output, coverage reports and Astro's generated types are not source.
   // Linting them is what produced 6 of the audit's 26 errors.
+  //
+  // `.claude/` is agent state, and `.claude/worktrees/` holds entire checkouts
+  // of this same repository, `node_modules` included. Without this entry
+  // `npm run lint` walks them and dies with a V8 out-of-memory before reporting
+  // a single result — a failure that looks like a lint error in your own code
+  // and is not one. These are copies of source, not source.
   {
-    ignores: ['dist/', 'coverage/', '.astro/', 'node_modules/', 'public/', '**/*.tmp.*'],
+    ignores: ['dist/', 'coverage/', '.astro/', 'node_modules/', 'public/', '.claude/', '**/*.tmp.*'],
   },
 
   // ── Plain ESM tooling: config files and content scripts ───────────────────

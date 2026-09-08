@@ -27,11 +27,15 @@ import type { DomainId } from '../config/domains.ts';
 export const SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
 /**
- * A relative media path inside the project's own `media/` directory.
+ * A relative media path inside the entry's own `media/` directory.
  * Absolute paths, parent traversal and backslashes are rejected so a cover can
- * never point outside the project it belongs to.
+ * never point outside the entry it belongs to.
+ *
+ * Exported because `src/content/writing-schema.ts` needs the identical
+ * guarantee. Two copies of this regex would be two chances to weaken one of
+ * them; the pattern is not project-specific, only media-specific.
  */
-const MEDIA_PATTERN = /^media\/[a-z0-9][a-z0-9._-]*$/i;
+export const MEDIA_PATTERN = /^media\/[a-z0-9][a-z0-9._-]*$/i;
 
 export const PROJECT_STATUSES = ['published', 'wip', 'draft'] as const;
 export type ProjectStatus = (typeof PROJECT_STATUSES)[number];
