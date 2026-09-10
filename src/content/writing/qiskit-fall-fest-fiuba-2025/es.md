@@ -3,9 +3,9 @@ title: 'Qiskit Fall Fest FIUBA 2025'
 summary: 'El Qiskit Fall Fest FIUBA 2025 abrió el viernes 31 de octubre con 436 personas inscriptas y sostuvo un mes de charlas y talleres durante noviembre. Cerró con una hackathon en la biblioteca de la facultad, donde los equipos escribieron el algoritmo de Grover desde cero en Qiskit para abrir una caja fuerte cuántica.'
 ---
 
-El Qiskit Fall Fest FIUBA 2025 abrió el viernes 31 de octubre. Para ese día había 436 personas inscriptas, y las inscripciones siguieron llegando después de la apertura. Lo que vino a continuación fue un mes de charlas y talleres durante noviembre, y una hackathon en la biblioteca de la facultad para cerrar.
+El Qiskit Fall Fest FIUBA 2025 abrió el viernes 31 de octubre. Para ese día había 436 personas inscriptas, y las inscripciones siguieron llegando después de la apertura. Lo que vino a continuación fue un mes de charlas y talleres durante noviembre —más de treinta charlas en total, con encuentros en formato híbrido— y una hackathon en la biblioteca de la facultad para cerrar. Al terminar, el programa había alcanzado a más de 500 participantes.
 
-El Qiskit Fall Fest es una iniciativa impulsada por IBM Quantum que conecta a estudiantes, investigadores y entusiastas de la computación cuántica de todo el mundo. Cada edición se arma localmente, por quienes quieren tener una donde están. La nuestra se hizo en la Facultad de Ingeniería de la Universidad de Buenos Aires, y fui uno de sus organizadores.
+El Qiskit Fall Fest es una iniciativa impulsada por IBM Quantum que conecta a estudiantes, investigadores y entusiastas de la computación cuántica de todo el mundo. Cada edición se arma localmente, por quienes quieren tener una donde están. La nuestra se hizo en la Facultad de Ingeniería de la Universidad de Buenos Aires, y estuve a cargo de su organización de punta a punta.
 
 ## La jornada de apertura
 

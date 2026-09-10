@@ -3,9 +3,9 @@ title: 'Qiskit Fall Fest FIUBA 2025'
 summary: "The Qiskit Fall Fest FIUBA 2025 opened on Friday 31 October with 436 people registered, and ran a month of talks and workshops through November. It closed with a hackathon in the faculty library, where teams wrote Grover's algorithm from scratch in Qiskit to open a quantum vault."
 ---
 
-The Qiskit Fall Fest FIUBA 2025 opened on Friday 31 October. By then 436 people had registered, and registrations kept arriving after the opening day. What followed was a month of talks and workshops through November, and a hackathon in the faculty library to close it.
+The Qiskit Fall Fest FIUBA 2025 opened on Friday 31 October. By then 436 people had registered, and registrations kept arriving after the opening day. What followed was a month of talks and workshops through November — more than thirty talks in all, with meetups run in hybrid format — and a hackathon in the faculty library to close it. By the end the programme had reached more than 500 participants.
 
-Qiskit Fall Fest is an initiative driven by IBM Quantum that connects students, researchers and quantum computing enthusiasts worldwide. Each edition is put together locally, by the people who want one where they are. Ours ran at the Facultad de Ingeniería of the Universidad de Buenos Aires, and I was one of its organisers.
+Qiskit Fall Fest is an initiative driven by IBM Quantum that connects students, researchers and quantum computing enthusiasts worldwide. Each edition is put together locally, by the people who want one where they are. Ours ran at the Facultad de Ingeniería of the Universidad de Buenos Aires, and I led its organisation from end to end.
 
 ## The opening day
 
