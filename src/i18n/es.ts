@@ -225,21 +225,21 @@ export const es: UIStrings = {
       qiskit: {
         role: 'Organizador principal',
         org: 'Qiskit Fall Fest FIUBA',
-        period: '2023 – Actualidad',
+        period: '2025',
         description:
-          'Co-organizador del festival de FIUBA respaldado por IBM Quantum: más de 30 charlas a lo largo de un mes, sesiones híbridas y más de 500 asistentes, cerrando con una hackathon donde los equipos programaron desde cero un buscador de Grover en Qiskit. Su alcance le valió a la facultad una invitación a la Noche de los Museos, donde exhibimos la única computadora cuántica de 2 qubits por resonancia magnética nuclear del país.',
+          'Lideré la organización integral del festival de FIUBA respaldado por IBM Quantum: más de 30 charlas a lo largo de un mes, sesiones híbridas y más de 500 asistentes, cerrando con una hackathon donde los equipos programaron desde cero un buscador de Grover en Qiskit. Su alcance le valió a la facultad una invitación a la Noche de los Museos, donde exhibimos la única computadora cuántica de 2 qubits por resonancia magnética nuclear del país.',
       },
       digitalSystems: {
         role: 'Ayudante de cátedra',
         org: 'Sistemas Digitales — FIUBA',
-        period: '2022 – Actualidad',
+        period: '2025 – Actualidad',
         description:
           'Ayudante de cátedra en Sistemas Digitales, en la Facultad de Ingeniería de la Universidad de Buenos Aires. Acompañamiento en laboratorios prácticos, orientación a estudiantes y evaluación.',
       },
       quantumComms: {
         role: 'Ayudante de cátedra',
         org: 'Computación y Comunicaciones Cuánticas — FIUBA',
-        period: '2023 – Actualidad',
+        period: '2024 – Actualidad',
         description:
           'Ayudante de cátedra en Computación y Comunicaciones Cuánticas. Fundamentos de circuitos cuánticos, teoría de la información cuántica y su relación con los sistemas criptográficos y de comunicaciones actuales.',
       },

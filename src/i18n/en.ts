@@ -225,21 +225,21 @@ export const en: UIStrings = {
       qiskit: {
         role: 'Lead Organizer',
         org: 'Qiskit Fall Fest FIUBA',
-        period: '2023 – Present',
+        period: '2025',
         description:
-          'Co-organizer of the IBM Quantum-backed festival at FIUBA — 30+ talks across a month, hybrid sessions and 500+ attendees, closing with a hackathon where teams built a Grover search in Qiskit from scratch. Its reach earned the faculty an invitation to Noche de los Museos, where we exhibited the only 2-qubit NMR quantum computer in Argentina.',
+          'I led the end-to-end organization of the IBM Quantum-backed festival at FIUBA — 30+ talks across a month, hybrid sessions and 500+ attendees, closing with a hackathon where teams built a Grover search in Qiskit from scratch. Its reach earned the faculty an invitation to Noche de los Museos, where we exhibited the only 2-qubit NMR quantum computer in Argentina.',
       },
       digitalSystems: {
         role: 'Teaching Assistant',
         org: 'Digital Systems — FIUBA',
-        period: '2022 – Present',
+        period: '2025 – Present',
         description:
           'Teaching assistant for Digital Systems at the School of Engineering of the University of Buenos Aires. Supporting practical labs, student guidance, and assessment.',
       },
       quantumComms: {
         role: 'Teaching Assistant',
         org: 'Quantum Computation and Communications — FIUBA',
-        period: '2023 – Present',
+        period: '2024 – Present',
         description:
           'Teaching assistant for Quantum Computation and Communications. Covering quantum circuit fundamentals, quantum information theory, and their relationship to modern cryptographic and communication systems.',
       },
