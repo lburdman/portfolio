@@ -31,15 +31,19 @@ pnpm-debug.log*
 # agent worktrees
 .claude/worktrees/
 
-# raw source material for content, kept local and unpublished.
-# the edited, published form of these lives in src/content/**; what sits here
-# are the unprocessed originals (LinkedIn posts, camera-resolution photos)
-# that the articles were written from.
-publications/
-images/
+# Working material: LinkedIn post drafts and event photography, kept out of the
+# build. These are the unprocessed originals — camera-resolution photos and
+# unedited text — and the site never reads them. What the site actually uses is
+# the edited, published form committed under src/content/<collection>/<slug>/
+# and public/. docs/PUBLICATIONS_SOURCE.md is the record of which of these were
+# used, which were not, and why.
+/images/
+/publications/
 
-# loose working files dropped at the repo root
+# loose working files dropped at the repo root, and personal documents that are
+# not the published resume (which lives in public/)
 /*.png
 /*.jpeg
 /*.jpg
+/*.pdf
 PORTFOLIO_RECOVERY_SIGNATURE_MOTION_PROMPT.md

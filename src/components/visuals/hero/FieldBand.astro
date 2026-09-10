@@ -1,0 +1,133 @@
+---
+/**
+ * The opening band: the box the magnet field fills, and the element pointer
+ * events are read from.
+ *
+ * ── Why this component exists at all ────────────────────────────────────────
+ *
+ * The field used to sit in the hero `<Section>`'s `bleed` slot, which is
+ * `position: absolute; inset: 0` inside a section that is `position: relative`.
+ * That is a correct arrangement and it has exactly one property we no longer
+ * want: the field can never be larger than the hero. Extending it down through
+ * the descent (`LayersSequence`) is therefore not a CSS tweak — the field needs
+ * a positioned ancestor that contains both sections, and neither section can be
+ * that ancestor. This wrapper is it, and it is the smallest thing that can be.
+ *
+ * The band ends where `TechnicalWorlds` begins, and that edge is deliberate:
+ * the worlds band paints its own ink ground, so the field terminating against
+ * it reads as one surface giving way to another rather than as a texture that
+ * ran out. Nothing here fades, because nothing needs to.
+ *
+ * ── Why the controller moved here too ───────────────────────────────────────
+ *
+ * The pointer target must be the element the field covers. It used to be
+ * `field.closest('section')`, which was the hero; now that the field covers two
+ * sections, `closest('section')` would resolve to whichever one happened to
+ * contain it and the disturbance would die halfway down the band. So the
+ * listener binds to this element, which is exactly the field's own box.
+ *
+ * `src/pages/[...locale]/index.astro` still composes and does not decorate: it
+ * wraps two of its five sections in one named band. The script lives with the
+ * element it binds to, which is the rule the rest of the site's islands follow.
+ */
+
+import MagnetField from '@/components/visuals/hero/MagnetField.astro';
+---
+
+<div class="field-band" data-field-band>
+  <MagnetField />
+  <slot />
+</div>
+
+<style>
+  .field-band {
+    /* The field's containing block, and nothing else. No padding, no
+       background, no stacking context beyond the one `position` implies —
+       the two sections inside keep the spacing and the ground they already
+       had, and paint over the field by tree order alone. */
+    position: relative;
+  }
+</style>
+
+<script>
+  /**
+   * The field controller, bound to the band.
+   *
+   * This is the script that used to live in `Hero.astro`; the only thing that
+   * changed with the move is the pointer target, which is now the band element
+   * rather than `field.closest('section')`. Everything below — the rival
+   * contract, the lifecycle binding, the reasons for each — is unchanged and
+   * the comments are the originals.
+   */
+  import { createMagnetLines } from './magnet-lines';
+  import { bindPageLifecycle } from '../../../lib/motion/page-lifecycle';
+
+  const field = document.querySelector<HTMLElement>('[data-hero-field]');
+  const band = document.querySelector<HTMLElement>('[data-field-band]');
+
+  if (field && band) {
+    /**
+     * The pointer target is the BAND, not the field. The field is
+     * `pointer-events: none` so it cannot swallow a click meant for a CTA
+     * beneath it, which means it never receives a pointer event of its own —
+     * and it is not `window` either, so moving the pointer anywhere else on
+     * the page costs this band nothing.
+     */
+    const lines = createMagnetLines(field, { pointerTarget: band });
+    lines.start();
+
+    /**
+     * At most one expensive visual runs at a time (docs/MOTION_SYSTEM.md §4).
+     * The controller already stops itself when the band leaves the viewport,
+     * so this is the belt to that braces — but it is also the site's one
+     * cross-island contract and it is kept deliberately: any element carrying
+     * `data-stops-hero-visual` stops this field while it is on screen. No
+     * global store, no event bus, no import across islands.
+     */
+    const rival = document.querySelector('[data-stops-hero-visual]');
+
+    let observer: IntersectionObserver | null = null;
+
+    if (rival && 'IntersectionObserver' in window) {
+      observer = new IntersectionObserver(
+        (entries) => {
+          for (const entry of entries) {
+            if (entry.isIntersecting) lines.stop();
+            else lines.start();
+          }
+        },
+        { threshold: 0 },
+      );
+      observer.observe(rival);
+    }
+
+    /**
+     * Teardown, and the back/forward cache.
+     *
+     * Ordinary navigation here is cross-document (there is no `<ClientRouter />`),
+     * so the page is torn down wholesale and the `destroy()` branch is
+     * belt-and-braces. It is worth the line anyway: it makes "no listener and no
+     * pending frame survives this band" a property the controller can be tested
+     * for rather than one the runtime happens to provide.
+     *
+     * The freeze branch is not belt-and-braces, and it is why this goes through
+     * `bindPageLifecycle` instead of a bare `pagehide` listener. This field
+     * shipped destroying itself on every `pagehide`, including the persisted one
+     * — so on Safari and Firefox, where Back restores the document without
+     * re-running this module, the field came back permanently dead. The rule and
+     * the reasoning live in `src/lib/motion/page-lifecycle.ts`, where they are
+     * unit-tested; `ProjectGrid.astro` binds its card light through the same
+     * function, so the two cannot drift apart again.
+     *
+     * The observer is released on a real unload because `destroy()` cannot reach
+     * it — it belongs to this script, not to the controller — and left connected
+     * it would go on calling `start()`/`stop()` on a dead handle. It is
+     * deliberately kept across a freeze: the restored document is the same
+     * document, and the rival element is still the one it observes.
+     */
+    bindPageLifecycle(window, lines, () => {
+      observer?.disconnect();
+      observer = null;
+    });
+  }
+</script>

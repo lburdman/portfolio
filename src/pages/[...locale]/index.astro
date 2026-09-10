@@ -29,6 +29,13 @@
  * `spine` is passed here and nowhere else: the layer spine describes the
  * homepage's ordered descent and has nothing to annotate on any other page
  * (docs/MOTION_SYSTEM.md §2).
+ *
+ * `FieldBand` wraps the first two sections and nothing more. It is the magnet
+ * field's containing block: the field runs from the top of the Hero to the
+ * bottom of the descent and stops at the Technical Worlds ink band, and CSS
+ * gives an absolutely-positioned element no way to span two siblings without an
+ * ancestor that holds both. It composes; it adds no spacing and no ground of
+ * its own, and the sections inside keep the ones they already had.
  */
 
 import Contact from '@/components/home/Contact.astro';
@@ -36,6 +43,7 @@ import Hero from '@/components/home/Hero.astro';
 import LayersSequence from '@/components/home/LayersSequence.astro';
 import SelectedProjects from '@/components/home/SelectedProjects.astro';
 import TechnicalWorlds from '@/components/home/TechnicalWorlds.astro';
+import FieldBand from '@/components/visuals/hero/FieldBand.astro';
 import { SITE } from '@/config/site';
 import { DEFAULT_LOCALE, LOCALES, useTranslations, type Locale } from '@/i18n';
 import PageLayout from '@/layouts/PageLayout.astro';
@@ -68,8 +76,10 @@ const base = SITE.basePath;
   ogImageAlt={t.seo.ogImageAlt}
   spine
 >
-  <Hero locale={locale} t={t} base={base} />
-  <LayersSequence locale={locale} t={t} base={base} />
+  <FieldBand>
+    <Hero locale={locale} t={t} base={base} />
+    <LayersSequence locale={locale} t={t} base={base} />
+  </FieldBand>
   <TechnicalWorlds locale={locale} t={t} base={base} />
   <SelectedProjects locale={locale} t={t} base={base} />
   <Contact locale={locale} t={t} base={base} />

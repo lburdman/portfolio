@@ -67,7 +67,7 @@ import { REDUCED_MOTION_QUERY, TRAVERSE_QUERY, useMediaQuery } from './useMediaQ
  *
  * ── PROGRESSIVE ENHANCEMENT ────────────────────────────────────────────────
  * The first render — the one Astro runs at build time and the one React
- * hydrates against — is the *stack*: five panels, in document order, with real
+ * hydrates against — is the *stack*: six panels, in document order, with real
  * headings and real prose, no transforms and no `tabindex`. That is what a
  * reader with JavaScript disabled gets, and it is also the reduced-motion and
  * the mobile composition. The traverse is an attribute set on the root by an
@@ -119,7 +119,7 @@ export default function TechnicalWorlds({ t }: TechnicalWorldsProps) {
   const [tabVisible, setTabVisible] = useState(true);
   /* The same value as `activeIndex`, readable synchronously inside the
      ScrollTrigger callback. It is what makes the setState conditional: without
-     it the callback would re-render five panels and five stages on every
+     it the callback would re-render every panel and every stage on every
      scroll tick of the pin, to write the number it already held. */
   const activeIndexRef = useRef(-1);
 
@@ -213,7 +213,7 @@ export default function TechnicalWorlds({ t }: TechnicalWorldsProps) {
 
            hold(0) move(0→1) hold(1) move(1→2) … move(n-2→n-1) hold(n-1)
 
-         Five holds and four moves. A hold is an empty tween on a throwaway
+         `count` holds and `count - 1` moves. A hold is an empty tween on a throwaway
          object — GSAP's own idiom for reserving time — and with `scrub: true`
          reserving timeline time is reserving *scroll distance*, so it is a real
          dwell with the panel at the exact centre of the frame. A move is one

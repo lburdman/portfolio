@@ -17,7 +17,7 @@ export function isLocale(value: string): value is Locale {
 /**
  * A value that must be supplied once per technical domain.
  *
- * Keyed by `DomainId` from `src/config/domains.ts`, so adding a sixth domain
+ * Keyed by `DomainId` from `src/config/domains.ts`, so adding a seventh domain
  * is a type error in both dictionaries rather than a silently missing label.
  */
 export type PerDomain<T> = Record<DomainId, T>;
@@ -127,13 +127,16 @@ export interface UIStrings {
     ctaResume: string;
   };
 
-  /** Section 01 — the descent, from the models down to the physics. */
+  /** Section 01 — the descent, from the interface down to the physics. */
   layers: {
     heading: string;
-    /** One line explaining why five domains belong in one portfolio. */
+    /** One line explaining why six domains belong in one portfolio. */
     narrative: string;
     items: PerDomain<{
-      /** The engineering layer name: MODELS / COMPUTATION / DIGITAL LOGIC / HARDWARE / SIGNALS. */
+      /**
+       * The engineering layer name:
+       * INTERFACE / MODELS / COMPUTATION / DIGITAL LOGIC / HARDWARE / SIGNALS.
+       */
       layer: string;
       description: string;
     }>;
@@ -262,6 +265,35 @@ export interface UIStrings {
     facts: CredentialTrio;
     currentlyHeading: string;
     interests: string[];
+    /**
+     * Work presented outside this site, to people who did not have to be kind
+     * about it.
+     *
+     * It sits above teaching on the page because it is the only thing here that
+     * was reviewed by strangers. Everything else on About is self-reported.
+     *
+     * `title` is deliberately NOT localized, for the same reason the credential
+     * names are not: a translated paper title is one nobody can search for. The
+     * surrounding prose is translated; the citation is not.
+     */
+    researchHeading: string;
+    research: readonly {
+      /** The work's own title, in the language it was presented in. */
+      title: string;
+      /** Conference and year, as it would appear in a citation. */
+      venue: string;
+      where: string;
+      description: string;
+      /**
+       * Alt text for the poster photograph, when the entry has one.
+       *
+       * Optional because a talk is a research entry too and does not come with
+       * a poster. Its presence is what makes `about.astro` render the figure,
+       * so the alt is not decoration hung off an image — it IS the switch, and
+       * an entry cannot acquire a picture without someone writing what it shows.
+       */
+      posterAlt?: string;
+    }[];
     teachingHeading: string;
     roles: Record<
       'qiskit' | 'digitalSystems' | 'quantumComms',
@@ -272,6 +304,32 @@ export interface UIStrings {
         description: string;
       }
     >;
+    /**
+     * Shipped client work, which lives here rather than in the projects grid.
+     *
+     * A project on that grid must declare at least one `DomainId`, and the six
+     * of them — product, ai, quantum, fpga, electronics, audio — are the site's
+     * argument, not a tag vocabulary.
+     *
+     * `product` is the newest of them and it is deliberately **not** the home
+     * for this list. The domain is the layer a person touches, sitting one rung
+     * above the models; these are commissions, and "I built this for a paying
+     * client" is a different claim from "this is where I work in the stack". A
+     * client site can carry the product layer, and one that does belongs on the
+     * grid with the tag. Being paid for is not what puts it there.
+     *
+     * So they are named here instead. "I ship for real clients" is a fair claim
+     * and worth making; it is simply not the same claim the grid makes.
+     */
+    clientWorkHeading: string;
+    clientWork: readonly {
+      name: string;
+      /** The deployed site. Shown as the link text too, so no bare URL is duplicated. */
+      href: string;
+      /** Domain shown as the link's visible label, e.g. `bylou.com.ar`. */
+      site: string;
+      description: string;
+    }[];
   };
 
   /**

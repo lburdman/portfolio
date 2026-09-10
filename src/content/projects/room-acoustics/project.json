@@ -1,0 +1,12 @@
+{
+  "slug": "room-acoustics",
+  "status": "published",
+  "featured": true,
+  "domains": ["audio"],
+  "stack": ["Go", "Acoustics", "Numerical Methods", "Python", "NumPy", "pyroomacoustics", "Test-Driven Development"],
+  "links": {
+    "github": "https://github.com/lburdman/acustics"
+  },
+  "cover": "media/app-modal-field.webp",
+  "order": 15
+}

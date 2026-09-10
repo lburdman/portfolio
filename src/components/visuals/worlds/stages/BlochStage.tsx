@@ -1,4 +1,6 @@
 import { useEffect, useRef } from 'react';
+import { stepEngagement } from '../../../../lib/motion/magnet-field';
+import { FINE_POINTER_QUERY } from '../../../../lib/motion/media';
 import {
   ARROW_HEAD_PATH,
   AXIS_X,
@@ -9,60 +11,70 @@ import {
   BLOCH_R,
   EQUATOR,
   MERIDIAN,
-  PHI_EASE,
-  PHI_EPSILON,
   READOUT_WIDTH,
   READOUT_X,
+  RESTING_STATE,
   STATIC_FRAME,
-  STATIC_PROGRESS,
-  azimuthFromPointer,
   blochFrame,
+  pointerState,
   type BlochFrame,
+  type BlochState,
 } from '../../../../lib/visuals/bloch';
 import { StageFrame, type StageProps } from '../StageFrame';
-import { subscribeStageProgress, traverseIndexOf } from '../traverse';
 import { REDUCED_MOTION_QUERY, useMediaQuery } from '../useMediaQuery';
 
 /**
- * Quantum Computing — a Bloch sphere the reader's own scroll drives.
+ * Quantum Computing — a Bloch sphere the reader's own pointer drives.
  *
- * The state is `|ψ⟩ = cos(θ/2)|0⟩ + e^{iφ} sin(θ/2)|1⟩` with **θ = p·π**, where
- * `p` is this world's local traverse progress. So the descent through the
- * section *is* the rotation: |0⟩ at the top, |+⟩ — an equal superposition —
- * exactly at the centred dwell, |1⟩ at the bottom. Scrolling back up runs the
- * state backwards, exactly, because θ is a pure function of p and of nothing
- * else. The probability bars beside it are the same fact stated as numbers.
- *
- * The pointer owns φ alone, over a deliberately small ±16°: it rotates the
- * state about the Z axis, which is a real degree of freedom and one that
- * changes *no* measurement outcome. The bars therefore stay frozen while the
- * pointer moves — a second, non-geometric confirmation that φ is not the story.
- * See `src/lib/visuals/bloch.ts` for why 16° and not 35°.
+ * The state is `|ψ⟩ = cos(θ/2)|0⟩ + e^{iφ} sin(θ/2)|1⟩`, and the two axes of
+ * the stage are its two angles: **θ = y·π** — the top edge is |0⟩, the exact
+ * middle is |+⟩, an equal superposition, the bottom edge is |1⟩ — and **φ = x**,
+ * over a deliberately small ±16°. So the vector points where the hand is, and
+ * the probability bars beside it, which are a function of θ alone, rise and fall
+ * as the hand rises and falls while staying perfectly still as it crosses. That
+ * second fact is the non-geometric statement that φ changes no measurement
+ * outcome. `src/lib/visuals/bloch.ts` holds the mapping, and why 16° and not
+ * 35°.
  *
  * ── HOW IT IS DRAWN ────────────────────────────────────────────────────────
  * SVG, not canvas, and the reason is the site's CSP: every colour has to come
  * from a stylesheet rule, which SVG reads natively (`--tw-accent`) where canvas
  * would need `getComputedStyle` to launder tokens through JavaScript. SVG also
- * server-renders a correct picture for the no-JS, reduced-motion and mobile
- * cases, all of which get the |+⟩ still.
+ * server-renders a correct picture for the no-JS, reduced-motion and coarse-
+ * pointer cases, all of which get the |+⟩ still.
  *
  * ── HOW IT MOVES ───────────────────────────────────────────────────────────
  * Once per activation, this component renders. After that it never re-renders:
- * the scroll subscription and the pointer both write **presentation attributes
- * through refs**. React state per frame would re-render the panel sixty times a
- * second to change fifteen numbers, and an inline `style` — the other obvious
- * way to move something — is dropped outright by the hash-based CSP in
- * production while working perfectly in dev.
+ * the pointer writes **presentation attributes through refs**. React state per
+ * frame would re-render the panel sixty times a second to change fifteen
+ * numbers, and an inline `style` — the other obvious way to move something — is
+ * dropped outright by the hash-based CSP in production while working perfectly
+ * in dev.
  *
- * The rAF loop exists only for φ's ease back to centre. It is not a render
- * loop: a scroll update paints one frame and stops, and the loop stands down as
- * soon as φ has reached its target (`docs/MOTION_SYSTEM.md` §4).
+ * This file is the DOM half and is deliberately dumb, in the same shape as
+ * `src/components/visuals/hero/magnet-lines.ts`: **measure once, then write
+ * only.** The handler stores two numbers and asks for a frame; the frame reads
+ * the cached box, calls `pointerState`, and writes. No `getBoundingClientRect`
+ * is ever read on the pointer path — the box is measured on attach, on resize
+ * and after a scroll, which is the only thing that moves this panel — so a
+ * pointer crossing the stage forces no layout at all.
  *
- * The two effects below are split along the one line that matters: **scroll is
- * not gated on `active`, the pointer is.** The reasons are on each of them.
+ * ── WHEN IT STOPS ──────────────────────────────────────────────────────────
+ * `docs/MOTION_SYSTEM.md` §4 and §6, as one predicate. Nothing is attached and
+ * no frame is pending unless every one of these holds: this world is the
+ * centred one, motion is not reduced, the pointer is fine, the stage is on
+ * screen, and the tab is visible. Each of the last two is watched
+ * (`IntersectionObserver`, `visibilitychange`) and each "off" path ends in the
+ * same `detach()`, so there is no state in which a listener outlives the reason
+ * it was attached. Every one of them also settles the sphere to |+⟩ — the
+ * finished still, not a frozen half-turn.
+ *
+ * The two media queries are read through `useSyncExternalStore`, so toggling
+ * either at the OS level takes effect without a reload and the effect below is
+ * never even constructed for a reader who asked for less motion.
  */
 
-/** Every node the scroll and the pointer write to. */
+/** Every node the pointer writes to. */
 interface StageNodes {
   latitudeFront: SVGPathElement | null;
   latitudeBack: SVGPathElement | null;
@@ -108,8 +120,8 @@ function emptyNodes(): StageNodes {
  *
  * The diff is not a micro-optimisation, it is what keeps the readout honest:
  * `textContent` and `data-hit` change a handful of times across a whole
- * traverse, and rewriting them every frame would invalidate text layout sixty
- * times a second for no visible change.
+ * pass of the hand, and rewriting them every frame would invalidate text layout
+ * sixty times a second for no visible change.
  */
 function paintFrame(nodes: StageNodes, next: BlochFrame, previous: BlochFrame | null): void {
   const moved = (key: keyof BlochFrame): boolean => previous === null || previous[key] !== next[key];
@@ -148,11 +160,29 @@ function paintFrame(nodes: StageNodes, next: BlochFrame, previous: BlochFrame | 
   if (moved('hitPlus')) nodes.hitPlus?.setAttribute('data-hit', next.hitPlus);
 }
 
-/** Everything that survives between frames. None of it is React state. */
+/**
+ * Everything that survives between frames. None of it is React state.
+ *
+ * The box is held here rather than read per event, and it is held in *viewport*
+ * coordinates because that is what a `PointerEvent` reports. It is invalidated
+ * by the two things that move this panel — a scroll (the traverse slides the
+ * track as the page scrolls) and a resize — and re-read at the top of the next
+ * frame, never inside a handler.
+ */
 interface Motion {
-  progress: number;
-  phi: number;
-  targetPhi: number;
+  /** Pointer position as the last event reported it, in viewport coordinates. */
+  pointerX: number;
+  pointerY: number;
+  /** The stage's cached box. */
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+  /** Set by scroll and resize; consumed by the next frame, before it writes. */
+  boxDirty: boolean;
+  /** The one eased quantity: 0 at rest, 1 while the pointer is over the stage. */
+  engagement: number;
+  engagementTarget: number;
   frame: number;
   previous: BlochFrame | null;
 }
@@ -161,134 +191,192 @@ export function BlochStage({ domain, active }: StageProps) {
   const frameRef = useRef<HTMLDivElement | null>(null);
   const nodesRef = useRef<StageNodes>(emptyNodes());
   const motionRef = useRef<Motion>({
-    progress: STATIC_PROGRESS,
-    phi: 0,
-    targetPhi: 0,
+    pointerX: 0,
+    pointerY: 0,
+    left: 0,
+    top: 0,
+    width: 0,
+    height: 0,
+    boxDirty: true,
+    engagement: 0,
+    engagementTarget: 0,
     frame: 0,
     previous: null,
   });
-  /** Set by the scroll effect, called by the pointer effect. */
-  const scheduleRef = useRef<(() => void) | null>(null);
   const reducedMotion = useMediaQuery(REDUCED_MOTION_QUERY);
+  const finePointer = useMediaQuery(FINE_POINTER_QUERY);
 
-  /* ── The scroll channel ──────────────────────────────────────────────────
-     Not gated on `active`, and that is the whole difference between a state
-     and a diagram of one. This world's local progress spans its *entire*
-     ownership window — the move that brings the panel in, its centred dwell,
-     and the move that takes it out — and only that full span carries the
-     story: |0⟩ as the panel arrives, |+⟩ while it is held, |1⟩ as it leaves.
-     Gating on `active` froze the sphere at |+⟩ for the two moves the reader
-     can plainly see it during, so p = 0 and p = 1 were never drawn at all.
-
-     This does not break MOTION_SYSTEM §4. What §4 forbids an inactive stage is
-     *animating* — a loop, a timer, an rAF that runs on its own clock. There is
-     none here: a scroll update paints once and stops. `StageFrame` already
-     subscribes to this same channel for every stage regardless of `active`,
-     which is the framework's own statement that progress flows always and
-     `active` gates animation. And while the world is off its window, progress
-     clamps and the frame is byte-identical to the last, so the attribute diff
-     writes nothing at all.
+  /* ── The pointer, and nothing else ───────────────────────────────────────
+     Gated on `active`, because only the centred world is the one being
+     interacted with, and nothing at all is attached to the other four
+     (MOTION_SYSTEM §4). Gated on the two media queries as well: a reduced-
+     motion reader and a coarse-pointer reader both keep the |+⟩ still, which
+     is a finished composition rather than a degraded one — there is no
+     information in this sphere that the panel's own heading and summary do not
+     already carry in text, so there is nothing hover-only to make reachable
+     some other way (MOTION_SYSTEM §7).
      ─────────────────────────────────────────────────────────────────────── */
   useEffect(() => {
-    if (reducedMotion) return;
-
-    const index = traverseIndexOf(domain.id);
-    if (index < 0) return;
+    const root = frameRef.current;
+    if (!active || reducedMotion || !finePointer || !root) return;
 
     const nodes = nodesRef.current;
     const motion = motionRef.current;
 
-    const paint = (): void => {
-      const next = blochFrame(motion.progress, motion.phi);
+    let attached = false;
+    let onScreen = true;
+
+    /* ── Measurement ───────────────────────────────────────────────────────
+       The only layout read in the file, and it is never reached from a pointer
+       handler. */
+    const measure = (): void => {
+      const rect = root.getBoundingClientRect();
+      motion.left = rect.left;
+      motion.top = rect.top;
+      motion.width = rect.width;
+      motion.height = rect.height;
+      motion.boxDirty = false;
+    };
+
+    /* ── Writing ─────────────────────────────────────────────────────────── */
+    const paint = (state: BlochState): void => {
+      const next = blochFrame(state.progress, state.phi);
       paintFrame(nodes, next, motion.previous);
       motion.previous = next;
     };
 
     const schedule = (): void => {
-      if (motion.frame === 0) motion.frame = requestAnimationFrame(tick);
+      if (motion.frame === 0 && attached) motion.frame = requestAnimationFrame(tick);
     };
 
     function tick(): void {
       motion.frame = 0;
-      if (motion.phi !== motion.targetPhi) {
-        const delta = motion.targetPhi - motion.phi;
-        motion.phi = Math.abs(delta) < PHI_EPSILON ? motion.targetPhi : motion.phi + delta * PHI_EASE;
-      }
-      paint();
-      // The only reason to ask for another frame: φ is still easing home.
-      // Scroll alone paints once and the loop stands down.
-      if (motion.phi !== motion.targetPhi) schedule();
+      if (motion.boxDirty) measure();
+
+      motion.engagement = stepEngagement(motion.engagement, motion.engagementTarget);
+
+      // A box with no area is a stage laid out to nothing — a breakpoint change
+      // caught mid-frame. Resting is the honest answer; NaN would be written
+      // into every coordinate on the sphere.
+      const measured = motion.width > 0 && motion.height > 0;
+      paint(
+        motion.engagement === 0 || !measured
+          ? RESTING_STATE
+          : pointerState({
+              x: (motion.pointerX - motion.left) / motion.width,
+              y: (motion.pointerY - motion.top) / motion.height,
+              engagement: motion.engagement,
+            }),
+      );
+
+      // The only reason to ask for another frame: the envelope is still moving.
+      // A pointer that has stopped paints once and the loop stands down.
+      if (motion.engagement !== motion.engagementTarget) schedule();
     }
 
-    scheduleRef.current = schedule;
-
-    const unsubscribe = subscribeStageProgress(index, (value) => {
-      if (value === null) {
-        // The traverse has stood down. Hand the stage back to the still it was
-        // server-rendered as rather than freezing it mid-rotation.
-        motion.progress = STATIC_PROGRESS;
-        motion.phi = 0;
-        motion.targetPhi = 0;
-        paint();
-        return;
-      }
-      motion.progress = value;
-      schedule();
-    });
-
-    return () => {
-      unsubscribe();
-      scheduleRef.current = null;
-      if (motion.frame !== 0) cancelAnimationFrame(motion.frame);
-      motion.frame = 0;
-      motion.progress = STATIC_PROGRESS;
-      motion.phi = 0;
-      motion.targetPhi = 0;
-      paintFrame(nodes, STATIC_FRAME, motion.previous);
-      motion.previous = STATIC_FRAME;
-    };
-  }, [domain.id, reducedMotion]);
-
-  /* ── The pointer ─────────────────────────────────────────────────────────
-     This one *is* gated on `active`, because φ is an interaction and only the
-     centred world is the one being interacted with. Nothing is attached to the
-     other four (MOTION_SYSTEM §4), and leaving eases φ back to zero rather
-     than dropping it, so a world that scrolls away does not snap.
-     ─────────────────────────────────────────────────────────────────────── */
-  useEffect(() => {
-    const root = frameRef.current;
-    if (!active || reducedMotion || !root) return;
-
-    const motion = motionRef.current;
-
+    /* ── Input ─────────────────────────────────────────────────────────────
+       Two numbers and a flag. No layout read, no element touched, nothing
+       allocated. Passive, so a drag over the sphere scrolls the page normally:
+       this stage can never swallow a scroll gesture. `pointerdown` as well as
+       `pointermove` so a tap reaches the same state a hover does. */
     const handlePointer = (event: PointerEvent): void => {
-      const rect = root.getBoundingClientRect();
-      if (rect.width <= 0) return;
-      motion.targetPhi = azimuthFromPointer((event.clientX - rect.left) / rect.width);
-      scheduleRef.current?.();
+      motion.pointerX = event.clientX;
+      motion.pointerY = event.clientY;
+      motion.engagementTarget = 1;
+      schedule();
     };
 
     const handleRelease = (): void => {
-      motion.targetPhi = 0;
-      scheduleRef.current?.();
+      motion.engagementTarget = 0;
+      schedule();
     };
 
-    // Passive, so a touch drag over the sphere scrolls the page normally: this
-    // stage can never swallow a scroll gesture. `pointerdown` as well as
-    // `pointermove` so a tap reaches the same state a hover does.
-    root.addEventListener('pointermove', handlePointer, { passive: true });
-    root.addEventListener('pointerdown', handlePointer, { passive: true });
-    root.addEventListener('pointerleave', handleRelease, { passive: true });
-    root.addEventListener('pointercancel', handleRelease, { passive: true });
+    const handleScroll = (): void => {
+      motion.boxDirty = true;
+    };
 
-    return () => {
+    // Scoped to the stage. `window` carries the scroll and the resize, which
+    // invalidate a measurement; it never carries a pointer.
+    const resizeObserver =
+      typeof ResizeObserver === 'function'
+        ? new ResizeObserver(() => {
+            motion.boxDirty = true;
+            schedule();
+          })
+        : null;
+
+    /** Settle synchronously, without waiting for a frame that may never come. */
+    const settleNow = (): void => {
+      if (motion.frame !== 0) cancelAnimationFrame(motion.frame);
+      motion.frame = 0;
+      motion.engagement = 0;
+      motion.engagementTarget = 0;
+      paintFrame(nodes, STATIC_FRAME, motion.previous);
+      motion.previous = STATIC_FRAME;
+    };
+
+    const attach = (): void => {
+      if (attached) return;
+      attached = true;
+      motion.boxDirty = true;
+      root.addEventListener('pointermove', handlePointer, { passive: true });
+      root.addEventListener('pointerdown', handlePointer, { passive: true });
+      root.addEventListener('pointerleave', handleRelease, { passive: true });
+      root.addEventListener('pointercancel', handleRelease, { passive: true });
+      window.addEventListener('scroll', handleScroll, { passive: true });
+      resizeObserver?.observe(root);
+    };
+
+    const detach = (): void => {
+      if (!attached) return;
+      attached = false;
       root.removeEventListener('pointermove', handlePointer);
       root.removeEventListener('pointerdown', handlePointer);
       root.removeEventListener('pointerleave', handleRelease);
       root.removeEventListener('pointercancel', handleRelease);
-      handleRelease();
+      window.removeEventListener('scroll', handleScroll);
+      resizeObserver?.disconnect();
+      settleNow();
     };
-  }, [active, reducedMotion]);
+
+    /* ── Gating ────────────────────────────────────────────────────────────
+       One predicate, and every "off" path ends in `detach()`. */
+    const shouldRun = (): boolean => onScreen && !document.hidden;
+
+    const evaluate = (): void => {
+      if (shouldRun()) attach();
+      else detach();
+    };
+
+    const handleVisibility = (): void => {
+      evaluate();
+    };
+
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    const intersectionObserver =
+      typeof IntersectionObserver === 'function'
+        ? new IntersectionObserver(
+            (entries) => {
+              for (const entry of entries) onScreen = entry.isIntersecting;
+              evaluate();
+            },
+            { threshold: 0 },
+          )
+        : null;
+
+    intersectionObserver?.observe(root);
+    evaluate();
+
+    return () => {
+      intersectionObserver?.disconnect();
+      document.removeEventListener('visibilitychange', handleVisibility);
+      detach();
+      // `detach()` settles only if it was attached; an effect torn down while
+      // off screen has nothing to detach and must still hand back the still.
+      settleNow();
+    };
+  }, [active, finePointer, reducedMotion]);
 
   return (
     <StageFrame domain={domain} active={active} frameRef={frameRef}>

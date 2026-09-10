@@ -45,7 +45,7 @@ export function traverseIndexOf(id: string): number {
    1. **No world ever held at centre.** The track moved 2.14px per 1px of
       scroll, with no plateau anywhere, so each domain was within 60px of the
       middle of the frame for 50–75px of scroll — well under one wheel tick.
-      The band read as five things being dragged past, not five things being
+      The band read as things being dragged past, not things being
       shown.
 
    2. **350px of dead scroll.** The finale's dwell was appended as an empty
@@ -58,7 +58,7 @@ export function traverseIndexOf(id: string): number {
 
        hold(0) move(0→1) hold(1) move(1→2) … move(n-2→n-1) hold(n-1)
 
-   Five holds and four moves for five domains. A hold is a real dwell with the
+   `count` holds and `count - 1` moves. A hold is a real dwell with the
    panel at the exact centre of the frame; a move is an eased slide of exactly
    one panel pitch. The last hold *is* the finale's dwell — it is the same
    duration as every other world's, and there is no frozen tail after it.
@@ -364,7 +364,7 @@ export function scrollTargetForIndex(index: number, count: number, start: number
    THE LOCAL PROGRESS CHANNEL
 
    Stages need a continuous value, not a boolean, and they need it every frame.
-   Sending it through React state would re-render five panels and five stages
+   Sending it through React state would re-render every panel and every stage
    per scroll tick, which is the cost the island already refuses to pay for the
    active index.
 

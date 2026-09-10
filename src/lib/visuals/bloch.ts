@@ -5,22 +5,30 @@
  * owns refs, listeners and `setAttribute`; it owns no arithmetic. That split is
  * what makes the picture testable in a node environment — `tests/bloch.test.ts`
  * asserts the projection, the ellipses, the depth ordering and, most
- * importantly, that a frame is a **pure function of scroll progress**, which is
- * the whole reverse-scroll contract.
+ * importantly, that a frame is a **pure function of pointer position**, with no
+ * hysteresis and no cached previous value.
  *
- * ── THE STATE ──────────────────────────────────────────────────────────────
+ * ── THE STATE ──────────────────────────────────────────────────────────
  *   |ψ⟩ = cos(θ/2)|0⟩ + e^{iφ} sin(θ/2)|1⟩
  *   r   = (sin θ cos φ, sin θ sin φ, cos θ)
  *   θ   = p·π
  *
- * so p = 0 is |0⟩ at +Z, p = 0.5 is |+⟩ at +X, p = 1 is |1⟩ at −Z. `p` is the
- * world's local traverse progress, which reaches exactly 0.5 at the centred
- * dwell (`worlds/traverse.ts`). The midpoint of the scroll therefore *is* the
- * midpoint of the state: superposition is where the reader stops.
+ * so p = 0 is |0⟩ at +Z, p = 0.5 is |+⟩ at +X, p = 1 is |1⟩ at −Z.
  *
- * θ is a pure function of p and nothing else. φ is the only stateful quantity
- * and the pointer owns it, so scrolling back up retraces the same geometry
- * regardless of what the pointer did on the way down.
+ * **The pointer owns both angles, and the two axes of the stage are the two
+ * angles of the state.** `p` is the pointer's vertical position over the stage,
+ * so the top edge is |0⟩, the exact middle is |+⟩ and the bottom edge is |1⟩:
+ * the vector points where the hand is, and the north pole is up the screen
+ * because it is up the sphere. φ is the horizontal position, over a deliberately
+ * small ±16° (see {@link PHI_MAX}) — a rotation about Z, which changes no
+ * measurement outcome, which is why the probability bars stay put while the
+ * pointer crosses the stage and move only as it rises or falls.
+ *
+ * Neither angle is eased. The only quantity with a time constant is the
+ * engagement envelope in {@link pointerState}, which swells on enter and settles
+ * on leave; between those two moments the state *is* the pointer position, with
+ * no lag. `src/lib/motion/magnet-field.ts` carries the reasoning, and the ease
+ * itself, so there is one of it.
  *
  * ── WHY ORTHOGRAPHIC ───────────────────────────────────────────────────────
  * Under an orthographic camera every great circle on the unit sphere projects
@@ -72,12 +80,6 @@ export const CAMERA_AZIMUTH = 62 * DEG;
  * statement that φ is not the story.
  */
 export const PHI_MAX = 16 * DEG;
-
-/** Per-frame easing coefficient as φ returns to 0 after the pointer leaves. */
-export const PHI_EASE = 0.12;
-
-/** Below this the φ ease is snapped to its target and the rAF loop stands down. */
-export const PHI_EPSILON = 1e-4;
 
 /** Half-width of the depth crossfade band, in units of depth. */
 const CROSSFADE = 0.12;
@@ -161,7 +163,11 @@ export function depth(v: Vec3): number {
    THE STATE
    ======================================================================== */
 
-/** Polar angle for a local traverse progress. The entire mapping, in one line. */
+/**
+ * Polar angle for a normalised vertical position. The entire mapping, in one
+ * line, and the reason the stage needs no separate notion of "progress": `p` is
+ * simply how far down the stage the pointer is.
+ */
 export function polarAngle(p: number): number {
   return clamp01(p) * Math.PI;
 }
@@ -172,7 +178,7 @@ export function stateVector(theta: number, phi: number): Vec3 {
   return [s * Math.cos(phi), s * Math.sin(phi), Math.cos(theta)];
 }
 
-/** Bloch vector for a local traverse progress and an azimuth. */
+/** Bloch vector for a normalised vertical position and an azimuth. */
 export function blochVector(p: number, phi = 0): Vec3 {
   return stateVector(polarAngle(p), phi);
 }
@@ -217,7 +223,13 @@ export function smoothstep(edge0: number, edge1: number, x: number): number {
   return t * t * (3 - 2 * t);
 }
 
-/** φ for a normalised pointer x, `0 → 1`. Centre of the stage is φ = 0. */
+/**
+ * φ for a normalised pointer x, `0 → 1`. Centre of the stage is φ = 0.
+ *
+ * Clamped rather than wrapped: the last `pointermove` before a `pointerleave`
+ * can carry a coordinate a pixel or two outside the box, and a state that
+ * kicked past ±φmax on the way out would be a visible flick.
+ */
 export function azimuthFromPointer(x: number): number {
   return PHI_MAX * (2 * clamp01(x) - 1);
 }
@@ -436,11 +448,12 @@ export function latitudeRing(theta: number): { readonly front: string; readonly 
 }
 
 /**
- * Everything the stage writes for one scroll position, as strings.
+ * Everything the stage writes for one (p, φ) pair, as strings.
  *
  * Pure. No module state, no cache, no easing over time — which is what makes
- * scrolling back up retrace the same pixels, and what `tests/bloch.test.ts`
- * asserts by running the sweep forwards and backwards and comparing.
+ * the same pointer position always draw the same pixels, whatever route the
+ * hand took to get there, and what `tests/bloch.test.ts` asserts by running the
+ * sweep forwards and backwards and comparing.
  *
  * **The vector is never split.** `depth` is linear and vanishes at the origin,
  * so the sign of the tip's depth decides the entire arrow: there is no case
@@ -489,14 +502,101 @@ export function blochFrame(p: number, phi = 0): BlochFrame {
 }
 
 /**
- * The frame every non-scrolling reader gets: |+⟩, φ = 0.
+ * The frame every reader who is not pointing at the stage gets: |+⟩, φ = 0.
  *
- * It is the server-rendered markup, the reduced-motion picture, the mobile
- * picture, and the frame `localProgress` publishes at the centred dwell.
- * So the first client frame after hydration is byte-identical to the markup it
+ * It is the server-rendered markup, the reduced-motion picture, the coarse-
+ * pointer picture, and the state the engagement envelope settles back to. So
+ * the first client frame after hydration is byte-identical to the markup it
  * hydrates against — there is no mismatch and no flash — and it is also the
  * single most informative still: both probabilities equal, the latitude ring at
  * its widest, the vector on the equator. Superposition in one picture.
+ *
+ * It is 0.5 in both coordinates, which is the geometric centre of the stage, so
+ * "at rest" and "pointer in the middle" are the same picture rather than two
+ * that have to be reconciled.
  */
 export const STATIC_PROGRESS = 0.5;
 export const STATIC_FRAME: BlochFrame = blochFrame(STATIC_PROGRESS, 0);
+
+/* ===========================================================================
+   THE POINTER
+
+   The whole of what the stage's DOM half is allowed to decide is *where the
+   pointer is* and *how far the envelope has opened*. Turning those three
+   numbers into a state is arithmetic, so it lives here where a test can reach
+   it rather than inside a `requestAnimationFrame` callback.
+   ======================================================================== */
+
+/** A qubit state as this stage parameterises it: θ = p·π, and φ. */
+export interface BlochState {
+  /** θ as a fraction of π — the same normalised quantity {@link polarAngle} takes. */
+  readonly progress: number;
+  readonly phi: number;
+}
+
+/**
+ * Where the sphere stands when nothing is pointing at it.
+ *
+ * Exactly {@link STATIC_FRAME}'s state, so a stage that has never been touched,
+ * one whose pointer has just left, and one rendered on a server all show the
+ * same picture — and the two that reach it through JavaScript write nothing at
+ * all to get there, because the attribute diff sees no change.
+ */
+export const RESTING_STATE: BlochState = { progress: STATIC_PROGRESS, phi: 0 };
+
+export interface PointerStateInput {
+  /** Pointer x over the stage, `0 → 1` left to right. Drives φ. */
+  readonly x: number;
+  /** Pointer y over the stage, `0 → 1` top to bottom. Drives θ. */
+  readonly y: number;
+  /**
+   * Global engagement, `0 → 1`, eased on enter and leave by
+   * `stepEngagement` in `src/lib/motion/magnet-field.ts`.
+   *
+   * It is the ONLY eased quantity, for the reason stated there: an angle that
+   * arrives after the hand has stopped is not read as a response at all. At
+   * full engagement this function is the identity on the pointer position.
+   */
+  readonly engagement: number;
+}
+
+/**
+ * Interpolates between the two endpoints so that both are hit *exactly*.
+ *
+ * `a + (b - a) * t` is the obvious form and is wrong at `t = 1`: for
+ * `a = 0.5, b = 0.1` it answers `0.09999999999999998`, so a fully engaged
+ * pointer would drive a state a float away from the one it is pointing at and
+ * the "no lag" contract would be true only to within an epsilon. This form is
+ * `a` at 0 and `b` at 1 by the arithmetic of multiplying by zero.
+ */
+function mix(a: number, b: number, t: number): number {
+  return a * (1 - t) + b * t;
+}
+
+/**
+ * The state one pointer position drives, under one engagement envelope.
+ *
+ * The two stage axes are the two angles: **y is θ** — top edge |0⟩, middle |+⟩,
+ * bottom edge |1⟩, so the vector points where the hand is — and **x is φ**, the
+ * rotation about Z that no measurement can see, over ±{@link PHI_MAX}.
+ *
+ * That assignment is not a free choice. θ is the angle from +Z, +Z projects to
+ * straight up the screen under this camera, and the probability readout is a
+ * function of θ alone; mapping the vertical axis onto it is therefore the only
+ * assignment where moving the hand up the stage moves the vector up the sphere
+ * and up the |0⟩ bar together. φ takes the axis that is left over, which is the
+ * one it can afford: the horizontal excursion is small on purpose, and a small
+ * excursion on the *vertical* axis would have been an unreadable one.
+ *
+ * Pure, and total: a non-finite or out-of-range coordinate clamps rather than
+ * propagating, because the last event before a `pointerleave` is routinely a
+ * pixel outside the box.
+ */
+export function pointerState({ x, y, engagement }: PointerStateInput): BlochState {
+  const gain = clamp01(engagement);
+  if (gain === 0) return RESTING_STATE;
+  return {
+    progress: mix(RESTING_STATE.progress, clamp01(y), gain),
+    phi: mix(RESTING_STATE.phi, azimuthFromPointer(x), gain),
+  };
+}

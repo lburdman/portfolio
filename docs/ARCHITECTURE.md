@@ -303,7 +303,7 @@ src/
     writing/       WritingTimeline, ArticleDate, ArticleNeighbours
     visuals/
       hero/        signal-field canvas module (framework-free)
-      worlds/      the React island and its five domain stages
+      worlds/      the React island and its six domain stages
   config/          site.ts, navigation.ts, domains.ts — no logic, only values
   content/         schema.ts, writing-schema.ts, projects/<slug>/, writing/<slug>/
   content.config.ts  the four collection definitions and their loaders

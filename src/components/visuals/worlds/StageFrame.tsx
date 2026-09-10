@@ -23,10 +23,10 @@ const TICK = 12;
 /**
  * The chrome every domain stage shares.
  *
- * This is the answer to brief §6: five domains must not look like five
+ * This is the answer to brief §6: six domains must not look like six
  * unrelated microsites. They differ in *behaviour* and in one accent; the
  * frame, the coordinate space, the corner ticks, the annotation row and the
- * hairline weights are identical across all five, so the set reads as five
+ * hairline weights are identical across all six, so the set reads as six
  * channels of one instrument.
  *
  * The SVG is `aria-hidden`. It carries no information that the panel's heading
@@ -44,8 +44,8 @@ const TICK = 12;
  *
  * This frame publishes nothing per frame, and that is a deliberate removal
  * rather than an omission. It used to write `--tw-progress` through CSSOM on
- * every traverse tick, for all five stages — five `toFixed(4)` allocations and
- * five CSSOM writes per frame on the scroll path. Nothing ever read it: no
+ * every traverse tick, for every stage — one `toFixed(4)` allocation and one
+ * CSSOM write each, per frame, on the scroll path. Nothing ever read it: no
  * `var(--tw-progress)` existed in this repository, and both scroll-driven
  * stages subscribe to `traverse.ts`'s numeric registry directly, because a
  * stage that has to compute a path needs the number and not a string.

@@ -425,14 +425,18 @@ const mediaTransition = `project-media-${meta.slug}`;
      `style=""` is dropped. Painting the accents that way rendered correctly in
      `astro dev` and produced uncoloured channel bars in production.
 
-     These five lines mirror `Domain['accentVar']`, typed
-     `--color-domain-${DomainId}`. CSS cannot derive the name, so a sixth domain
-     needs a sixth line here — `tests/pages.test.ts` fails if one is missing.
+     These six lines mirror `Domain['accentVar']`, typed
+     `--color-domain-${DomainId}`. CSS cannot derive the name, so a seventh
+     domain needs a seventh line here — `tests/pages.test.ts` fails if one is
+     missing.
 
      Paper ground, so the values are consumed through the 68% ink mix below,
      never as `color` — see the boxed warning in tokens.css.
      ----------------------------------------------------------------------- */
 
+  .detail [data-domain='product'] {
+    --domain-accent: var(--color-domain-product);
+  }
   .detail [data-domain='ai'] {
     --domain-accent: var(--color-domain-ai);
   }

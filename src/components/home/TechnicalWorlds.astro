@@ -46,7 +46,7 @@
  *
  *    The cost, stated plainly: with no island on the mobile path there is also
  *    no `IntersectionObserver` marking one panel at a time as active, so the
- *    five stages are static there rather than ambient. That is the trade
+ *    six stages are static there rather than ambient. That is the trade
  *    docs/REDESIGN_DECISIONS.md #11 accepts — 60 KB of framework was not a
  *    fair price for a breathing SVG, and MOTION_SYSTEM §7 already prefers
  *    static over janky on a phone. If it is ever wanted back, it is a CSS
@@ -85,9 +85,9 @@
  * away above it. The island finds it with `closest('.tw')`; the contract
  * between these two files is that one `.tw` class.
  *
- * The island itself is server-rendered by this file at build time, so all five
+ * The island itself is server-rendered by this file at build time, so all six
  * domains are complete, semantic HTML in document order before any JavaScript
- * exists. With scripting off, the section is a readable stack of five panels.
+ * exists. With scripting off, the section is a readable stack of six panels.
  */
 
 import Section from '../ui/Section.astro';
@@ -137,27 +137,31 @@ const SECTION = 'worlds' as const;
      ======================================================================== */
 
   /* --- Domain accents -----------------------------------------------------
-     `--tw-accent` is the one thing that differs between the five stages, and
+     `--tw-accent` is the one thing that differs between the six stages, and
      it is resolved here rather than by an inline `style` on each panel.
 
      That is a CSP requirement, not a preference. `astro.config.mjs` enables
      `security.csp` with no `'unsafe-inline'`, and Astro emits no
      `style-src-attr`, so `style-src` governs style *attributes* too — with no
      `'unsafe-hashes'`, every inline `style=""` on the page is dropped. An
-     island that painted its accents that way would render five identical grey
+     island that painted its accents that way would render six identical grey
      stages in production and look perfect in `astro dev`.
 
      `data-domain` is on the panel, the stage and the rail stop, so one rule per
      domain covers all three and the value inherits to every descendant.
 
-     These five lines mirror `Domain['accentVar']`, which is typed
-     `--color-domain-${DomainId}`. CSS cannot derive the name, so a sixth domain
-     needs a sixth line here — `tests/worlds.test.ts` fails if one is missing.
+     These six lines mirror `Domain['accentVar']`, which is typed
+     `--color-domain-${DomainId}`. CSS cannot derive the name, so a seventh
+     domain needs a seventh line here — `tests/worlds.test.ts` fails if one is
+     missing.
 
      Ink ground only, per the warning in tokens.css: the band is `.on-ink`, and
      these hues measure 1.72:1–2.77:1 on paper.
      --------------------------------------------------------------------- */
 
+  .tw [data-domain='product'] {
+    --tw-accent: var(--color-domain-product);
+  }
   .tw [data-domain='ai'] {
     --tw-accent: var(--color-domain-ai);
   }
@@ -316,20 +320,25 @@ const SECTION = 'worlds' as const;
      the arithmetic is worth stating because both defects were pure layout
      rather than anything visual.
 
-     **Whole-pitch registration** (docs/REDESIGN_DECISIONS.md #15). Five panels
-     at 86% make a track 430% of the viewport wide, so a bare track travels
-     430% − 100% = 330%. The traverse has four steps between five stops, so
-     each step moves 330 / 4 = 82.5% — while the panels are pitched 86% apart.
-     The 3.5% shortfall accumulates: at stop *i* the outgoing panel is left
-     standing 3.5×*i* percent inside the frame. Measured at 1440×900, viewport
-     box 1344px: slivers of 46, 102, 157 and 213px at the four stops after the
-     first, each showing the clipped tail of the previous stage's annotation.
-     They were not a transient — they were where the traverse came to rest.
+     **Whole-pitch registration** (docs/REDESIGN_DECISIONS.md #15). Panels at
+     86% with no spacer make a track `n × 86%` wide, so a bare track travels
+     `n × 86% − 100%` across `n − 1` steps — which is not 86% per step for any
+     `n`. At the five panels this was first measured with, that was
+     430% − 100% = 330% over four steps: 82.5% each, while the panels were
+     pitched 86% apart. The 3.5% shortfall accumulates: at stop *i* the
+     outgoing panel is left standing 3.5×*i* percent inside the frame. Measured
+     at 1440×900, viewport box 1344px: slivers of 46, 102, 157 and 213px at the
+     four stops after the first, each showing the clipped tail of the previous
+     stage's annotation. They were not a transient — they were where the
+     traverse came to rest.
 
-     Adding 14% of spacer fixes that, because it makes the travel a whole
-     number of pitches:
+     Adding 14% of spacer fixes that for every `n`, because it makes the travel
+     a whole number of pitches — the 14% is exactly the peek, and it cancels:
 
-       track = 14% + 5 × 86% = 444%   travel = 444% − 100% = 344% = 4 × 86%
+       track = 14% + n × 86%   travel = track − 100% = (n − 1) × 86%
+
+     At today's six domains that is a 530% track and 430% of travel over five
+     steps of 86%. Nothing here is tuned to the count.
 
      **Centring.** That 14% used to be one trailing spacer, and *where* it sat
      decided where the panels sat. With all of it after the last panel, panel
@@ -497,7 +506,7 @@ const SECTION = 'worlds' as const;
   /* ===========================================================================
      VISUAL STAGES
 
-     One frame, one coordinate space, one annotation voice, five behaviours.
+     One frame, one coordinate space, one annotation voice, six behaviours.
      `--tw-accent` is set per panel from the domain's `accentVar`, so a stage
      never names a colour.
 
@@ -532,7 +541,7 @@ const SECTION = 'worlds' as const;
 
     /* There is deliberately no `--tw-progress` here. It was declared as a
        resting 0.5 and rewritten through CSSOM on every traverse tick for all
-       five stages, and no rule in this file — or anywhere else — ever read it.
+       six stages, and no rule in this file — or anywhere else — ever read it.
        Scroll progress reaches the two stages that need it as a number, through
        `traverse.ts`'s registry. If a CSS channel is wanted later, declare it
        with its first `var()` consumer and not before. */
@@ -659,9 +668,10 @@ const SECTION = 'worlds' as const;
      after a 2515px pinned commitment. MOTION_SYSTEM §3 specifies a 400–1000ms
      arrival; it was never built. This is it.
 
-     One grammar, five verbs — same flag, same tokens, a different primitive per
+     One grammar, six verbs — same flag, same tokens, a different primitive per
      domain, because the primitive is the thing each domain is *about*:
 
+       product      the grid fills in left to right, the way time runs in it
        ai           the decision boundary draws itself out of nothing
        quantum      the sphere draws itself, then the state vector arrives
        fpga         the selected route draws, its cells latching as it resolves
@@ -708,6 +718,41 @@ const SECTION = 'worlds' as const;
   .tw[data-traverse='true'] .tw-stage:not([data-active='true']) .tw-stage__frame .tw-tick {
     opacity: 0.26;
     transition: opacity var(--duration-fast) var(--ease-exit);
+  }
+
+  /* product — the record accumulates.
+
+     The grid fills in from the left, which is the direction time runs in it: a
+     completion grid is not a picture that appears, it is a picture that was
+     built one day at a time, and the arrival is that sentence.
+
+     It reuses `tw-sweep-in`, the audio stage's clip wipe, rather than declaring
+     a second keyframe that would say the same thing. Two conditions make that
+     safe and both hold here: `.tw-pg-reveal` carries no transform, so the
+     keyframe's `320px` is one frame width in plain user units, and the wipe
+     ends on an *outset* inset, so the finished state clips nothing.
+
+     A dash draw is not available to this stage and it is worth saying why: the
+     matrix is a hundred and sixty-eight filled cells, not a stroke, and there
+     is no length along which anything could be drawn. A clip is what a filled
+     shape's arrival looks like. */
+  .tw-stage[data-active='true'] .tw-pg-reveal {
+    animation: tw-sweep-in var(--tw-arrive) var(--ease-instrument) both;
+  }
+
+  /* And the one ambient beat on this stage: the live edge.
+
+     Everything else in the frame is finished — it is a record, and a record
+     that breathed would be claiming the past was still changing. The last cell
+     is the exception: today is not over. It is the same device the FPGA's
+     `.tw-clock-active` uses, at the same 2.4s the electronics chain runs on,
+     delayed past `--tw-settle` so the world plays its verb first.
+
+     The keyframe returns to full opacity at both ends, so with
+     `animation: none` the marker is simply drawn — there is no resting state
+     here that depends on an animation running (audit 2.3). */
+  .tw-stage[data-active='true'] .tw-pg-today {
+    animation: tw-pg-live 2.4s var(--ease-standard) var(--tw-settle) infinite;
   }
 
   /* ai — the partition resolves.
@@ -924,6 +969,90 @@ const SECTION = 'worlds' as const;
 
   .tw-stage[data-active='true'] .tw-spectrum {
     animation: tw-rise 560ms var(--ease-entrance) var(--tw-arrive-lag) both;
+  }
+
+  /* --- product / completion grid -----------------------------------------
+     Weeks across, days down, one cell per day. Four paths carry a hundred and
+     sixty-eight cells — one per intensity level — for the same reason the
+     audio spectrum is two paths and not twenty-six rects.
+
+     The three used levels are the accent at three fixed opacities. Three
+     STEPS and not a ramp: a heatmap that reads as a gradient cannot be
+     counted, and this picture's whole claim is that it is countable. It is
+     also the one place on the band where the accent is a fill rather than a
+     stroke, which the token file's "never fills" note is worth checking
+     against — that rule protects *text and large areas* on the paper ground,
+     and these are 8×8 marks on ink, the same size class as the FPGA's cells.
+
+     Nothing here may declare `d` on `.tw-pg-cursor` or `.tw-pg-lit`. Those are
+     written per frame as presentation attributes, and a CSS declaration
+     outranks a presentation attribute — the writes would silently do nothing.
+     See the header of `stages/CompletionStage.tsx`. -------------------- */
+
+  /* The days that were not used. Ground, not subject: it has to be readable as
+     a lattice — otherwise the filled cells float with nothing to be filled
+     *against* — without competing with the cells that carry the meaning. */
+  .tw-pg-empty {
+    fill: var(--color-on-ink-muted);
+    opacity: 0.16;
+  }
+
+  .tw-pg-level {
+    fill: var(--tw-accent);
+  }
+
+  .tw-pg-level[data-level='1'] {
+    opacity: 0.34;
+  }
+
+  .tw-pg-level[data-level='2'] {
+    opacity: 0.62;
+  }
+
+  .tw-pg-level[data-level='3'] {
+    opacity: 1;
+  }
+
+  /* The live edge. An outline rather than a fill, because it marks a day
+     whose value is not in yet — a filled marker would be an assertion about
+     data that does not exist. No `pathLength`, never dashed, so the
+     `non-scaling-stroke` here is unconditionally safe. */
+  .tw-pg-today {
+    fill: none;
+    stroke: var(--tw-accent);
+    stroke-width: 1.2;
+    vector-effect: non-scaling-stroke;
+  }
+
+  /* The weekly totals, and the one the cursor is standing on. Same pairing as
+     the spectrum's body and lit bar, and the same reason: the accent stays on
+     exactly one object. */
+  .tw-pg-bars {
+    fill: var(--color-on-ink-muted);
+    opacity: 0.5;
+  }
+
+  .tw-pg-lit {
+    fill: var(--tw-accent);
+    opacity: 1;
+  }
+
+  /* The week bracket. Dashed and non-scaling, exactly like the audio cursor it
+     is the sibling of — it declares no `pathLength`, so the two never meet. */
+  .tw-pg-cursor {
+    fill: none;
+    stroke: var(--tw-accent);
+    stroke-width: 1.2;
+    stroke-dasharray: 3 3;
+    opacity: 0.85;
+    vector-effect: non-scaling-stroke;
+  }
+
+  .tw-pg-ticks line {
+    stroke: var(--color-ink-rule);
+    stroke-width: 1;
+    opacity: 0.55;
+    vector-effect: non-scaling-stroke;
   }
 
   /* --- ai / decision landscape -------------------------------------------
@@ -1704,6 +1833,21 @@ const SECTION = 'worlds' as const;
     }
     to {
       transform: scale(1);
+    }
+  }
+
+  /* product: today, which is the one cell in the grid that is not finished.
+
+     Both ends are the element's own resting opacity, so this perturbs a state
+     that is already on screen and `animation: none` resolves to a plain drawn
+     marker rather than to nothing. */
+  @keyframes tw-pg-live {
+    0%,
+    100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.32;
     }
   }
 

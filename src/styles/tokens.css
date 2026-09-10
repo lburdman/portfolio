@@ -36,7 +36,7 @@
       a token that exists here exists at runtime.
    6. Every colour token here is safe on the grounds its comment names, with
       ONE exception: `--color-domain-*` is valid on the ink ground only. Raw,
-      those five measure 1.72:1 - 2.77:1 on paper — worse than the border the
+      those six measure 1.72:1 - 2.77:1 on paper — worse than the border the
       audit caught. See the loud block beside them for the two measured
       `color-mix()` ceilings that make them usable on the paper ground.
 
@@ -108,7 +108,7 @@
 
   /* --- Domain accents ------------------------------------------------------
      A tempered oscilloscope-channel palette: matched saturation and lightness
-     so the five read as channels of one instrument rather than five brands.
+     so the six read as channels of one instrument rather than six brands.
      Thin strokes and small labels. Never fills. Never glow.
 
      ###########################################################################
@@ -121,6 +121,7 @@
      measured against the paper ground:
 
        token                       on ink   on paper   on paper-raised
+       --color-domain-product       6.74      2.13          2.30
        --color-domain-ai            8.03      1.79          1.93
        --color-domain-quantum       7.08      2.03          2.19
        --color-domain-fpga          8.35      1.72          1.85
@@ -144,10 +145,50 @@
             everywhere. Required for any domain-coloured TEXT on paper.
 
      A 68% mix (already shipped by one component) measures 3.41:1 - 4.90:1 on
-     paper: correct as a stroke, but ai / fpga / quantum / audio land under
-     4.5:1, so it must not carry a label. Re-measure if you pick another number.
+     paper: correct as a stroke, but ai / fpga / quantum / audio / product land
+     under 4.5:1, so it must not carry a label. Re-measure if you pick another
+     number.
+
+     ── HOW `product` WAS DERIVED, SO THE SIXTH IS NOT A GUESS ───────────────
+     The other five were authored as hexes. Converting them to OKLCH gives the
+     palette its actual, measured centre:
+
+       token         L        C        H
+       ai            0.7540   0.1358    75.98°
+       quantum       0.7066   0.0873   217.07°
+       fpga          0.7484   0.1411   130.24°
+       electronics   0.6486   0.1482    36.40°
+       audio         0.6869   0.0927   357.12°
+       mean          0.7089   0.1210
+
+     `product` is placed at exactly that mean L and C — which is what "matched
+     saturation and lightness" means once it is a number rather than an
+     intention — and at the hue that maximises the minimum angular distance to
+     all five. Sorting the five hues leaves gaps of 39.6°, 54.3°, 86.8°, 140.1°
+     and 39.3°; the widest is audio (357.12°) → quantum (217.07°), so the
+     optimum is its midpoint, 287.10°, at 70.02° from its nearest neighbour.
+     Violet was the obvious answer and it is also the computed one.
+
+       oklch(0.7089 0.1210 287.10)  ->  #9c95e9
+
+     Quantised to 8-bit sRGB that reads back as oklch(0.7093 0.1211 286.69),
+     69.62° clear of the nearest existing hue — the loss is rounding, not
+     placement. It is inside sRGB with no gamut clipping, so the L and C it was
+     specified at are the L and C it actually has.
+
+     It changes none of the ceilings above. On ink it measures 6.74:1, inside
+     the family's 5.19 - 8.35 band; on paper 2.13:1, inside 1.72 - 2.77; and
+     its three mixes land at 3.62:1 (73%), 4.02:1 (68%) and 5.18:1 (56%),
+     every one of them strictly between the extremes those ranges already name.
+
+     One neighbour worth stating: --color-accent (#1e3fd8) sits at hue 266.22°,
+     21° away. They never meet — the accent is a paper-ground token at L 0.46,
+     this is an ink-ground token at L 0.71 — but do not reach for one expecting
+     the other.
      ------------------------------------------------------------------------ */
 
+  /* 6.74:1 on ink · 6.06:1 on ink-raised — 2.13:1 on paper (ink ground only) */
+  --color-domain-product: #9c95e9;
   /* 8.03:1 on ink · 7.22:1 on ink-raised — 1.79:1 on paper (ink ground only) */
   --color-domain-ai: #e0a23c;
   /* 7.08:1 on ink · 6.36:1 on ink-raised — 2.03:1 on paper (ink ground only) */

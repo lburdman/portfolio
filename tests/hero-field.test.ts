@@ -4,7 +4,13 @@ import { fileURLToPath } from 'node:url';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { HOME_PATH } from '../src/config/navigation';
 import { LOCALES, localizePath } from '../src/i18n';
-import { HERO_FIELD_LINE_COUNT, HERO_FIELD_TIERS, REST_ANGLE_DEG, tierLineCount } from '../src/lib/motion/magnet-field';
+import {
+  HERO_FIELD_LINE_COUNT,
+  HERO_FIELD_TIERS,
+  LINE_LENGTH_REM,
+  REST_ANGLE_DEG,
+  tierLineCount,
+} from '../src/lib/motion/magnet-field';
 
 /**
  * The hero field survives the Content Security Policy — proved against the
@@ -158,7 +164,11 @@ describe('every visual property the field needs is in a stylesheet, not on an el
     // A CSP-stripped field is not merely unrotated: it has no width, no height
     // and no background either, because all three were inline too. Asserting
     // the declarations exist in CSS is asserting the field is visible at all.
-    expect(css).toMatch(/\.hero-field__line[^{]*\{[^}]*width:1\.75rem/);
+    // The width is read from `LINE_LENGTH_REM` for the same reason the angle is
+    // read from `REST_ANGLE_DEG`: the stylesheet has to carry the number as a
+    // literal (CSP drops the inline style that would let JavaScript set it), so
+    // the guard against the two drifting is this test, not a shared value.
+    expect(css).toMatch(new RegExp(`\\.hero-field__line[^{]*\\{[^}]*width:${LINE_LENGTH_REM}rem`));
     expect(css).toMatch(/\.hero-field__line[^{]*\{[^}]*height:var\(--border-hairline\)/);
     expect(css).toMatch(/\.hero-field__line[^{]*\{[^}]*background-color:color-mix\(/);
   });

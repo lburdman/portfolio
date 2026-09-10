@@ -7,6 +7,8 @@ summary: 'Un pipeline de reconocimiento de emociones en voz sobre CREMA-D con me
 
 Un pipeline de investigación de extremo a extremo para el reconocimiento de emociones en voz sobre el conjunto CREMA-D. La contribución central es una comparación controlada entre una cabeza clasificadora clásica y una cabeza cuántica variacional, ambas entrenadas sobre el mismo backbone clásico congelado.
 
+Este es el trabajo detrás de mi tesis de grado de Ingeniería Electrónica en la Universidad de Buenos Aires (FIUBA), _Redes Neuronales Híbridas Clásico-Cuánticas para Clasificación de Emociones en Audio_, dirigida por el Dr. Ing. Leónidas Caram y codirigida por el Ing. Ricardo A. Veiga, y defendida en abril de 2026. El documento completo está enlazado arriba.
+
 ## El problema
 
 El machine learning cuántico es un campo con una promesa teórica considerable y una validación empírica escasa bajo restricciones reales. El proyecto plantea una pregunta concreta: ¿puede una cabeza construida con un circuito cuántico variacional competir con una cabeza clásica — o superarla — en una tarea de clasificación de audio, si ambas reciben exactamente las mismas características y el circuito es lo bastante chico como para correr en el hardware actual?

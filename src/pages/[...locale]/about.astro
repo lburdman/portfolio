@@ -20,6 +20,8 @@
 import Container from '@/components/ui/Container.astro';
 import { DEFAULT_LOCALE, LOCALES, useTranslations, type Locale, type UIStrings } from '@/i18n';
 import PageLayout from '@/layouts/PageLayout.astro';
+import { Image } from 'astro:assets';
+import lanetPoster from '@/assets/lanet-2025-poster.webp';
 
 export function getStaticPaths() {
   return LOCALES.map((locale) => ({
@@ -47,6 +49,8 @@ const roles = ROLE_IDS.map((id) => t.about.roles[id]);
 const HEADING_ID = 'about-heading';
 const CURRENTLY_ID = 'about-currently';
 const TEACHING_ID = 'about-teaching';
+const CLIENT_WORK_ID = 'about-client-work';
+const RESEARCH_ID = 'about-research';
 ---
 
 <PageLayout
@@ -69,6 +73,60 @@ const TEACHING_ID = 'about-teaching';
         <h2 id={CURRENTLY_ID} class="about__block-heading">{t.about.currentlyHeading}</h2>
         <ul class="about__interests">
           {t.about.interests.map((interest) => <li class="about__interest">{interest}</li>)}
+        </ul>
+      </section>
+
+      <section class="about__block" aria-labelledby={RESEARCH_ID}>
+        <h2 id={RESEARCH_ID} class="about__block-heading">{t.about.researchHeading}</h2>
+        <ol class="about__research">
+          {
+            t.about.research.map((item) => (
+              <li class="about__paper">
+                <h3 class="about__paper-title" lang="es">
+                  {item.title}
+                </h3>
+                <p class="about__paper-meta">
+                  <span class="about__paper-venue">{item.venue}</span>
+                  <span class="about__paper-where">{item.where}</span>
+                </p>
+                <p class="about__paper-description">{item.description}</p>
+                {
+                  /* One entry, one poster, so the image is imported directly rather
+                     than globbed. `posterAlt` is the switch: an entry cannot show a
+                     picture without someone having written what it shows. */
+                  item.posterAlt && (
+                    <figure class="about__paper-figure">
+                      <Image
+                        src={lanetPoster}
+                        alt={item.posterAlt}
+                        widths={[480, 768, 1200]}
+                        sizes="(min-width: 60rem) 26rem, 90vw"
+                        loading="lazy"
+                        decoding="async"
+                      />
+                    </figure>
+                  )
+                }
+              </li>
+            ))
+          }
+        </ol>
+      </section>
+
+      <section class="about__block" aria-labelledby={CLIENT_WORK_ID}>
+        <h2 id={CLIENT_WORK_ID} class="about__block-heading">{t.about.clientWorkHeading}</h2>
+        <ul class="about__clients">
+          {
+            t.about.clientWork.map((client) => (
+              <li class="about__client">
+                <h3 class="about__client-name">{client.name}</h3>
+                <p class="about__client-description">{client.description}</p>
+                <a class="about__client-link" href={client.href} rel="noopener noreferrer" target="_blank">
+                  {client.site}
+                </a>
+              </li>
+            ))
+          }
         </ul>
       </section>
 
@@ -200,5 +258,114 @@ const TEACHING_ID = 'about-teaching';
     line-height: var(--leading-body);
     color: var(--color-slate);
     text-wrap: pretty;
+  }
+
+  /* --- client work ---------------------------------------------------------
+     Deliberately quieter than a project card. This work is real and shipped,
+     and it is not the argument the projects grid is making — the type scale
+     says so without the copy having to.
+     ---------------------------------------------------------------------- */
+
+  .about__clients {
+    list-style: none;
+    display: grid;
+    gap: var(--spacing-stack);
+    margin: 0;
+    padding: 0;
+  }
+
+  .about__client-name {
+    font-family: var(--font-display);
+    font-stretch: var(--display-width-wide);
+    font-size: var(--text-display-4);
+    font-weight: 600;
+    letter-spacing: var(--tracking-label);
+    text-transform: uppercase;
+  }
+
+  .about__client-description {
+    margin-top: 0.5rem;
+    font-size: var(--text-base);
+    line-height: var(--leading-body);
+    color: var(--color-slate);
+    max-width: 52ch;
+    text-wrap: pretty;
+  }
+
+  .about__client-link {
+    display: inline-block;
+    margin-top: 0.5rem;
+    font-family: var(--font-mono);
+    font-stretch: normal;
+    font-size: var(--text-caption);
+    letter-spacing: var(--tracking-label);
+  }
+
+  /* --- research ------------------------------------------------------------
+     A citation, set like one. The title carries `lang="es"` because it is not
+     translated -- a paper title people can search for has to stay in the
+     language it was presented in -- and without that attribute a Spanish title
+     is read aloud with English phonemes on the English page.
+     ---------------------------------------------------------------------- */
+
+  .about__research {
+    list-style: none;
+    display: grid;
+    gap: var(--spacing-stack);
+    margin: 0;
+    padding: 0;
+  }
+
+  .about__paper {
+    padding-left: var(--spacing-gutter);
+    border-left: var(--border-rule) solid var(--color-accent);
+  }
+
+  .about__paper-title {
+    font-size: var(--text-lg);
+    line-height: var(--leading-snug);
+    max-width: 46ch;
+    text-wrap: pretty;
+  }
+
+  .about__paper-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem 0.75rem;
+    margin-top: 0.5rem;
+    font-family: var(--font-mono);
+    font-stretch: normal;
+    font-size: var(--text-caption);
+    letter-spacing: var(--tracking-label);
+    text-transform: uppercase;
+    color: var(--color-slate);
+  }
+
+  .about__paper-where {
+    color: var(--color-rule);
+  }
+
+  .about__paper-description {
+    margin-top: 0.75rem;
+    font-size: var(--text-base);
+    line-height: var(--leading-body);
+    color: var(--color-slate);
+    max-width: 62ch;
+    text-wrap: pretty;
+  }
+
+  /* The poster, set as a document rather than a photograph: a hairline, a small
+     measure, and no rounding. It is evidence, and evidence on this site looks
+     like the figures do. */
+  .about__paper-figure {
+    margin: var(--spacing-stack) 0 0;
+    max-width: 26rem;
+  }
+
+  .about__paper-figure :global(img) {
+    display: block;
+    width: 100%;
+    height: auto;
+    border: var(--border-hairline) solid var(--color-rule);
   }
 </style>

@@ -17,6 +17,21 @@ find yourself editing a component, a route or a schema to add a project or an
 article, stop — either it needs something genuinely new, or you are doing it the
 hard way. §12 draws that line precisely.
 
+## The short version
+
+```bash
+npm run project:new -- my-project-slug   # scaffolds project.json, en.md, es.md
+# replace every TODO; set `domains`; set `status` to "published"
+npm run project:validate                 # schema, links, media, both locales
+```
+
+Three commands and no application code. The one thing the scaffolder cannot do
+for you: if the project ships images, its alt text lives in `projects.mediaAlt`
+in **both** `src/i18n/en.ts` and `src/i18n/es.ts`, keyed `<slug>/<file-stem>`.
+`npm run verify` fails on a missing key _and_ on an orphan left behind after an
+image is deleted. That carve-out is §10, and it is the only dictionary edit a
+content change is allowed to imply.
+
 ---
 
 # Projects

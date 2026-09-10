@@ -400,14 +400,20 @@ const mediaTransition = `article-media-${meta.slug}`;
      without `'unsafe-hashes'` every `style=""` is dropped. Painted that way,
      these bars render correctly in `astro dev` and colourless in production.
 
-     These five lines mirror `Domain['accentVar']`, typed
+     These lines mirror `Domain['accentVar']`, typed
      `--color-domain-${DomainId}`. CSS cannot derive the name from the data, so
-     a sixth domain needs a sixth line here.
+     every domain needs its own line here, in `DOMAIN_IDS` order. The suite in
+     `tests/writing-routes.test.ts` walks `DOMAIN_IDS` and fails when one is
+     missing — which is how `product` was caught arriving from another branch
+     with no rule of its own, rendering a colourless bar in production only.
 
      Paper ground, so the values are consumed through an ink mix below and never
      as a raw `color` — see the boxed warning in tokens.css.
      ----------------------------------------------------------------------- */
 
+  .article [data-domain='product'] {
+    --domain-accent: var(--color-domain-product);
+  }
   .article [data-domain='ai'] {
     --domain-accent: var(--color-domain-ai);
   }

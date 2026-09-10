@@ -48,6 +48,11 @@ export const en: UIStrings = {
     narrative:
       'Each layer sets the limits of the one above it. Knowing what happens two layers down changes the decisions you make at the top.',
     items: {
+      product: {
+        layer: 'INTERFACE',
+        description:
+          'The software someone actually opens: the interface, the state behind it, and the daily use a product has to earn.',
+      },
       ai: {
         layer: 'MODELS',
         description:
@@ -76,8 +81,13 @@ export const en: UIStrings = {
 
   worlds: {
     heading: 'Technical Worlds',
-    subtitle: 'Five areas of work. What each one actually involves.',
+    subtitle: 'Six areas of work. What each one actually involves.',
     items: {
+      product: {
+        name: 'Product & Software',
+        summary:
+          'Web applications built end to end: the interface, the data model under it and the instrumentation that says whether anyone came back the next day.',
+      },
       ai: {
         name: 'AI & Machine Learning',
         summary:
@@ -124,6 +134,12 @@ export const en: UIStrings = {
     relatedWork: 'Related work',
     backToList: 'Back to projects',
     mediaAlt: {
+      'room-acoustics/app-modal-field':
+        "Screenshot of the Room Acoustics web app. Under the label 'modal model, valid below 723 Hz', a heading reads 'What resonates' over the line '92 modes below 300 Hz — 13 axial, 42 tangential, 37 oblique'. A monospaced table lists each mode's indices, frequency, type, energy weight and spacing; the 57.17 Hz axial row is selected and inverted, and brackets mark modes within 5% of a neighbour.",
+      'augmenta/trust-boundary':
+        "Three versions of the same message as it moves through the privacy layer. From the client: 'Contact me at john.doe@example.com'. Past a marked trust boundary the LLM gateway sees only 'Contact me at [[AUG:EMAIL_ADDRESS:1]]'. Rehydrated, the original address returns. Footnotes cite the two tests asserting no raw PII reaches the gateway and no plaintext is stored.",
+      'room-acoustics/modal-distribution':
+        'Three rows of vertical hairlines on a shared frequency axis from 50 to 300 Hz, one row per mode class: 13 axial, 42 tangential, 37 oblique. Tick height and darkness encode modal energy weight, so the sparse axial row is tallest and darkest. A dashed marker at 57.17 Hz labels the room\u2019s lowest mode. The axial modes are few and widely spaced; the oblique modes crowd together above roughly 200 Hz.',
       'energy-forecasting/prediction-interval':
         'Line chart of German electricity load over 14 days in August 2019: actual load in black, XGBoost forecast dashed, and a shaded 95% conformal prediction interval around it. The forecast tracks the daily peaks and troughs closely; the interval widens where the model is least certain.',
       'energy-forecasting/backtest-rmse-by-fold':
@@ -192,6 +208,18 @@ export const en: UIStrings = {
       'Time series forecasting pipelines',
       'Privacy-preserving AI architectures',
     ],
+    researchHeading: 'Research presented',
+    research: [
+      {
+        title: 'Transfer Learning para Redes Neuronales Híbridas Clásico–Cuánticas',
+        venue: 'LANET 2025 · Latin American Conference on Complex Networks',
+        where: 'Punta del Este, Uruguay',
+        description:
+          'Poster, with Leónidas Facundo Caram. The transfer-learning result behind my thesis: a frozen classical backbone feeding a variational quantum circuit, on binary and three-class emotion classification from audio. Work from the Laboratorio de Redes y Sistemas Móviles at FIUBA.',
+        posterAlt:
+          "Photograph of the printed poster on its stand at the conference. The header reads 'Transfer Learning para Redes Neuronales Híbridas Clásico–Cuánticas', Lucas Burdman and Leónidas Facundo Caram, Universidad de Buenos Aires. Below it, four columns: objective, introduction, the hybrid model architecture, an audio emotion-classification use case, results and conclusions.",
+      },
+    ],
     teachingHeading: 'Teaching & community',
     roles: {
       qiskit: {
@@ -199,7 +227,7 @@ export const en: UIStrings = {
         org: 'Qiskit Fall Fest FIUBA',
         period: '2023 – Present',
         description:
-          'Led end-to-end delivery of an IBM-supported annual quantum computing event — 30+ talks, hybrid sessions, a closing hackathon, and 500+ attendees. Responsible for program design, speaker coordination, logistics, and community engagement.',
+          'Co-organizer of the IBM Quantum-backed festival at FIUBA — 30+ talks across a month, hybrid sessions and 500+ attendees, closing with a hackathon where teams built a Grover search in Qiskit from scratch. Its reach earned the faculty an invitation to Noche de los Museos, where we exhibited the only 2-qubit NMR quantum computer in Argentina.',
       },
       digitalSystems: {
         role: 'Teaching Assistant',
@@ -216,6 +244,16 @@ export const en: UIStrings = {
           'Teaching assistant for Quantum Computation and Communications. Covering quantum circuit fundamentals, quantum information theory, and their relationship to modern cryptographic and communication systems.',
       },
     },
+    clientWorkHeading: 'Client work',
+    clientWork: [
+      {
+        name: 'ByLou Yoga',
+        href: 'https://www.bylou.com.ar',
+        site: 'bylou.com.ar',
+        description:
+          'Design and build of the site for a science-based yoga practice in Buenos Aires — a static Next.js export, deployed and in use. Published with the owner\u2019s permission.',
+      },
+    ],
   },
 
   contact: {
