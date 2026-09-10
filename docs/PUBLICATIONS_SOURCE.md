@@ -1,8 +1,9 @@
 # Publications — raw source material
 
-Working notes on the LinkedIn posts and photographs in the (gitignored)
-`publications/` and `images/` folders. **This file is the record of what was
-used, what was not, and why.** The folders themselves are not build input.
+Working notes on the LinkedIn posts, the organisers' report and the photographs
+in the (gitignored) `publications/` and `images/` folders. **This file is the
+record of what was used, what was not, and why.** The folders themselves are not
+build input.
 
 Anything transcribed from an image is marked as such: the wording is the
 author's and should be checked before it goes near the site.
@@ -10,9 +11,10 @@ author's and should be checked before it goes near the site.
 This material now has an outlet it did not have when these notes were started:
 the `writing` collection, a chronology of dated field reports at `/writing/`,
 which publishes long-form text and photographs together. **All seven posts** and
-eight of the ten images have gone into it. The two photographs still held back
-are held back for reasons of their own, below — not for want of a place to put
-them.
+eight of the ten images have gone into it, plus one article drawn from a source
+that is not a post at all: the organisers' report for the Montevideo hackathon.
+The two files still held back are held back for reasons of their own, below —
+not for want of a place to put them.
 
 ---
 
@@ -20,27 +22,30 @@ them.
 
 ### The writing collection
 
-Five articles under `src/content/writing/`, each an `article.json` with `en.md`
+Six articles under `src/content/writing/`, each an `article.json` with `en.md`
 and `es.md` beside it. The contract they answer to is
 `docs/PROJECT_CONTENT_CONTRACT.md` §15–§24.
 
-| Article                          | Date       | Kind      | From                                              |
-| -------------------------------- | ---------- | --------- | ------------------------------------------------- |
-| `mitx-micromasters-statistics`   | 2026-08    | study     | `Data Analysis - MITx.txt`, `statistics mitx.txt` |
-| `qiskit-fall-fest-fiuba-2025`    | 2025-10-31 | community | `kick off-qff.txt`, `Cierre-QFF.txt`              |
-| `noche-de-los-museos-fiuba`      | 2025-11-08 | community | `Noche de los museos.txt`                         |
-| `lanet-2025-complex-networks`    | 2025-08    | research  | `LANET.txt`                                       |
-| `quantum-computing-course-fiuba` | 2024-07    | teaching  | `cierre cuatri.txt`                               |
+| Article                              | Date       | Kind      | From                                              |
+| ------------------------------------ | ---------- | --------- | ------------------------------------------------- |
+| `mitx-micromasters-statistics`       | 2026-08    | study     | `Data Analysis - MITx.txt`, `statistics mitx.txt` |
+| `qiskit-fall-fest-fiuba-2025`        | 2025-10-31 | community | `kick off-qff.txt`, `Cierre-QFF.txt`              |
+| `noche-de-los-museos-fiuba`          | 2025-11-08 | community | `Noche de los museos.txt`                         |
+| `quantum-hackathon-latam-montevideo` | 2025-10-01 | community | `1764345915963.pdf`, the organisers' report       |
+| `lanet-2025-complex-networks`        | 2025-08    | research  | `LANET.txt`                                       |
+| `quantum-computing-course-fiuba`     | 2024-07    | teaching  | `cierre cuatri.txt`                               |
 
 The two Fall Fest posts are one article, not two: kickoff and closing are the
 opening and closing of a single month, and splitting them would have produced
 two half-reports that each had to re-explain the festival. The two MITx posts
 are one article for the same reason — a course and the programme it completes.
 
-`mitx-micromasters-statistics` is the only article with no `media/` directory
-and no `cover`. Both are optional in the schema, and there is no photograph of
-finishing a course online; inventing a stock image for the slot would be adding
-a picture of nothing.
+Two articles have no `media/` directory and no `cover`, and they arrive there by
+different routes. Both are optional in the schema. For
+`mitx-micromasters-statistics` there is no photograph of finishing a course
+online, and inventing a stock image for the slot would be adding a picture of
+nothing. For `quantum-hackathon-latam-montevideo` a candidate image existed and
+was rejected on resolution — the reasoning is under the held-back file below.
 
 `lanet-2025-complex-networks` declares `relatedProjects: ["quantum-audio"]`; it
 is the only article that does, because it is the only one describing work the
@@ -149,6 +154,37 @@ correction. Publish both, dated, or publish the larger one.
 Sponsors named across the posts, all now in the article: QuantumRev, Tecmaco
 Integral S.A., INVAP, Packt. IBM Quantum backs the festival.
 
+### Quantum Hackathon LATAM 2025 — an event named by its own report
+
+The only article with no post behind it. `publications/1764345915963.pdf` is the
+organisers' official report, and it is what turned an unlabelled image into a
+dated article: everything below is read from it rather than recalled.
+
+- **Quantum Hackathon LATAM 2025 — Quantum for Climate**, **1–3 October 2025**,
+  Universidad de Montevideo, Uruguay
+- The organisers call it the **first international quantum computing hackathon
+  organised in Latin America**
+- Promoted by Universidad de Montevideo with the **Open Quantum Institute
+  (OQI)**; sponsored by **Microsoft**. Collaboration from ANTEL, IEEE Quantum,
+  qBraid. Support from RIPAISC, CLEI, ANII (Declaration of National Interest),
+  UNESCO, the International Year of Quantum Science and Technology, IEEE
+  Region 9, and Uruguay Natural (Declaration of Tourist Interest)
+- The funnel, as the report gives it: **380 registered** from **21 countries**
+  and **86 universities**; **157 completed the QWorld course**; **80 attended**,
+  from **10 countries** and **40 universities**, in **8 teams**, working in
+  **3 languages**
+- The author was on **Team 5, Q-Forest** — reforestation in the Amazon as a
+  knapsack problem, a classical semidefinite relaxation rounded by QAOA, run on
+  the Qiskit Aer simulator without noise and designed for IBM Quantum. It
+  answered SDG 11.
+
+Placements, also from the report: Miqro first, Q-Enso second, GQG (Green Quantum
+Grids) third, QBrigade the Sustainability Award. **Q-Forest did not place, and
+the article says so in a sentence of its own.** Writing around it was available
+and cheap; a dated field report that mentions only the outcomes that flattered
+its author is a press release, and the rest of this site spends its credibility
+on being the other thing.
+
 ---
 
 ## Held back, with reasons
@@ -162,13 +198,22 @@ on the site where every line is expected to be independently verifiable.
 
 ### `team_hackathon montevideo.png`
 
-No source text exists for it, and **the event it shows has not been
-identified**. Every other photograph on the site sits under a dated article that
-says what the room was; this one has neither a date nor a name, and a
-photograph published under a caption its author had to guess at is the failure
-mode the rest of this document exists to prevent.
+The event is identified — it is the Montevideo hackathon above — and the file is
+still held back, because it turned out **not to be a photograph**. At 1620×812
+it is a screen capture of a slide from the organisers' report: the
+"THE TEAMS / Team 5 - Q-Forest" panel, with the group photo occupying the left
+third and the English description paragraph filling the right.
 
-It is worth chasing rather than dropping — see below.
+Two ways of salvaging it were measured, and both fail. Cropping the screenshot
+away from the text leaves **750×579**, too small to carry a card on the index,
+where covers are cropped wide. `pdfimages -list` on page 10 of the PDF puts the
+embedded original at **537×404**, smaller still.
+
+So the article ships with no cover, like `mitx-micromasters-statistics`. A
+figure at that resolution would have cost the page more than the empty space
+does, and the slide's baked-in English text would have been read out verbatim on
+the Spanish page, where every other string is translated. Held back on quality
+now, not for want of a name.
 
 ### `detalle proyecto superpuesto linea en no hover.png`
 
@@ -225,9 +270,6 @@ class of error no test can, because both values type-check and both render.
 
 ## Still to collect
 
-- **The event behind `team_hackathon montevideo.png`.** What it was, when, who
-  was there, and whether there is a post about it. With that, it is an article.
-  Without it, it stays where it is.
 - **The poster's results table**, above — the only outstanding fact that blocks
   something already written.
 - **Four earlier screenshots that never arrived** — they were sent as
