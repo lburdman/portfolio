@@ -199,7 +199,6 @@ export const es: UIStrings = {
   about: {
     heading: 'Sobre mí',
     bio: 'Soy Ingeniero Electrónico por la UBA y trabajo en sistemas de IA en producción. Mi formación viene de las señales, los circuitos y el diseño digital; hoy la mayor parte de mi tiempo va al machine learning y a los sistemas con LLM, y al trabajo de evaluación que decide si un modelo está listo para salir. Soy ayudante de cátedra en Sistemas Digitales y en Computación y Comunicaciones Cuánticas, en la FIUBA.',
-    portraitAlt: 'Lucas Burdman, Ingeniero Electrónico y AI Engineer.',
     facts: CREDENTIALS,
     currentlyHeading: 'Explorando ahora',
     interests: [

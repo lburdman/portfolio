@@ -277,14 +277,9 @@ class of error no test can, because both values type-check and both render.
   screenshot thumbnail is dismissed. To supply one: take it, wait for the
   thumbnail to vanish, then drag the file from `~/Desktop`.
 
-## Loose end still open
+## Loose end closed
 
-`about.portraitAlt` exists in `src/i18n/types.ts` and in both dictionaries and
-is **used nowhere**. A dead key that looks authoritative is exactly the pattern
-the audit named: the next person needing portrait alt text wires up this one,
-and the two locales are then free to drift apart unnoticed. Either render a
-portrait or delete the key.
-
-Note that this is precisely the failure `writing.mediaAlt` is protected from and
-`about.portraitAlt` is not — the media sweep in `tests/i18n.test.ts` ties keys to
-files on disk, while a standalone string key answers to nothing.
+The `about.portraitAlt` key was removed because no portrait is rendered, so it
+was dead text in the type and both dictionaries. A future portrait should add a
+new key together with a test tying it to its file, like the `writing.mediaAlt`
+sweep in `tests/i18n.test.ts`.
