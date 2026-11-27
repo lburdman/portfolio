@@ -136,6 +136,8 @@ The dependency is declared, `site` is set (its one prerequisite), and `integrati
 
 ### 2.1 Listing and detail routes disagree on which projects are visible
 
+**Status (checked 2026-11-27): Resolved** — one shared predicate, `isVisible()` (`status !== 'draft'`) in `src/lib/projects/visibility.ts:40`, is the only filter: `src/lib/projects/query.ts:92,113,152` (listing, lookup, static paths) call it, and `src/pages/[...locale]/projects/index.astro` and `[slug].astro` contain no `status` comparison of their own. Writing has the same predicate in `src/lib/writing/visibility.ts:42`. Covered by `tests/projects.test.ts:111-134` and `tests/writing.test.ts:121-142`. Route paths moved to `src/pages/[...locale]/`.
+
 `src/pages/projects/index.astro:12` vs `src/pages/projects/[slug].astro:8` (mirrored in both ES routes)
 
 ```ts
@@ -148,6 +150,8 @@ The schema permits three states (`src/content/config.ts:16`: `published | draft 
 **Fix:** export one `isVisible` predicate from `src/content/` and use it in all four routes. That also creates a testable seam where none exists.
 
 ### 2.2 `/about` and `/es/about` have no `<h1>`
+
+**Status (checked 2026-11-27): Resolved** — `src/pages/[...locale]/about.astro:65` renders `<h1 id={HEADING_ID}>{t.about.heading}</h1>` (the old `src/pages/about.astro` and `src/pages/es/about.astro` no longer exist). After `npm run build`, `dist/about/index.html` and `dist/es/about/index.html` each contain exactly one `<h1`, followed by `<h2>` sections. The related Projects index note is also resolved: `dist/projects/index.html` goes `<h1>` → `<h2>` (cards use `headingLevel={2}`, see `src/pages/[...locale]/projects/index.astro:12`), with no `<h3>`.
 
 `src/pages/about.astro:17-21` · `src/pages/es/about.astro:17-21`
 
@@ -195,6 +199,8 @@ Applied to non-decorative text at `Footer.astro:22,49,56,63,70,126,131` (tagline
 Separately, `--color-border: #1e1e2e` measures **1.14:1** against surface. It is the sole visual boundary of `.card`, `.btn-ghost`, and the sticky header — WCAG 1.4.11 requires 3:1 for UI component boundaries. `.btn-ghost` is a button whose only affordance is a border nobody can see.
 
 ### 2.6 Skip-link target exists, skip link does not
+
+**Status (checked 2026-11-27): Resolved** — `src/components/ui/SkipLink.astro` renders `<a class="skip-link" href="#main-content">`, with the id taken from `MAIN_CONTENT_ID` in `src/config/navigation.ts:45`; `src/layouts/BaseLayout.astro:153` renders it as the first child of `<body>` (the file moved from `src/components/BaseLayout.astro`). The built `dist/about/index.html`, `dist/es/about/index.html` and `dist/projects/index.html` each contain the skip link and `<main id="main-content" tabindex="-1">`; `tests/layout.test.ts:109` asserts the skip link is present.
 
 `src/components/BaseLayout.astro:70`
 
