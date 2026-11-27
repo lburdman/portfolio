@@ -161,6 +161,8 @@ Related, LOW: the Projects index skips `<h1>` → `<h3>` (`projects/index.astro:
 
 ### 2.3 The Hero's `<h1>` is `opacity: 0` unless an animation runs
 
+**Status (checked 2026-11-27): Resolved** — `.animate-in` in `src/styles/global.css:629-631` is now just `animation: var(--animate-fade-up)` with no resting `opacity: 0`; the only `opacity: 0` in the file are inside the `fade-up` and `fade-in` keyframes (`global.css:737-745`, `748-750`), and `--animate-fade-up` (`src/styles/tokens.css:370`) uses `both` fill. The comment at `global.css:617-628` records the contract. The Hero moved to `src/components/home/Hero.astro`, where the `<h1 class="hero__name">` (line 78) has no resting `opacity: 0` (note at line 7); `src/components/home/LayersSequence.astro:31` documents the same fix. No test asserts this for `.animate-in` itself (`tests/completion.test.ts:678-686` covers only the `.tw-pg-` rules).
+
 `src/styles/global.css:301-304`, applied at `Hero.astro:32-33,39,44,49`
 
 ```css
@@ -175,6 +177,8 @@ Related, LOW: the Projects index skips `<h1>` → `<h3>` (`projects/index.astro:
 **Fix:** move the hidden state into the keyframe (`@keyframes fadeUp { from { opacity: 0 } }`) and delete the standalone declaration, so absent animation degrades to _visible_.
 
 ### 2.4 No `prefers-reduced-motion` handling anywhere
+
+**Status (checked 2026-11-27): Resolved** — `src/styles/global.css:780-794` is a global `@media (prefers-reduced-motion: reduce)` block that sets `html { scroll-behavior: auto }` (the smooth-scroll declaration is at `global.css:73`) and collapses `animation-*`/`transition-*` durations and delays on `*, *::before, *::after` to 1ms/0ms, with `scroll-behavior: auto !important`. It needs no `.animate-in { opacity: 1 !important }` patch because the hidden state lives only in the keyframe (see 2.3), so the 1ms `both`-fill animation lands on the visible state. Component-level handling also exists: `src/components/projects/ProjectCard.astro:997`, `src/components/visuals/spine/LayerSpine.astro:526`, `src/components/writing/WritingTimeline.astro:508`, `src/components/home/TechnicalWorlds.astro:1930`, `src/pages/[...locale]/projects/[slug].astro:728`, `src/pages/[...locale]/writing/[slug].astro:637`, and JS gating via `REDUCED_MOTION_QUERY` in `src/lib/motion/media.ts:29`. `tailwind.config.ts` no longer exists. Covered in part by `tests/card-light.test.ts:136-139,211-218`; no test asserts the global block in `global.css`.
 
 `src/styles/global.css:31,92,210,232,254,301-322` · `tailwind.config.ts:41-53`
 
@@ -207,6 +211,8 @@ Separately, `--color-border: #1e1e2e` measures **1.14:1** against surface. It is
 `<main id="main-content" tabindex="-1">` was written as a skip destination, but no `<a href="#main-content">` exists anywhere. Keyboard users tab through the logo, 4 nav links, the switcher, and the menu button on every page before reaching content (WCAG 2.4.1).
 
 ### 2.7 Mobile menu: no Escape, no focus management, static icon
+
+**Status (checked 2026-11-27): Resolved** — all four complaints are fixed in `src/components/navigation/MobileMenu.astro` (the old `Navbar.astro` location is gone). Escape: a document `keydown` handler closes the open menu and restores focus to the toggle (lines 257-262). Focus: `open()` focuses the first item inside the panel (lines 235-242) and a Tab focus trap cycles toggle → panel items (lines 264-287). Outside click and navigation: a `pointerdown` handler closes on clicks outside the panel/toggle (lines 289-297), a panel `click` handler closes on link activation, covering same-document hash links (lines 299-307), and growing past the desktop breakpoint closes it (lines 311-313). Icon: the bars rotate into an X via `.menu-toggle[aria-expanded='true'] .menu-toggle__bar` (lines 135-141), and `aria-label` switches between open/close labels. No test exercises this behaviour (`tests/` has no MobileMenu assertions).
 
 `src/components/Navbar.astro:68-96,126-133`
 
