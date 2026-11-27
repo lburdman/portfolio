@@ -5,6 +5,8 @@
 **Scope:** full repository (60 files, Astro 4.16 static site, bilingual EN/ES, deployed to GitHub Pages)
 **Method:** five parallel specialized audits — security & supply chain, architecture & i18n, testing & CI, accessibility/SEO/performance, code quality & tooling. Every finding below was verified by reading source, running the real command, or inspecting a real `npm run build` output. Nothing here is inferred.
 
+> **Note (2026-11-26):** this audit is a historical snapshot of commit `7db8f3e` on Astro 4.16. The current stack is Astro 7 (see `package.json`), and files cited below may have moved or been rewritten. Priority 1 statuses were refreshed on 2026-11-26 (7 of 7 resolved; the résumé PDF itself is still not shipped, see 1.5). Priority 2 and later sections have not yet been re-checked.
+
 ---
 
 ## Executive summary
@@ -27,6 +29,8 @@ Underneath all three is one pattern worth naming: the last few commits made erro
 
 ### 1.1 `npm run lint` fails with 26 errors and is not wired into CI
 
+**Status (checked 2026-11-26): Resolved** — `npm run lint` exits 0 with `--max-warnings 0`; `eslint.config.mjs` splits `.ts`/`.tsx` (`projectService`) from `.astro` (`project`), `--ext` is gone from `package.json`, and `.github/workflows/deploy.yml:55-56` runs a `Lint` step.
+
 `package.json:15` · `.github/workflows/deploy.yml:37-46`
 
 CI runs `format:check`, `type-check`, `test`, `build`. It has **never** run `lint` — confirmed in the workflow's introducing commit. Meanwhile `README.md:293-296` advertises "ESLint (strict, zero warnings)" as an active gate.
@@ -41,6 +45,8 @@ Two config defects cause most of them:
 **Fix, in order:** split the ESLint config so `**/*.ts` keeps `projectService: true` and `**/*.astro` gets `parserOptions: { project: './tsconfig.json' }` → drop `--ext` and add `coverage/`, `.atl/` to `ignores` → add `astro.config.mjs`/`vitest.config.ts` to `tsconfig.json` `include` → add a `Lint` step to the `ci` job. Fixing the parser first makes most of the 26 evaporate.
 
 ### 1.2 `hreflang` alternates are relative — the EN↔ES pairing does not exist
+
+**Status (checked 2026-11-26): Resolved** — `dist/es/about/index.html` emits absolute `hreflang` `en`/`es`/`x-default` URLs with trailing slashes matching the canonical, built by `getAlternates()` in `src/i18n/routing.ts` and used in `src/layouts/BaseLayout.astro` (the layout moved from `src/components/`).
 
 `src/components/BaseLayout.astro:38,40` ← `src/i18n/index.ts:26-42`
 
@@ -62,6 +68,8 @@ There is a second defect layered on top — the alternates emit `/portfolio/es/a
 
 ### 1.3 Spanish homepage CTAs send users to English pages
 
+**Status (checked 2026-11-26): Resolved** — `src/components/home/Hero.astro` (moved from `src/components/Hero.astro`) now takes a required `locale` prop and uses `localizePath`; `dist/es/index.html` links to `/portfolio/es/projects/` and `/portfolio/es/writing/`.
+
 `src/components/Hero.astro:50,67`
 
 ```astro
@@ -78,6 +86,8 @@ There is a second defect layered on top — the alternates emit `/portfolio/es/a
 
 ### 1.4 No `og:image` on any page
 
+**Status (checked 2026-11-26): Resolved** — `dist/index.html` has an absolute `og:image` (`https://lburdman.github.io/portfolio/og-default.png`) plus width, height and alt; `public/og-default.png` exists (added in `9e13776`) and `src/config/site.ts` sets the default.
+
 `src/components/BaseLayout.astro:13,16,48,54`
 
 `ogImage` is an optional prop passed by **zero** pages. `dist/index.html` contains 0 occurrences of `og:image`. Worse, `BaseLayout.astro:51` unconditionally declares `twitter:card = summary_large_image` — a card type that promises a large image that does not exist.
@@ -88,6 +98,8 @@ Every share of this portfolio on LinkedIn, Slack, or WhatsApp currently renders 
 
 ### 1.5 Résumé links 404 in production
 
+**Status (checked 2026-11-26): Resolved by gating, PDF still not shipped** — `public/assets/` is empty and `SITE.resumePath` in `src/config/site.ts` is `null`, so `Hero.astro`, `home/Contact.astro` and `Footer.astro` render no résumé link; built HTML contains no résumé `href`. Shipping a PDF remains open.
+
 `src/components/Hero.astro:74` · `src/components/ContactSection.astro:40`
 
 Both point at `${base}/assets/resume.pdf`. `public/assets/` contains only `.gitkeep`; `dist/assets/` after a full build contains only `.gitkeep`. Two prominent CTAs are dead links today.
@@ -95,6 +107,8 @@ Both point at `${base}/assets/resume.pdf`. `public/assets/` contains only `.gitk
 **Fix:** ship the PDF, or gate both links behind a config flag until it exists.
 
 ### 1.6 `vitest.config.ts` hardcodes an absolute machine path
+
+**Status (checked 2026-11-26): Resolved** — `vitest.config.ts` now uses `fileURLToPath(new URL('./src', import.meta.url))` for the `@` alias. The follow-up of migrating test imports to `@/` was not done: no file in `tests/` uses `@/`.
 
 `vitest.config.ts:14-16`
 
@@ -107,6 +121,8 @@ Resolves on exactly one machine. It is inert today only because all three test f
 **Fix:** `'@': fileURLToPath(new URL('./src', import.meta.url))`, then migrate test imports to `@/`.
 
 ### 1.7 `@astrojs/sitemap` is installed but never registered
+
+**Status (checked 2026-11-26): Resolved** — `astro.config.mjs` registers `sitemap({ i18n: … })` and `npm run build` creates `dist/sitemap-index.xml` and `dist/sitemap-0.xml`.
 
 `package.json:22` · `astro.config.mjs:8-14`
 
