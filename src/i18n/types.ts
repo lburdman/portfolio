@@ -253,7 +253,6 @@ export interface UIStrings {
     heading: string;
     bio: string;
     /** Meaningful `alt` for the portrait — never "Photo coming soon". */
-    portraitAlt: string;
     /**
      * The same three credentials the Hero carries. Not a second copy — both
      * dictionaries define the trio once and reference it from both places, so

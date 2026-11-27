@@ -199,7 +199,6 @@ export const en: UIStrings = {
   about: {
     heading: 'About',
     bio: "I'm an Electronic Engineer from UBA, working on AI systems in production. My background is signals, circuits and digital design; most of my time now goes to machine learning and LLM systems, and to the evaluation work that decides whether they are good enough to ship. I'm a teaching assistant in Digital Systems and in Quantum Computation and Communications at FIUBA.",
-    portraitAlt: 'Lucas Burdman, Electronic Engineer and AI Engineer.',
     facts: CREDENTIALS,
     currentlyHeading: 'Currently exploring',
     interests: [
