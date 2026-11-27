@@ -138,32 +138,32 @@ The dependency is declared, `site` is set (its one prerequisite), and `integrati
 
 **Status (checked 2026-11-27): Resolved** — one shared predicate, `isVisible()` (`status !== 'draft'`) in `src/lib/projects/visibility.ts:40`, is the only filter: `src/lib/projects/query.ts:92,113,152` (listing, lookup, static paths) call it, and `src/pages/[...locale]/projects/index.astro` and `[slug].astro` contain no `status` comparison of their own. Writing has the same predicate in `src/lib/writing/visibility.ts:42`. Covered by `tests/projects.test.ts:111-134` and `tests/writing.test.ts:121-142`. Route paths moved to `src/pages/[...locale]/`.
 
-`src/pages/projects/index.astro:12` vs `src/pages/projects/[slug].astro:8` (mirrored in both ES routes)
+_Historical citation (files no longer exist; see Status above for current locations):_ `src/pages/projects/index.astro:12` vs `src/pages/projects/[slug].astro:8` (mirrored in both ES routes)
 
 ```ts
 .filter((p) => p.data.status === 'published')  // listing
 getCollection('projects', (p) => p.data.status !== 'draft')  // detail
 ```
 
-The schema permits three states (`src/content/config.ts:16`: `published | draft | wip`). A `wip` project gets a fully built, publicly reachable, sitemap-eligible detail page that appears in no listing. Not triggered today — all 8 files are `published` — which is exactly why it will slip through when the first WIP project lands.
+The schema permits three states (historical citation, `src/content/config.ts:16` no longer exists: `published | draft | wip`). A `wip` project gets a fully built, publicly reachable, sitemap-eligible detail page that appears in no listing. Not triggered today — all 8 files are `published` — which is exactly why it will slip through when the first WIP project lands.
 
 **Fix:** export one `isVisible` predicate from `src/content/` and use it in all four routes. That also creates a testable seam where none exists.
 
 ### 2.2 `/about` and `/es/about` have no `<h1>`
 
-**Status (checked 2026-11-27): Resolved** — `src/pages/[...locale]/about.astro:65` renders `<h1 id={HEADING_ID}>{t.about.heading}</h1>` (the old `src/pages/about.astro` and `src/pages/es/about.astro` no longer exist). After `npm run build`, `dist/about/index.html` and `dist/es/about/index.html` each contain exactly one `<h1`, followed by `<h2>` sections. The related Projects index note is also resolved: `dist/projects/index.html` goes `<h1>` → `<h2>` (cards use `headingLevel={2}`, see `src/pages/[...locale]/projects/index.astro:12`), with no `<h3>`.
+**Status (checked 2026-11-27): Resolved** — `src/pages/[...locale]/about.astro:65` renders `<h1 id={HEADING_ID}>{t.about.heading}</h1>` (the old `src/pages/about.astro` and `src/pages/es/about.astro` no longer exist). After `npm run build`, `dist/about/index.html` and `dist/es/about/index.html` each contain exactly one `<h1`, followed by `<h2>` sections. The related Projects index note is also resolved: `dist/projects/index.html` goes `<h1>` → `<h2>` (cards use `headingLevel={2}`, see `src/pages/[...locale]/projects/index.astro:106`), with no `<h3>`.
 
-`src/pages/about.astro:17-21` · `src/pages/es/about.astro:17-21`
+_Historical citation (files no longer exist):_ `src/pages/about.astro:17-21` · `src/pages/es/about.astro:17-21`
 
 Both render `AboutSection` → `LeadershipSection` → `ContactSection`, all of which start at `<h2>`. Confirmed in `dist/about/index.html`: zero `<h1>`, first heading is `<h2 id="about-heading">`. WCAG 2.4.6 / 1.3.1 — the page's primary topic is missing from the accessibility tree and from search snippets.
 
-Related, LOW: the Projects index skips `<h1>` → `<h3>` (`projects/index.astro:28` → `ProjectCard.astro:20`), confirmed in the build output.
+Related, LOW: the Projects index skips `<h1>` → `<h3>` (historical citation: `projects/index.astro:28` → `ProjectCard.astro:20`; now `src/pages/[...locale]/projects/index.astro:106`), confirmed in the build output.
 
 ### 2.3 The Hero's `<h1>` is `opacity: 0` unless an animation runs
 
 **Status (checked 2026-11-27): Resolved** — `.animate-in` in `src/styles/global.css:629-631` is now just `animation: var(--animate-fade-up)` with no resting `opacity: 0`; the only `opacity: 0` in the file are inside the `fade-up` and `fade-in` keyframes (`global.css:737-745`, `748-750`), and `--animate-fade-up` (`src/styles/tokens.css:370`) uses `both` fill. The comment at `global.css:617-628` records the contract. The Hero moved to `src/components/home/Hero.astro`, where the `<h1 class="hero__name">` (line 78) has no resting `opacity: 0` (note at line 7); `src/components/home/LayersSequence.astro:31` documents the same fix. No test asserts this for `.animate-in` itself (`tests/completion.test.ts:678-686` covers only the `.tw-pg-` rules).
 
-`src/styles/global.css:301-304`, applied at `Hero.astro:32-33,39,44,49`
+_Historical citation (code replaced; current locations in Status above):_ `src/styles/global.css:301-304`, applied at `Hero.astro:32-33,39,44,49`
 
 ```css
 .animate-in {
@@ -180,7 +180,7 @@ Related, LOW: the Projects index skips `<h1>` → `<h3>` (`projects/index.astro:
 
 **Status (checked 2026-11-27): Resolved** — `src/styles/global.css:780-794` is a global `@media (prefers-reduced-motion: reduce)` block that sets `html { scroll-behavior: auto }` (the smooth-scroll declaration is at `global.css:73`) and collapses `animation-*`/`transition-*` durations and delays on `*, *::before, *::after` to 1ms/0ms, with `scroll-behavior: auto !important`. It needs no `.animate-in { opacity: 1 !important }` patch because the hidden state lives only in the keyframe (see 2.3), so the 1ms `both`-fill animation lands on the visible state. Component-level handling also exists: `src/components/projects/ProjectCard.astro:997`, `src/components/visuals/spine/LayerSpine.astro:526`, `src/components/writing/WritingTimeline.astro:508`, `src/components/home/TechnicalWorlds.astro:1930`, `src/pages/[...locale]/projects/[slug].astro:728`, `src/pages/[...locale]/writing/[slug].astro:637`, and JS gating via `REDUCED_MOTION_QUERY` in `src/lib/motion/media.ts:29`. `tailwind.config.ts` no longer exists. Covered in part by `tests/card-light.test.ts:136-139,211-218`; no test asserts the global block in `global.css`.
 
-`src/styles/global.css:31,92,210,232,254,301-322` · `tailwind.config.ts:41-53`
+_Historical citation (line numbers predate the stylesheet rewrite; `tailwind.config.ts` no longer exists; current locations in Status above):_ `src/styles/global.css:31,92,210,232,254,301-322` · `tailwind.config.ts:41-53`
 
 Zero matches repo-wide. Users get unrequested `scroll-behavior: smooth` on every in-page anchor plus translate-based entrance animations. **Note the ordering dependency:** any reduced-motion block must include `.animate-in { opacity: 1 !important }` or it will trigger 2.3 for exactly the users it is meant to help.
 
